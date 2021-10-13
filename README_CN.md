@@ -139,9 +139,9 @@ FastKV默认采用mmap的方式写入，mmap默认情况下由系统定时刷入
     }
 ```
 
-### 2.4 Android下的用法
+### 2.4 用法 For Android
 相对于常规用法，Android平台主要是多了SharePreferences API, 以及支持Kotlin。<br/>
-具体参考：[Android下的用法](android_case_CN.md)
+具体参考：[用法 For Android](android_case_CN.md)
 
 ## 3. 性能测试
 - 测试数据：搜集APP中的SharePreferenses汇总的部份key-value数据（经过随机混淆）得到总共四百多个key-value。<br>
