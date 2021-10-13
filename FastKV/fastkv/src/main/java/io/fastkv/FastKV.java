@@ -691,7 +691,7 @@ public class FastKV {
     /**
      * @param key     The name of the data to modify
      * @param value   The new value
-     * @param encoder The encoder to encode value to byte[], encoder must register in {@link Builder#encoder(Encoder[])},
+     * @param encoder The encoder to encode value to byte[], encoder must register in  Builder.encoder(),
      *                for decoding byte[] to object in next loading.
      * @param <T>     Type of value
      */
@@ -828,21 +828,16 @@ public class FastKV {
         return result;
     }
 
-    /**
-     * Batch put objects.
-     * Only support type in [boolean, int, long, float, double, String, byte[], Set<String>]
-     */
     public void putAll(Map<String, Object> values) {
         putAll(values, null);
     }
 
     /**
      * Batch put objects.
-     * Only support type in [boolean, int, long, float, double, String, byte[], Set<String>] and object with encoder.
+     * Only support type in [boolean, int, long, float, double, String, byte[], Set of String] and object with encoder.
      *
      * @param values   map of key to value
-     * @param encoders map of value Class to Encoder,
-     *                 please mind the Generic erasure, which means Classes like  ArrayList<Integer> is same as ArrayList<Float>.
+     * @param encoders map of value Class to Encoder
      */
     public synchronized void putAll(Map<String, Object> values, Map<Class, Encoder> encoders) {
         for (Map.Entry<String, Object> entry : values.entrySet()) {
@@ -1578,6 +1573,9 @@ public class FastKV {
 
         /**
          * Set obj Encoders
+         *
+         * @param encoders The encoder array to decode the bytes to obj.
+         * @return the builder
          */
         public Builder encoder(Encoder[] encoders) {
             this.encoders = encoders;
@@ -1598,6 +1596,7 @@ public class FastKV {
          * <p>
          * NOTE: DON'T CHANGE THE WRITING MODE ONCE THE FILE WAS CREATED, OTHERWISE MIGHT LOSS DATA.
          *
+         * @return the builder
          */
         public Builder blocking() {
             writingMode = SYNC_BLOCKING;
@@ -1606,6 +1605,8 @@ public class FastKV {
 
         /**
          * Similar to  {@link #blocking()}, but put writing task to async thread.
+         *
+         * @return the builder
          */
         public Builder asyncBlocking() {
             writingMode = ASYNC_BLOCKING;

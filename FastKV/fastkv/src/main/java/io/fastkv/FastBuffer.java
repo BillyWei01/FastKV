@@ -175,14 +175,17 @@ public class FastBuffer {
     }
 
     /**
-     * get string size in uft-8
+     * get string size in utf-8
+     *
+     * @param str The String
+     * @return The utf-8 size of the string
      */
-    public static int getStringSize(String s) {
+    public static int getStringSize(String str) {
         int j = 0;
         int i = 0;
-        int n = s.length();
+        int n = str.length();
         while (i < n) {
-            char c = s.charAt(i++);
+            char c = str.charAt(i++);
             if (c < 0x80) {
                 j += 1;
             } else if (c < 0x800) {

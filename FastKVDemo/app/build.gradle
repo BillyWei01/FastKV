@@ -46,6 +46,5 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.4.1"
     implementation 'com.tencent:mmkv-static:1.2.10'
     implementation 'io.github.billywei01:packable:1.0.2'
-
-    implementation project(":fastkv")
+    implementation 'io.github.billywei01:fastkv:1.0.2'
 }

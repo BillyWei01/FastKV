@@ -37,7 +37,15 @@ It can be used on  platforms with JVM environment, such as Android.
    
 ## 2. Getting Start
 
-### 2.1 Initialization
+### 2.1 Import
+FastKV had been publish to Maven Central:
+```gradle
+dependencies {
+    implementation 'io.github.billywei01:fastkv:1.0.2'
+}
+```
+
+### 2.2 Initialization
 ```kotlin
     FastKVConfig.setLogger(FastKVLogger)
     FastKVConfig.setExecutor(ChannelExecutorService(4))
@@ -59,8 +67,8 @@ The log interface provides three levels of callbacks.
 
 ```
 
-### 2.2 Read/Write
-#### 2.2.1 Basic case
+### 2.3 Read/Write
+- Basic case
 ```java
     FastKV kv = new FastKV.Builder(path, name).build();
     if(!kv.getBoolean("flag")){
@@ -68,8 +76,7 @@ The log interface provides three levels of callbacks.
     }
 ```
 
-#### 2.2.2 Advance case
-1. Sava custom object
+- Sava custom object
 ```java
     FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
     FastKV kv = new FastKV.Builder(path, name).encoder(encoders).build();
@@ -116,8 +123,7 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 Encoding objects needs serialization/deserialization. <br/>
 Here recommend my serialization project: https://github.com/BillyWei01/Packable
 
-
-2. Blocking mode
+- Blocking mode
 
 By default, FastKV uses mmap to save data. <br/>
 The way with mmap has very low probability to loss update (If system crash or power off before flush update to disk). <br/>
@@ -146,8 +152,8 @@ private void blockingIO() {
 ```
 
 
-### 2.3 Android Case
-Comparing with common usage,  Android platform has SharePreferences API and support Kotlin.<br/>
+### 2.4 For Android 
+Comparing with common usage, Android platform has SharePreferences API and support Kotlin.<br/>
 See: [Android Case](android_case.md)
 
 

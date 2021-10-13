@@ -2,8 +2,8 @@ plugins {
     id 'java'
 }
 
-group 'io.github'
-version '1.0.1'
+group 'io.github.billywei01'
+version '1.0.2'
 
 sourceCompatibility = 1.8
 

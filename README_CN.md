@@ -32,7 +32,15 @@ FastKV有以下特点：
    
 ## 2. 使用方法
 
-### 2.1 初始化
+### 2.1 导入
+FastKV 已发布到Maven中央仓库，路径如下:
+```gradle
+dependencies {
+    implementation 'io.github.billywei01:fastkv:1.0.2'
+}
+```
+
+### 2.2 初始化
 ```kotlin
     FastKVConfig.setLogger(FastKVLogger)
     FastKVConfig.setExecutor(ChannelExecutorService(4))
@@ -52,8 +60,8 @@ FastKV有以下特点：
 
 ```
 
-### 2.2 数据读写
-#### 2.2.1 基本用法
+### 2.3 数据读写
+- 基本用法
 ```java
     FastKV kv = new FastKV.Builder(path, name).build();
     if(!kv.getBoolean("flag")){
@@ -61,9 +69,8 @@ FastKV有以下特点：
     }
 ```
 
-#### 2.2.2 进阶用法：
 
-1. 存储自定义对象
+- 存储自定义对象
 
 ```java
     FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
@@ -110,7 +117,7 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 编码对象涉及序列化/反序列化。<br/>
 这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
 
-2. 阻塞模式
+- 阻塞模式
 
 默认情况下，FastKV采用mmap的方式保存数据。<br/>
 mmap的方式有一定概率（很低）会丢失更新（在数据刷盘前发生宕机或断电等）。<br/>
@@ -138,9 +145,9 @@ mmap的方式有一定概率（很低）会丢失更新（在数据刷盘前发�
     }
 ```
 
-### 2.3 Android下的用法
+### 2.4 Android下的用法
 相对于常规用法，Android平台主要是多了SharePreferences API, 以及支持Kotlin。<br/>
-具体参见：[Android下的用法](android_case_CN.md)
+具体参考：[Android下的用法](android_case_CN.md)
 
 ## 3. 性能测试
 - 测试数据：搜集APP中的SharePreferenses汇总的部份key-value数据（经过随机混淆）得到总共四百多个key-value。<br>
