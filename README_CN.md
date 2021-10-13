@@ -115,10 +115,10 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 编码对象涉及序列化/反序列化。<br/>
 这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
 
-- 阻塞模式 <br/>
+- blocking I/O <br/>
 
-要使用阻塞模式，在构造FastKV时调用blocking()函数即可。<br/>
-具体用法如下：
+要使用blocking I/O，在构造FastKV时调用blocking()或者asyncBlocking() 函数即可。<br/>
+用法如下：
 
 ```java
     FastKV kv = new FastKV.Builder(TestHelper.DIR, "test").blocking().build();
