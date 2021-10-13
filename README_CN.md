@@ -116,8 +116,9 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
 
 - blocking I/O <br/>
-
-要使用blocking I/O，在构造FastKV时调用blocking()或者asyncBlocking() 函数即可。<br/>
+FastKV默认采用mmap的方式写入，mmap默认情况下由系统定时刷入磁盘，若在刷盘前断电或系统崩溃，会丢失更新（原来的数据不会丢失）。
+对于非常重要的数据，需确保更新真正了写入磁盘，一种方式是调用force()强制刷盘，另一种方式是使用常规的blocking I/O写入。
+要使用blocking I/O，在构造FastKV时调用blocking()或者asyncBlocking()函数即可。<br/>
 用法如下：
 
 ```java
