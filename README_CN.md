@@ -10,7 +10,6 @@ FastKV有以下特点：
     - 增量编码：FastKV记录了各个key-value相对文件的偏移量（包括失效的key-value），
       从而在更新数据时可以直接在指定的位置写入数据。
     - 默认用mmap的方式记录数据，更新数据时直接写入到内存即可，没有IO阻塞。
-    - 对于长度大于一定阈值的value, 单独写到另外一个文件，并且只cache其文件名，从而不影响整个主文件的读写。
 2. 支持多种写入模式
    - 除了mmap这种非阻塞的写入方式，FastKV也支持常规的阻塞式写入方式，
      并且支持同步阻塞和异步阻塞（分别类似于SharePreferences的commit和apply)。
@@ -24,9 +23,8 @@ FastKV有以下特点：
    - 提供的接口其中包括getAll()和putAll()方法，
      所以很方便迁移SharePreferences等框架的数据到FastKV, 当然，迁移FastKV的数据到其他框架也很方便。
 5. 稳定可靠
-   - 当FastKV用非阻塞(mmap)的方式写入数据时，会分别依次写入两个文件，从而保证任何时刻至少有一份文件时完整的；
-   - 打开文件时，通过多种校验方式验证文件的完整性，如果某个文件不完整，则用另一个文件恢复之。
-   - FastKV实现了降级逻辑：当mmap失败时，降级到常规的I/O写入模式；再次打开时会尝试恢复到mmap的方式。
+   - 通过double-write等方法确保数据的完整性。
+   - 在API抛IO异常时提供降级处理。
 6. 代码精简
    - FastKV由纯Java实现，编译成jar包或体积仅30多K。
    
@@ -117,14 +115,9 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 编码对象涉及序列化/反序列化。<br/>
 这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
 
-- 阻塞模式
+- 阻塞模式 <br/>
 
-默认情况下，FastKV采用mmap的方式保存数据。<br/>
-mmap的方式有一定概率（很低）会丢失更新（在数据刷盘前发生宕机或断电等）。<br/>
-为防止丢失更新，可在put数据后调用force()函数强制刷盘。
-
-另一种方法就是用阻塞模式写入数据。
-要使用阻塞模式，在构造FastKV时调用blocking()函数即可。
+要使用阻塞模式，在构造FastKV时调用blocking()函数即可。<br/>
 具体用法如下：
 
 ```java
