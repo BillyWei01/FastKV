@@ -1,0 +1,3 @@
+rootProject.name = "FastKVDemo"
+include ':app'
+include ':fastkv'

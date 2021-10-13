@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">FastKVDemo</string>
+    <string name="main_tips">Launch %d times.</string>
+    <string name="logout">logout</string>
+    <string name="login">login</string>
+    <string name="test_performance">test_performance</string>
+    <string name="test_tips">Test finish, please check the logcat for result.</string>
+    <string name="running_tips">Test running</string>
+</resources>
