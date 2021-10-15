@@ -123,36 +123,7 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 Encoding objects needs serialization/deserialization. <br/>
 Here recommend my serialization project: https://github.com/BillyWei01/Packable
 
-- Blocking mode
-
-By default, FastKV uses mmap to save data. <br/>
-The way with mmap has very low probability to loss update (If system crash or power off before flush update to disk). <br/>
-In case of lossing udpate, you could call the method 'force()' to flush udpate to disk.
-
-An other way to ensure persistence is use blocking mode. 
-
-```java
-private void blockingIO() {
-    FastKV kv = new FastKV.Builder(TestHelper.DIR, "test").blocking().build();
-    // auto commit
-    kv.putLong("time", System.currentTimeMillis());
-
-    // custom commit
-    kv.disableAutoCommit();
-    kv.putLong("time", System.currentTimeMillis());
-    kv.putString("str", "hello");
-    kv.putInt("int", 100);
-    boolean success = kv.commit();
-    if (success) {
-        // handle success
-    } else {
-        // handle failed
-    }
-}
-```
-
-
-### 2.4 For Android 
+### 2.3 For Android 
 Comparing with common usage, Android platform has SharePreferences API and support Kotlin.<br/>
 See: [Android Case](android_case.md)
 
