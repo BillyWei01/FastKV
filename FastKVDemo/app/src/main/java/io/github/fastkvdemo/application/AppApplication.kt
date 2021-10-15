@@ -23,7 +23,8 @@ class AppApplication : Application() {
 
         // filter other processes,
         // in case files damaged in multiple processes mode
-        if(GlobalConfig.APPLICATION_ID == getProcessName(this)) {
+        val processName = ProcessUtil.getProcessName(this)
+        if(processName == null || processName == GlobalConfig.APPLICATION_ID) {
             init()
             initMMKV()
         }
@@ -52,20 +53,6 @@ class AppApplication : Application() {
             UserData.kv
             FastKV.Builder(fastKVDir, "fastkv").build()
         }
-    }
-
-    private fun getProcessName(context: Context): String? {
-        val am = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager?
-        am?.runningAppProcesses?.let {
-            val curPid = Process.myPid()
-            for (runningApp in it) {
-                if (runningApp.pid == curPid) {
-                    return runningApp.processName
-                }
-            }
-        }
-        Log.e("AppApplication", "Get ActivityManager service failed.")
-        return GlobalConfig.APPLICATION_ID
     }
 }
 

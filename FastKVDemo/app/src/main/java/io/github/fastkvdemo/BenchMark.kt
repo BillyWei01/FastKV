@@ -91,6 +91,7 @@ object BenchMark {
             val t1 = System.nanoTime()
             applyToSp(inputList)
             val t2 = System.nanoTime()
+            // TODO DataStore writes too slow, you could exclude this to speed up other test.
             applyToDataStore(inputList)
             val t3 = System.nanoTime()
             putToMMKV(inputList)
@@ -114,6 +115,7 @@ object BenchMark {
             TAG, "Update total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
+
         Arrays.fill(time, 0L)
         for (i in 0 until round) {
             val t1 = System.nanoTime()
@@ -145,7 +147,7 @@ object BenchMark {
                 putToMMKV(srcList)
                 putToFastKV(srcList)
             }
-            for (i in 0..9) {
+            for (i in 0..5) {
                 val inputList = getDistributedList(srcList, r)
                 applyToSp(inputList)
                 applyToDataStore(inputList)
