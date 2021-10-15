@@ -166,7 +166,7 @@ I make a normally distributed sequence to test the accessing.
 
 - Device: Huawei Horor 20s
 
-Read and write 10 times respectively, and the time consumption is as follows:
+Result:
 
 | | Write(ms) | Read(ms) 
 ---|---|---
