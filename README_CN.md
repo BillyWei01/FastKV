@@ -149,7 +149,7 @@ FastKV默认采用mmap的方式写入，mmap默认情况下由系统定时刷入
 - 比较对象： SharePreferences/DataStore/MMKV
 - 测试机型：荣耀20S
 
-分别读写10次，耗时如下：
+测试结果：
 
 | | 写入(ms) |读取(ms) 
 ---|---|---
