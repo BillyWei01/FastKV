@@ -123,7 +123,7 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 Encoding objects needs serialization/deserialization. <br/>
 Here recommend my serialization project: https://github.com/BillyWei01/Packable
 
-### 2.3 For Android 
+### 2.4 For Android 
 Comparing with common usage, Android platform has SharePreferences API and support Kotlin.<br/>
 See: [Android Case](android_case.md)
 
