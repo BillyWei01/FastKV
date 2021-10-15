@@ -146,19 +146,20 @@ FastKV默认采用mmap的方式写入，mmap默认情况下由系统定时刷入
 ## 3. 性能测试
 - 测试数据：搜集APP中的SharePreferenses汇总的部份key-value数据（经过随机混淆）得到总共四百多个key-value。<br>
           由于日常使用过程中部分key-value访问多，部分访问少，所以构造了一个正态分布的访问序列。
-- 比较对象： SharePreferences/DataStore/MMKV
-- 测试机型：荣耀20S
+- 比较对象： SharePreferences/DataStore/MMKV。
+- 测试机型：荣耀20S。
 
 测试结果：
 
 | | 写入(ms) |读取(ms) 
 ---|---|---
 SharePreferences | 1258 | 3
-DataStore | 118 | 3
+DataStore | 16650 | 3
 MMKV | 25 | 9
 FastKV  | 16 | 1 
 
 - SharePreferences提交用的是apply, 耗时依然不少。
+- DataStore写入很慢。
 - MMKV的读取比SharePreferences/DataStore要慢一些，写入则比之快许多。
 - FastKV无论读取还是写入都比其他方式要快。
 

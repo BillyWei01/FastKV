@@ -171,13 +171,14 @@ Result:
 | | Write(ms) | Read(ms) 
 ---|---|---
 SharePreferences | 1258 | 3
-DataStore | 118 | 3
+DataStore | 16650 | 3
 MMKV | 25 | 9
 FastKV  | 16 | 1 
 
 - SharePreferences use the apply mode. When use commit mode, used more than 5s, much slower.
+- DataStore writes data very slow.
 - MMKV read slower then SharePreferences/DataStore，but much faster in writing.
-- FastKV is fastest both in writing or reading
+- FastKV is fastest both in writing or reading.
 
 
 ## License

@@ -29,14 +29,19 @@ object BenchMark {
     private const val TAG = "Benchmark"
     private val sp = GlobalConfig.appContext.getSharedPreferences("sp", Context.MODE_PRIVATE)
     private val dataStore =
-        PreferenceDataStoreFactory.create { File(PathManager.filesDir, "data_store.preferences_pb") }
+        PreferenceDataStoreFactory.create {
+            File(
+                PathManager.filesDir,
+                "data_store.preferences_pb"
+            )
+        }
     private val mmkv = MMKV.defaultMMKV()
     private val fastkv = FastKV.Builder(fastKVDir, "fastkv").build()
 
 
     private const val MILLION = 1000000
     private var hadWarmingUp = false
-    suspend fun  start() {
+    suspend fun start() {
         try {
             runTest(GlobalConfig.appContext)
         } catch (e: Throwable) {
@@ -76,7 +81,7 @@ object BenchMark {
         }
         Log.i(
             TAG,
-            "Fill, sp: " + time[0] / MILLION  + ", dataStore: " + time[1] / MILLION
+            "Fill, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
         Arrays.fill(time, 0L)
@@ -100,11 +105,15 @@ object BenchMark {
             time[1] += b
             time[2] += c
             time[3] += d
-            Log.d(TAG, "Update, sp: " + a / MILLION + ", dataStore: " + b / MILLION
-                    + ", mmkv: " + c / MILLION + ", fastkv:" + d / MILLION)
+            Log.d(
+                TAG, "Update, sp: " + a / MILLION + ", dataStore: " + b / MILLION
+                        + ", mmkv: " + c / MILLION + ", fastkv:" + d / MILLION
+            )
         }
-        Log.i(TAG, "Update total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
-                    + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION)
+        Log.i(
+            TAG, "Update total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
+                    + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
+        )
         Arrays.fill(time, 0L)
         for (i in 0 until round) {
             val t1 = System.nanoTime()
@@ -121,8 +130,10 @@ object BenchMark {
             time[2] += t4 - t3
             time[3] += t5 - t4
         }
-        Log.i(TAG, "Read total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
-                + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION)
+        Log.i(
+            TAG, "Read total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
+                    + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
+        )
     }
 
     @Throws(InterruptedException::class)
@@ -268,23 +279,21 @@ object BenchMark {
     }
 
     private suspend fun applyToDataStore(list: List<Pair<String, Any>>) {
-        dataStore.edit { setting ->
-            for (pair in list) {
-                val key = pair.first
-                val value = pair.second
-                if (value is String) {
-                    setting[stringPreferencesKey(key)] = value
-                } else if (value is Boolean) {
-                    setting[booleanPreferencesKey(key)] = value
-                } else if (value is Int) {
-                    setting[intPreferencesKey(key)] = value
-                } else if (value is Long) {
-                    setting[longPreferencesKey(key)] = value
-                } else if (value is Float) {
-                    setting[floatPreferencesKey(key)] = value
-                } else if (value is Set<*>) {
-                    setting[stringSetPreferencesKey(key)] = value as Set<String>
-                }
+        for (pair in list) {
+            val key = pair.first
+            val value = pair.second
+            if (value is String) {
+                dataStore.edit { it[stringPreferencesKey(key)] = value }
+            } else if (value is Boolean) {
+                dataStore.edit { it[booleanPreferencesKey(key)] = value }
+            } else if (value is Int) {
+                dataStore.edit { it[intPreferencesKey(key)] = value }
+            } else if (value is Long) {
+                dataStore.edit { it[longPreferencesKey(key)] = value }
+            } else if (value is Float) {
+                dataStore.edit { it[floatPreferencesKey(key)] = value }
+            } else if (value is Set<*>) {
+                dataStore.edit { it[stringSetPreferencesKey(key)] = value as Set<String> }
             }
         }
     }
@@ -309,7 +318,7 @@ object BenchMark {
                 }
             }
         }
-       val v =  value.first()
+        val v = value.first()
     }
 
     private fun putToMMKV(list: List<Pair<String, Any>>) {
