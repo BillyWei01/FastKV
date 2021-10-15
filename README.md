@@ -162,7 +162,7 @@ See: [Android Case](android_case.md)
 Because some key values are accessed more and others accessed less in normally, 
 I make a normally distributed sequence to test the accessing.
 
-- Comparison component: Sharepreferences and MMKV
+- Comparison component: Sharepreferences/DataStore/MMKV
 
 - Device: Huawei Horor 20s
 
@@ -170,13 +170,14 @@ Read and write 10 times respectively, and the time consumption is as follows:
 
 | | Write(ms) | Read(ms) 
 ---|---|---
-SharePreferences | 1490 | 6 
-MMKV | 34 | 9 
-FastKV  | 14 | 1 
+SharePreferences | 1258 | 3
+DataStore | 118 | 3
+MMKV | 25 | 9
+FastKV  | 16 | 1 
 
 - SharePreferences use the apply mode. When use commit mode, used more than 5s, much slower.
-- MMKV read slower then SharePreferences，but much faster in writing.
-- FastKV is faster both in writing or reading
+- MMKV read slower then SharePreferences/DataStore，but much faster in writing.
+- FastKV is fastest both in writing or reading
 
 
 ## License
