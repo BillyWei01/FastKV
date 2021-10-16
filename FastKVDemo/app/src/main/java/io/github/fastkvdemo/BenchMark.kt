@@ -38,7 +38,6 @@ object BenchMark {
     private val mmkv = MMKV.defaultMMKV()
     private val fastkv = FastKV.Builder(fastKVDir, "fastkv").build()
 
-
     private const val MILLION = 1000000
     private var hadWarmingUp = false
     suspend fun start() {
@@ -147,10 +146,11 @@ object BenchMark {
                 putToMMKV(srcList)
                 putToFastKV(srcList)
             }
-            for (i in 0..5) {
+            for (i in 0..10) {
                 val inputList = getDistributedList(srcList, r)
                 applyToSp(inputList)
-                applyToDataStore(inputList)
+                // applyToDataStore take too much time
+                // applyToDataStore(inputList)
                 putToMMKV(inputList)
                 putToFastKV(inputList)
             }
