@@ -885,9 +885,6 @@ public class FastKV {
      * Forces any changes to be written to the storage device containing the mapped file.
      * No need to call this unless what's had written is very import
      * and you worry about system crash or power off would happen before data sync to disk.
-     * <p>
-     * In the case, it's suggested to use an instance of blocking mode to write these data.
-     * Use {@link Builder#blocking()} could open the blocking mode.
      */
     public synchronized void force() {
         if (writingMode == NON_BLOCKING) {
@@ -1022,9 +1019,9 @@ public class FastKV {
     private void updateChange() {
         checksum ^= fastBuffer.getChecksum(updateStart, updateSize);
         if (writingMode == NON_BLOCKING) {
-            // When changed data len more than 8 bytes,
+            // When changed data's length is more than 8 bytes,
             // checksum has small probability can't check data's integrity.
-            // So we make dataLen's part to be negative,
+            // So we make the dataLen to be negative,
             // if crash happen when writing data to mmap memory,
             // we can know that the writing was not completely.
             aBuffer.putInt(0, -1);
@@ -1586,9 +1583,7 @@ public class FastKV {
          * Assigned writing mode to SYNC_BLOCKING or ASYNC_BLOCKING.
          * <p>
          * In non-blocking mode (write data with mmap),
-         * it might loss update if the system crash or power off before flush data to disk,
-         * and has very low probability both files just write part of data to disk (FastLV use two files to record data).
-         * In that case, both files could be not integrity (Loss data).
+         * it might loss update if the system crash or power off before flush data to disk.
          * <p>
          * In blocking mode, every update will write all data to the file, which is expensive cost.
          * <p>
