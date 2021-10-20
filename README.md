@@ -41,7 +41,7 @@ It can be used on  platforms with JVM environment, such as Android.
 FastKV had been publish to Maven Central:
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.0.2'
+    implementation 'io.github.billywei01:fastkv:1.0.3'
 }
 ```
 
@@ -141,10 +141,10 @@ Result:
 
 | | Write(ms) | Read(ms) 
 ---|---|---
-SharePreferences | 1258 | 3
-DataStore | 16650 | 3
-MMKV | 25 | 9
-FastKV  | 16 | 1 
+SharePreferences | 1182 | 2
+DataStore | 33277 | 2
+MMKV | 29 | 10
+FastKV  | 19 | 1 
 
 - SharePreferences use the apply mode. When use commit mode, used more than 5s, much slower.
 - DataStore writes data very slow.

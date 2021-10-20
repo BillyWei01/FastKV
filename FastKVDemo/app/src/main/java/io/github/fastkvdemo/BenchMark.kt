@@ -146,7 +146,7 @@ object BenchMark {
             putToMMKV(srcList)
             putToFastKV(srcList)
 
-            for (i in 0 until 2) {
+            for (i in 0 until 5) {
                 val inputList = getDistributedList(srcList, r)
                 applyToSp(inputList)
                 // applyToDataStore take too much time

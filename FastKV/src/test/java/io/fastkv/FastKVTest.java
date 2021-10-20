@@ -683,6 +683,7 @@ public class FastKVTest {
         Assert.assertEquals(newTime, kv2.getLong("time"));
 
         kv1.putLong("time", 100L);
+        Thread.sleep(50L);
         FastKV kv3 = new FastKV(TestHelper.DIR, name,null, 1);
         Assert.assertEquals(100L, kv3.getLong("time"));
     }

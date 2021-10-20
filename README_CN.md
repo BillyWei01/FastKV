@@ -34,7 +34,7 @@ FastKV有以下特点：
 FastKV 已发布到Maven中央仓库，路径如下:
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.0.2'
+    implementation 'io.github.billywei01:fastkv:1.0.3'
 }
 ```
 
@@ -129,10 +129,10 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 
 | | 写入(ms) |读取(ms) 
 ---|---|---
-SharePreferences | 1258 | 3
-DataStore | 16650 | 3
-MMKV | 25 | 9
-FastKV  | 16 | 1 
+SharePreferences | 1182 | 2
+DataStore | 33277 | 2
+MMKV | 29 | 10
+FastKV  | 19 | 1 
 
 - SharePreferences提交用的是apply, 耗时依然不少。
 - DataStore写入很慢。
