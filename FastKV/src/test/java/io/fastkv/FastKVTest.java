@@ -156,10 +156,10 @@ public class FastKVTest {
         }
         int gc2 = TestHelper.gcCount.get();
         Assert.assertEquals(1, gc2 - gc1);
-        for (int i = 0; i < 160; i++) {
+        for (int i = 0; i < 80; i++) {
             kv1.putString("string_" + i, "hello");
         }
-        for (int i = 0; i < 160; i++) {
+        for (int i = 0; i < 80; i++) {
             kv1.remove("string_" + i);
         }
         int gc3 = TestHelper.gcCount.get();

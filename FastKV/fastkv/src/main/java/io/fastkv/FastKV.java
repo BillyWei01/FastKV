@@ -32,7 +32,7 @@ public class FastKV {
     private static final int[] TYPE_SIZE = {0, 1, 4, 4, 8, 8};
     private static final byte[] EMPTY_ARRAY = new byte[0];
     private static final int DATA_START = 12;
-    private static final int GC_KEYS_THRESHOLD = 160;
+    private static final int BASE_GC_KEYS_THRESHOLD = 80;
     private static final int BASE_GC_BYTES_THRESHOLD = 4096;
     private static final int INTERNAL_LIMIT = 2048;
 
@@ -1019,8 +1019,8 @@ public class FastKV {
     private void updateChange() {
         checksum ^= fastBuffer.getChecksum(updateStart, updateSize);
         if (writingMode == NON_BLOCKING) {
-            // When changed data's length is more than 8 bytes,
-            // checksum has small probability can't check data's integrity.
+            // When size of changed data is more than 8 bytes,
+            // checksum might fail to check the integrity in small probability.
             // So we make the dataLen to be negative,
             // if crash happen when writing data to mmap memory,
             // we can know that the writing was not completely.
@@ -1030,7 +1030,7 @@ public class FastKV {
 
             // bBuffer doesn't need to mark dataLen's part before writing bytes,
             // cause aBuffer has already written completely.
-            // We just need to have one file at less at completely state at any time.
+            // We just need to have one file to be completely at least at any time.
             syncABBuffer(bBuffer);
         } else {
             if (sizeChanged) {
@@ -1344,7 +1344,8 @@ public class FastKV {
     }
 
     private void checkGC() {
-        if (invalidBytes >= (bytesThreshold() << 1) || invalids.size() >= GC_KEYS_THRESHOLD) {
+        if (invalidBytes >= (bytesThreshold() << 1)
+                || invalids.size() >= (dataEnd < (1 << 14) ? BASE_GC_KEYS_THRESHOLD : BASE_GC_KEYS_THRESHOLD << 1)) {
             gc(0);
         }
     }
@@ -1580,14 +1581,15 @@ public class FastKV {
         }
 
         /**
-         * Assigned writing mode to SYNC_BLOCKING or ASYNC_BLOCKING.
+         * Assigned writing mode to SYNC_BLOCKING.
          * <p>
          * In non-blocking mode (write data with mmap),
          * it might loss update if the system crash or power off before flush data to disk.
+         * You could use {@link #force()} to avoid loss update, or use SYNC_BLOCKING mode.
          * <p>
          * In blocking mode, every update will write all data to the file, which is expensive cost.
          * <p>
-         * So it's recommended to using blocking mode only if the data is every important.
+         * So it's recommended to use blocking mode only if the data is every important.
          * <p>
          * NOTE: DON'T CHANGE THE WRITING MODE ONCE THE FILE WAS CREATED, OTHERWISE MIGHT LOSS DATA.
          *
@@ -1599,7 +1601,7 @@ public class FastKV {
         }
 
         /**
-         * Similar to  {@link #blocking()}, but put writing task to async thread.
+         * Similar to {@link #blocking()}, but put writing task to async thread.
          *
          * @return the builder
          */
