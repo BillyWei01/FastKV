@@ -759,10 +759,14 @@ public class FastKV {
                 oldFileName = c.external ? (String) c.value : null;
             }
             byte newByte = (byte) (type | DataType.DELETE_MASK);
-            aBuffer.putLong(4, checksum);
-            aBuffer.put(removeStart, newByte);
-            bBuffer.putLong(4, checksum);
-            bBuffer.put(removeStart, newByte);
+            if (writingMode == NON_BLOCKING) {
+                aBuffer.putLong(4, checksum);
+                aBuffer.put(removeStart, newByte);
+                bBuffer.putLong(4, checksum);
+                bBuffer.put(removeStart, newByte);
+            } else {
+                fastBuffer.putLong(4, checksum);
+            }
             removeStart = 0;
             if (oldFileName != null) {
                 Util.deleteFile(new File(path + name, oldFileName));
@@ -1098,35 +1102,41 @@ public class FastKV {
 
     private void updateBoolean(byte value, int offset) {
         checksum ^= shiftCheckSum(1L, offset);
-        fastBuffer.hb[offset] = value;
         if (writingMode == NON_BLOCKING) {
             aBuffer.putLong(4, checksum);
             aBuffer.put(offset, value);
             bBuffer.putLong(4, checksum);
             bBuffer.put(offset, value);
+        } else {
+            fastBuffer.putLong(4, checksum);
         }
+        fastBuffer.hb[offset] = value;
     }
 
     private void updateInt32(int value, long sum, int offset) {
         checksum ^= shiftCheckSum(sum, offset);
-        fastBuffer.putInt(offset, value);
         if (writingMode == NON_BLOCKING) {
             aBuffer.putLong(4, checksum);
             aBuffer.putInt(offset, value);
             bBuffer.putLong(4, checksum);
             bBuffer.putInt(offset, value);
+        } else {
+            fastBuffer.putLong(4, checksum);
         }
+        fastBuffer.putInt(offset, value);
     }
 
     private void updateInt64(long value, long sum, int offset) {
         checksum ^= shiftCheckSum(sum, offset);
-        fastBuffer.putLong(offset, value);
         if (writingMode == NON_BLOCKING) {
             aBuffer.putLong(4, checksum);
             aBuffer.putLong(offset, value);
             bBuffer.putLong(4, checksum);
             bBuffer.putLong(offset, value);
+        } else {
+            fastBuffer.putLong(4, checksum);
         }
+        fastBuffer.putLong(offset, value);
     }
 
     private void updateBytes(int offset, byte[] bytes) {
@@ -1144,6 +1154,8 @@ public class FastKV {
             bBuffer.putLong(4, checksum);
             bBuffer.position(offset);
             bBuffer.put(bytes);
+        } else {
+            fastBuffer.putLong(4, checksum);
         }
     }
 
@@ -1408,15 +1420,17 @@ public class FastKV {
             checksum ^= fastBuffer.getChecksum(gcStart, newDataEnd - gcStart);
         }
 
-        aBuffer.putInt(0, -1);
-        aBuffer.putLong(4, checksum);
-        aBuffer.position(gcStart);
-        aBuffer.put(fastBuffer.hb, gcStart, updateSize);
-        aBuffer.putInt(0, newDataSize);
-        bBuffer.putInt(0, newDataSize);
-        bBuffer.putLong(4, checksum);
-        bBuffer.position(gcStart);
-        bBuffer.put(fastBuffer.hb, gcStart, updateSize);
+        if (writingMode == NON_BLOCKING) {
+            aBuffer.putInt(0, -1);
+            aBuffer.putLong(4, checksum);
+            aBuffer.position(gcStart);
+            aBuffer.put(fastBuffer.hb, gcStart, updateSize);
+            aBuffer.putInt(0, newDataSize);
+            bBuffer.putInt(0, newDataSize);
+            bBuffer.putLong(4, checksum);
+            bBuffer.position(gcStart);
+            bBuffer.put(fastBuffer.hb, gcStart, updateSize);
+        }
 
         dataEnd = newDataEnd;
         updateOffset(gcStart, srcToShift);

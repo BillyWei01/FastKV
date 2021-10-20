@@ -69,7 +69,6 @@ public class Utils {
      * Get array with normal distribution.
      */
     public static int[] getDistributedArray(int n, int times, Random r) {
-        int[] a = new int[n];
         int avg = n / 2;
         int v;
         if (n <= 50) {
@@ -81,13 +80,12 @@ public class Utils {
         } else {
             v = n * 3;
         }
-        Arrays.fill(a, 0);
         int count = n * times;
+        int[] a = new int[count];
         for (int i = 0; i < count; ) {
             int x = (int) (Math.sqrt(v) * r.nextGaussian() + avg);
             if (x >= 0 && x < n) {
-                i++;
-                a[x]++;
+                a[i++] = x;
             }
         }
         return a;

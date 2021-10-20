@@ -84,7 +84,7 @@ object BenchMark {
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
         Arrays.fill(time, 0L)
-        val round = 10
+        var round = 10
         for (i in 0 until round) {
             inputList = getDistributedList(srcList, r)
             val t1 = System.nanoTime()
@@ -115,6 +115,7 @@ object BenchMark {
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
 
+        round = 10
         Arrays.fill(time, 0L)
         for (i in 0 until round) {
             val t1 = System.nanoTime()
@@ -140,13 +141,12 @@ object BenchMark {
     @Throws(InterruptedException::class)
     private suspend fun warmingUp(srcList: ArrayList<Pair<String, Any>>, r: Random) {
         if (!hadWarmingUp) {
-            for (i in 0..0) {
-                applyToSp(srcList)
-                applyToDataStore(srcList)
-                putToMMKV(srcList)
-                putToFastKV(srcList)
-            }
-            for (i in 0..10) {
+            applyToSp(srcList)
+            applyToDataStore(srcList)
+            putToMMKV(srcList)
+            putToFastKV(srcList)
+
+            for (i in 0 until 2) {
                 val inputList = getDistributedList(srcList, r)
                 applyToSp(inputList)
                 // applyToDataStore take too much time
@@ -176,8 +176,8 @@ object BenchMark {
         srcList: List<Pair<String, Any>>,
         r: Random
     ): List<Pair<String, Any>> {
-        val inputList: MutableList<Pair<String, Any>> = ArrayList(srcList)
-        val a = Utils.getDistributedArray(srcList.size, 10, r)
+        val inputList: MutableList<Pair<String, Any>> = ArrayList(srcList.size)
+        val a = Utils.getDistributedArray(srcList.size, 2, r)
         for (index in a) {
             val pair = srcList[index]
             inputList.add(Pair(pair.first, tuningObject(pair.second, r)))

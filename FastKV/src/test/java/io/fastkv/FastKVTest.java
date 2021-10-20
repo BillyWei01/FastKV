@@ -377,10 +377,10 @@ public class FastKVTest {
 
         kv1.putString("flag", "hello");
 
-        int round = 10;
+        int round = 3;
         time = 0;
         for (int i = 0; i < round; i++) {
-            inputList = getDistributedList(srcList, r);
+            inputList = getDistributedList(srcList, r, 3);
             long t1 = System.nanoTime();
             putToFastKV(kv1, inputList);
             long t2 = System.nanoTime();
@@ -492,9 +492,9 @@ public class FastKVTest {
         return newStr;
     }
 
-    private static List<Pair<String, Object>> getDistributedList(List<Pair<String, Object>> srcList, Random r) {
-        List<Pair<String, Object>> inputList = new ArrayList<>(srcList);
-        int[] a = getDistributedArray(srcList.size(), 10, r);
+    private static List<Pair<String, Object>> getDistributedList(List<Pair<String, Object>> srcList, Random r, int n) {
+        List<Pair<String, Object>> inputList = new ArrayList<>(srcList.size());
+        int[] a = getDistributedArray(srcList.size(), n, r);
         for (int index : a) {
             Pair<String, Object> pair = srcList.get(index);
             inputList.add(new Pair<>(pair.first, tuningObject(pair.second, r)));
@@ -506,7 +506,6 @@ public class FastKVTest {
      * Get array with normal distribution.
      */
     private static int[] getDistributedArray(int n, int times, Random r) {
-        int[] a = new int[n];
         int avg = n / 2;
         int v;
         if (n <= 50) {
@@ -518,13 +517,12 @@ public class FastKVTest {
         } else {
             v = n * 3;
         }
-        Arrays.fill(a, 0);
         int count = n * times;
+        int[] a = new int[count];
         for (int i = 0; i < count; ) {
             int x = (int) (Math.sqrt(v) * r.nextGaussian() + avg);
             if (x >= 0 && x < n) {
-                i++;
-                a[x]++;
+                a[i++] = x;
             }
         }
         return a;
@@ -595,6 +593,7 @@ public class FastKVTest {
     public void testAsyncBlockingMode() throws Exception {
         String name = "test_blocking";
         testSync(name);
+        testSync2(name);
         testAsync(name);
         testDisableAutoCommit(name);
     }
@@ -616,8 +615,50 @@ public class FastKVTest {
         long t = buffer.getLong(18);
         Assert.assertEquals(newTime, t);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name,null, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name,null, 2);
         Assert.assertEquals(newTime, kv2.getLong("time"));
+
+        kv1.putLong("time", 100L);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name,null, 2);
+        Assert.assertEquals(100L, kv3.getLong("time"));
+    }
+
+    private void testSync2(String name) throws IOException {
+        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).blocking().build();
+        kv1.clear();
+
+        long seed = System.nanoTime();
+        System.out.println("random test seed: " + seed);
+        Random r = new Random(seed);
+
+        ArrayList<Pair<String, Object>> srcList = generateInputList(loadSourceData());
+
+        long time = 0;
+        List<Pair<String, Object>> inputList = new ArrayList<>(srcList);
+        for (int i = 0; i < 1; i++) {
+            long t1 = System.nanoTime();
+            putToFastKV(kv1, inputList);
+            long t2 = System.nanoTime();
+            time += (t2 - t1);
+
+        }
+        System.out.println("fill, use time: " + (time / 1000000) + " ms");
+
+        kv1.putString("flag", "hello");
+
+        int round = 3;
+        time = 0;
+        for (int i = 0; i < round; i++) {
+            inputList = getDistributedList(srcList, r, 3);
+            long t1 = System.nanoTime();
+            putToFastKV(kv1, inputList);
+            long t2 = System.nanoTime();
+            time += (t2 - t1);
+        }
+        System.out.println("update, use time: " + (time / 1000000) + " ms");
+
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, 2);
+        Assert.assertEquals("hello", kv2.getString("flag"));
     }
 
     private void testAsync(String name) throws Exception {
@@ -638,10 +679,13 @@ public class FastKVTest {
         long t = buffer.getLong(18);
         Assert.assertEquals(newTime, t);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name,null, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name,null, 1);
         Assert.assertEquals(newTime, kv2.getLong("time"));
-    }
 
+        kv1.putLong("time", 100L);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name,null, 1);
+        Assert.assertEquals(100L, kv3.getLong("time"));
+    }
 
     private void testDisableAutoCommit(String name) throws Exception {
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).blocking().build();
@@ -672,6 +716,7 @@ public class FastKVTest {
         long t = buffer.getLong(18);
         Assert.assertEquals(newTime, t);
 
+        kv1.putBoolean("bool", false);
         kv1.putBoolean("bool", true);
 
         FastKV kv4 = new FastKV(TestHelper.DIR, name,null, 2);
