@@ -34,7 +34,7 @@ FastKV有以下特点：
 FastKV 已发布到Maven中央仓库，路径如下:
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.0.3'
+    implementation 'io.github.billywei01:fastkv:1.0.4'
 }
 ```
 

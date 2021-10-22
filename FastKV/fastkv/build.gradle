@@ -3,7 +3,7 @@ plugins {
 }
 
 group 'io.github.billywei01'
-version '1.0.3'
+version '1.0.4'
 
 sourceCompatibility = 1.8
 

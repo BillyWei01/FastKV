@@ -67,7 +67,7 @@ object BenchMark {
             val t1 = System.nanoTime()
             applyToSp(inputList)
             val t2 = System.nanoTime()
-            applyToDataStore(inputList)
+            //applyToDataStore(inputList)
             val t3 = System.nanoTime()
             putToMMKV(inputList)
             val t4 = System.nanoTime()
@@ -80,7 +80,7 @@ object BenchMark {
         }
         Log.i(
             TAG,
-            "Fill, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
+            "Fill, sp: " + time[0] / MILLION + ", dataStore: " + "none"/*time[1] / MILLION*/
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
         Arrays.fill(time, 0L)
@@ -90,8 +90,8 @@ object BenchMark {
             val t1 = System.nanoTime()
             applyToSp(inputList)
             val t2 = System.nanoTime()
-            // TODO DataStore writes too slow, you could exclude this to speed up other test.
-            applyToDataStore(inputList)
+            // DataStore writes too slow.
+            // applyToDataStore(inputList)
             val t3 = System.nanoTime()
             putToMMKV(inputList)
             val t4 = System.nanoTime()
@@ -106,12 +106,12 @@ object BenchMark {
             time[2] += c
             time[3] += d
             Log.d(
-                TAG, "Update, sp: " + a / MILLION + ", dataStore: " + b / MILLION
+                TAG, "Update, sp: " + a / MILLION + ", dataStore: " + "none"/*b / MILLION*/
                         + ", mmkv: " + c / MILLION + ", fastkv:" + d / MILLION
             )
         }
         Log.i(
-            TAG, "Update total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
+            TAG, "Update total time, sp: " + time[0] / MILLION + ", dataStore: " + "none"/*time[1] / MILLION*/
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
 
@@ -133,7 +133,7 @@ object BenchMark {
             time[3] += t5 - t4
         }
         Log.i(
-            TAG, "Read total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
+            TAG, "Read total time, sp: " + time[0] / MILLION + ", dataStore: " + "none"/*time[1] / MILLION*/
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
     }
@@ -142,7 +142,7 @@ object BenchMark {
     private suspend fun warmingUp(srcList: ArrayList<Pair<String, Any>>, r: Random) {
         if (!hadWarmingUp) {
             applyToSp(srcList)
-            applyToDataStore(srcList)
+            // applyToDataStore(srcList)
             putToMMKV(srcList)
             putToFastKV(srcList)
 

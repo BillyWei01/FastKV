@@ -69,9 +69,9 @@ public class FastKV {
     // The default writing mode is non-blocking (write partial data with mmap).
     // If mmap API throw IOException, degrade to blocking mode (write all data to disk with blocking I/O).
     // User could assign to using blocking mode by FastKV.Builder
-    private static final int NON_BLOCKING = 0;
-    private static final int ASYNC_BLOCKING = 1;
-    private static final int SYNC_BLOCKING = 2;
+    static final int NON_BLOCKING = 0;
+    static final int ASYNC_BLOCKING = 1;
+    static final int SYNC_BLOCKING = 2;
     private int writingMode;
 
     // Only take effect when mode is not NON_BLOCKING
@@ -294,11 +294,18 @@ public class FastKV {
     }
 
     private void toResetBlockMode() {
-        writingMode = ASYNC_BLOCKING;
+        degrade();
+        clearData();
         if (fastBuffer == null || fastBuffer.hb.length != PAGE_SIZE) {
             fastBuffer = new FastBuffer(PAGE_SIZE);
+        } else {
+            fastBuffer.putInt(0, 0);
+            fastBuffer.putLong(4, 0L);
         }
-        clearData();
+    }
+
+    private void degrade() {
+        writingMode = ASYNC_BLOCKING;
         aChannel = null;
         bChannel = null;
         aBuffer = null;
@@ -331,7 +338,7 @@ public class FastKV {
                 des = newBuffer;
             } catch (IOException e) {
                 error(e);
-                writingMode = ASYNC_BLOCKING;
+                degrade();
                 return;
             }
         }
@@ -1088,7 +1095,9 @@ public class FastKV {
                         bBuffer.order(ByteOrder.LITTLE_ENDIAN);
                     } catch (IOException e) {
                         error(new Exception(MAP_FAILED, e));
-                        writingMode = ASYNC_BLOCKING;
+                        fastBuffer.putInt(0, dataEnd - DATA_START);
+                        fastBuffer.putLong(4, checksum);
+                        degrade();
                     }
                 }
             }
@@ -1245,6 +1254,7 @@ public class FastKV {
                 Util.deleteFile(new File(path + name, oldFileName));
             }
         }
+        checkIfCommit();
     }
 
     private void addOrUpdate(String key, Object value, byte[] bytes, VarContainer c, byte type) {
@@ -1419,6 +1429,7 @@ public class FastKV {
         } else {
             checksum ^= fastBuffer.getChecksum(gcStart, newDataEnd - gcStart);
         }
+        dataEnd = newDataEnd;
 
         if (writingMode == NON_BLOCKING) {
             aBuffer.putInt(0, -1);
@@ -1430,9 +1441,11 @@ public class FastKV {
             bBuffer.putLong(4, checksum);
             bBuffer.position(gcStart);
             bBuffer.put(fastBuffer.hb, gcStart, updateSize);
+        } else {
+            fastBuffer.putInt(0, newDataSize);
+            fastBuffer.putLong(4, checksum);
         }
 
-        dataEnd = newDataEnd;
         updateOffset(gcStart, srcToShift);
         int expectedEnd = newDataEnd + allocate;
         if (fastBuffer.hb.length - expectedEnd > TRUNCATE_THRESHOLD) {
@@ -1472,12 +1485,12 @@ public class FastKV {
                 bChannel.truncate(newCapacity);
                 bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, newCapacity);
                 bBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                info(TRUNCATE_FINISH);
             } catch (IOException e) {
                 error(new Exception(MAP_FAILED, e));
-                writingMode = ASYNC_BLOCKING;
+                degrade();
             }
         }
+        info(TRUNCATE_FINISH);
     }
 
     private int getNewCapacity(int capacity, int expected) {

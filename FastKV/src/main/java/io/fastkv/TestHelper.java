@@ -14,7 +14,7 @@ public class TestHelper {
     public static FastKV.Logger logger = new FastKV.Logger() {
         @Override
         public void i(String name, String message) {
-             if (FastKV.GC_FINISH.equals(message)) {
+            if (FastKV.GC_FINISH.equals(message)) {
                 gcCount.incrementAndGet();
                 //System.out.println("gc count:" + gcCount.get() + ", name: " + name);
             } else {
@@ -31,15 +31,17 @@ public class TestHelper {
             System.out.println("warning: " + e.getMessage() + ", name: " + name);
             if (message != null && message.contains("file error")) {
                 fileErrorCount.incrementAndGet();
-            }else {
+            } else {
                 e.printStackTrace();
             }
         }
 
         @Override
         public void e(String name, Exception e) {
-            System.out.println("error: " + e.getMessage() + " name: " + name);
-            e.printStackTrace();
+            System.out.println("error: " + e.getMessage() + ", name: " + name);
+            if (!"both files error".equals(e.getMessage())) {
+                e.printStackTrace();
+            }
         }
     };
 

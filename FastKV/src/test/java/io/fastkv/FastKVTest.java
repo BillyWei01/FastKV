@@ -64,7 +64,7 @@ public class FastKVTest {
         list.add(Long.MAX_VALUE);
         kv1.putObject(objectKey, list, LongListEncoder.INSTANCE);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, encoders, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
         Assert.assertEquals(kv1.getBoolean(boolKey), kv2.getBoolean(boolKey));
         Assert.assertEquals(kv1.getInt(intKey), kv2.getInt(intKey));
         Assert.assertTrue(kv1.getFloat(floatKey) == kv2.getFloat(floatKey));
@@ -85,19 +85,19 @@ public class FastKVTest {
         Map<Class, FastKV.Encoder> encoderMap = new HashMap<>();
         encoderMap.put(java.util.ArrayList.class, LongListEncoder.INSTANCE);
         Map<String, Object> all_1 = kv1.getAll();
-        FastKV kv3 =   new FastKV(TestHelper.DIR, name_2,encoders, 0);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name_2, encoders, FastKV.NON_BLOCKING);
         kv3.clear();
 
         kv3.putAll(all_1, encoderMap);
 
-        FastKV kv4 = new FastKV(TestHelper.DIR, name_2, encoders, 0);
+        FastKV kv4 = new FastKV(TestHelper.DIR, name_2, encoders, FastKV.NON_BLOCKING);
         Assert.assertEquals(all_1, kv4.getAll());
 
         Map<String, Object> m = new HashMap<>();
         m.put("a", "a");
         m.put("b", "b");
         kv3.putAll(m);
-        FastKV kv5 = new FastKV(TestHelper.DIR, name_2, encoders, 0);
+        FastKV kv5 = new FastKV(TestHelper.DIR, name_2, encoders, FastKV.NON_BLOCKING);
         Assert.assertEquals("a", kv5.getString("a"));
         Assert.assertEquals("b", kv5.getString("b"));
 
@@ -123,7 +123,7 @@ public class FastKVTest {
         kv1.putArray(arrayKey, bytes);
         kv1.putArray(arrayKey, "Hello".getBytes(StandardCharsets.UTF_8));
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, encoders, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
         Assert.assertEquals(true, kv2.getBoolean("b"));
         Assert.assertEquals(200, kv2.getInt("i"));
         Assert.assertEquals(Long.MIN_VALUE, kv2.getLong("L"));
@@ -164,6 +164,10 @@ public class FastKVTest {
         }
         int gc3 = TestHelper.gcCount.get();
         Assert.assertEquals(1, gc3 - gc2);
+
+        FastKV kvt3 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals(100, kvt3.getInt("int_1"));
+
         for (int i = 0; i < 10; i++) {
             kv1.putString("string_" + i, longStr);
         }
@@ -173,6 +177,8 @@ public class FastKVTest {
         }
         int gc4 = TestHelper.gcCount.get();
         Assert.assertEquals(1, gc4 - gc3);
+        FastKV kvt4 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals(100, kvt4.getInt("int_1"));
 
         kv1.remove("int_2");
 
@@ -186,7 +192,73 @@ public class FastKVTest {
         int truncate2 = TestHelper.truncateCount.get();
         Assert.assertEquals(1, truncate2 - truncate1);
 
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals(100, kv3.getInt("int_1"));
+        Assert.assertEquals(0, kv3.getInt("int_2"));
+        Assert.assertEquals(kv1.getBoolean("bool_1"), kv3.getBoolean("bool_1"));
+        Assert.assertEquals("", kv3.getString("empty_str"));
+    }
+
+    @Test
+    public void testSyncBlockingGC() {
+        String name = "test_blocking_gc";
+        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).blocking().build();
+        kv1.clear();
+
+        String longStr = TestHelper.makeString(2000);
+        String shortStr = TestHelper.makeString(200);
+
+        int gc1 = TestHelper.gcCount.get();
+        kv1.putBoolean("bool_1", true);
+        kv1.putInt("int_1", 100);
+        kv1.putInt("int_2", 200);
+        kv1.putString("short_string", shortStr);
+        kv1.putString("string_0", longStr);
+        for (int i = 0; i < 10; i++) {
+            kv1.putString("string_" + i, longStr);
+        }
+        for (int i = 0; i < 10; i++) {
+            kv1.remove("string_" + i);
+        }
+        int gc2 = TestHelper.gcCount.get();
+        Assert.assertEquals(1, gc2 - gc1);
+        for (int i = 0; i < 80; i++) {
+            kv1.putString("string_" + i, "hello");
+        }
+        for (int i = 0; i < 80; i++) {
+            kv1.remove("string_" + i);
+        }
+        int gc3 = TestHelper.gcCount.get();
+        Assert.assertEquals(1, gc3 - gc2);
+
+        FastKV kvt3 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
+        Assert.assertEquals(100, kvt3.getInt("int_1"));
+
+        for (int i = 0; i < 10; i++) {
+            kv1.putString("string_" + i, longStr);
+        }
+        String newLongStr = longStr + "hello";
+        for (int i = 0; i < 10; i++) {
+            kv1.putString("string_" + i, newLongStr);
+        }
+        int gc4 = TestHelper.gcCount.get();
+        Assert.assertEquals(1, gc4 - gc3);
+        FastKV kvt4 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
+        Assert.assertEquals(100, kvt4.getInt("int_1"));
+
+        kv1.remove("int_2");
+
+        int truncate1 = TestHelper.truncateCount.get();
+        for (int i = 0; i < 30; i++) {
+            kv1.putString("long_string_" + i, longStr);
+        }
+        for (int i = 0; i < 30; i++) {
+            kv1.remove("long_string_" + i);
+        }
+        int truncate2 = TestHelper.truncateCount.get();
+        Assert.assertEquals(1, truncate2 - truncate1);
+
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
         Assert.assertEquals(100, kv3.getInt("int_1"));
         Assert.assertEquals(0, kv3.getInt("int_2"));
         Assert.assertEquals(kv1.getBoolean("bool_1"), kv3.getBoolean("bool_1"));
@@ -210,16 +282,16 @@ public class FastKVTest {
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertEquals(longStr, kv2.getString("str"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
         kv1.putString("str", "hello");
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertEquals("hello", kv3.getString("str"));
 
         kv1.putString("str", longStr);
-        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertEquals(longStr, kv4.getString("str"));
     }
 
@@ -230,23 +302,23 @@ public class FastKVTest {
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertArrayEquals(longArray, kv2.getArray("array"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
         byte[] shortArray = "hello".getBytes(StandardCharsets.UTF_8);
         kv1.putArray("array", shortArray);
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertArrayEquals(shortArray, kv3.getArray("array"));
 
         kv1.putArray("array", longArray);
-        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertArrayEquals(longArray, kv4.getArray("array"));
     }
 
     private void testBigObject(String name) {
         FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{TestObjectEncoder.INSTANCE};
-        FastKV kv1 = new FastKV(TestHelper.DIR, name, encoders, 0);
+        FastKV kv1 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
         kv1.clear();
         String longStr = TestHelper.makeString(6000);
         TestObject obj = new TestObject(12345, longStr);
@@ -254,20 +326,20 @@ public class FastKVTest {
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, encoders, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
         Assert.assertEquals(obj, kv2.getObject("obj"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
         obj.id = 123456;
         obj.info = "hello";
         kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, encoders, 0);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
         Assert.assertEquals(obj, kv3.getObject("obj"));
 
         obj.id = 123457;
         obj.info = longStr;
         kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
-        FastKV kv4 = new FastKV(TestHelper.DIR, name, encoders, 0);
+        FastKV kv4 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
         Assert.assertEquals(obj, kv4.getObject("obj"));
     }
 
@@ -317,7 +389,7 @@ public class FastKVTest {
             long t2 = System.nanoTime();
             int gc2 = TestHelper.gcCount.get();
             System.out.println("use time:" + ((t2 - t1) / 1000000) + ", gc times:" + (gc2 - gc1));
-            FastKV kv2 = new FastKV(TestHelper.DIR, name, null, 0);
+            FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
             Assert.assertEquals("flag1", kv2.getString(flag1));
             Assert.assertEquals(100, kv2.getInt(flag2));
         }
@@ -334,7 +406,7 @@ public class FastKVTest {
             kv1.putString(str, str + i);
             i++;
         }
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         i = 1000;
         for (String str : notAscii) {
             Assert.assertEquals(str + i, kv2.getString(str));
@@ -388,7 +460,7 @@ public class FastKVTest {
         }
         System.out.println("update, use time: " + (time / 1000000) + " ms");
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertEquals("hello", kv2.getString("flag"));
     }
 
@@ -547,17 +619,20 @@ public class FastKVTest {
     }
 
     private void damageFastKVFile(String fileName) throws IOException {
-        File aFile = new File(TestHelper.DIR, fileName);
-        RandomAccessFile accessFile = new RandomAccessFile(aFile, "rw");
-        FileChannel channel = accessFile.getChannel();
-        MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, Util.getPageSize());
-        int index = (int) (System.currentTimeMillis() % 30);
-        System.out.println("Damage A file's byte at index:" + index);
-        buffer.put(index, (byte) (~buffer.get(index)));
+        File file = new File(TestHelper.DIR, fileName);
+        if (file.exists()) {
+            RandomAccessFile accessFile = new RandomAccessFile(file, "rw");
+            FileChannel channel = accessFile.getChannel();
+            MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, Util.getPageSize());
+            int index = (int) (System.currentTimeMillis() % 30);
+            String name = fileName.endsWith(".kva") ? "A" : "B";
+            System.out.println("Damage " + name + " file's byte at index:" + index);
+            buffer.put(index, (byte) (~buffer.get(index)));
+        }
     }
 
     @Test
-    public void testDamageFile() throws IOException {
+    public void testDamageFile() throws IOException, InterruptedException {
         String name = "test_damage_file";
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).build();
         kv1.clear();
@@ -566,27 +641,44 @@ public class FastKVTest {
         for (int i = 0; i < 10; i++) {
             kv1.putString("str_" + i, str);
         }
+        Thread.sleep(50L);
+        FastKV kvt1 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals("hello", kvt1.getString("flag"));
 
         int e1 = TestHelper.fileErrorCount.get();
 
         damageFastKVFile(name + ".kva");
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertEquals("hello", kv2.getString("flag"));
         int e2 = TestHelper.fileErrorCount.get();
         Assert.assertEquals(1, e2 - e1);
 
         damageFastKVFile(name + ".kvb");
 
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, 0);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertEquals("hello", kv3.getString("flag"));
         int e3 = TestHelper.fileErrorCount.get();
         Assert.assertEquals(1, e3 - e2);
 
-        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, 0);
+
+        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
         Assert.assertEquals("hello", kv4.getString("flag"));
         int e4 = TestHelper.fileErrorCount.get();
         Assert.assertEquals(0, e4 - e3);
+
+        damageFastKVFile(name + ".kva");
+        damageFastKVFile(name + ".kvb");
+
+        FastKV kv5 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals(0, kv5.getAll().size());
+
+        kv5.putString("key1", "a");
+        kv5.putString("key2", "b");
+        kv5.putString("key1", "A");
+        Thread.sleep(50L);
+        FastKV kv6 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals("A", kv6.getString("key1"));
     }
 
     @Test
@@ -615,11 +707,11 @@ public class FastKVTest {
         long t = buffer.getLong(18);
         Assert.assertEquals(newTime, t);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name,null, 2);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
         Assert.assertEquals(newTime, kv2.getLong("time"));
 
         kv1.putLong("time", 100L);
-        FastKV kv3 = new FastKV(TestHelper.DIR, name,null, 2);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
         Assert.assertEquals(100L, kv3.getLong("time"));
     }
 
@@ -657,7 +749,7 @@ public class FastKVTest {
         }
         System.out.println("update, use time: " + (time / 1000000) + " ms");
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, 2);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
         Assert.assertEquals("hello", kv2.getString("flag"));
     }
 
@@ -679,12 +771,12 @@ public class FastKVTest {
         long t = buffer.getLong(18);
         Assert.assertEquals(newTime, t);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name,null, 1);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.ASYNC_BLOCKING);
         Assert.assertEquals(newTime, kv2.getLong("time"));
 
         kv1.putLong("time", 100L);
         Thread.sleep(50L);
-        FastKV kv3 = new FastKV(TestHelper.DIR, name,null, 1);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.ASYNC_BLOCKING);
         Assert.assertEquals(100L, kv3.getLong("time"));
     }
 
@@ -700,13 +792,13 @@ public class FastKVTest {
         kv1.putString("str", "hello");
         kv1.putInt("int", 100);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name,null, 2);
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
         Assert.assertNotEquals(100, kv2.getInt("int"));
 
         boolean result = kv1.commit();
         Assert.assertEquals(true, result);
 
-        FastKV kv3 = new FastKV(TestHelper.DIR, name,null, 2);
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
         Assert.assertEquals(100, kv3.getInt("int"));
 
         File aFile = new File(TestHelper.DIR, name + ".kvc");
@@ -720,9 +812,8 @@ public class FastKVTest {
         kv1.putBoolean("bool", false);
         kv1.putBoolean("bool", true);
 
-        FastKV kv4 = new FastKV(TestHelper.DIR, name,null, 2);
+        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, FastKV.SYNC_BLOCKING);
         Assert.assertEquals(newTime, kv4.getLong("time"));
         Assert.assertEquals(true, kv4.getBoolean("bool"));
     }
-
 }

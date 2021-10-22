@@ -41,7 +41,7 @@ It can be used on  platforms with JVM environment, such as Android.
 FastKV had been publish to Maven Central:
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.0.3'
+    implementation 'io.github.billywei01:fastkv:1.0.4'
 }
 ```
 
