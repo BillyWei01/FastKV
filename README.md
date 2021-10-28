@@ -152,6 +152,8 @@ FastKV  | 19 | 1
 - MMKV read slower then SharePreferences/DataStore，but much faster in writing.
 - FastKV is the fastest both in writing or reading.
 
+The test above writes hundreds of key-values on one file, so the results have a big difference.
+Normally one file may only save several or tens of key-values, the result may be close.
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.
