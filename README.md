@@ -127,6 +127,8 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 - 比较对象： SharePreferences/DataStore/MMKV。
 - 测试机型：荣耀20S。
 
+测试代码：[BenchMark](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/BenchMark.kt)
+
 测试结果：
 
 | | 写入(ms) |读取(ms) 
