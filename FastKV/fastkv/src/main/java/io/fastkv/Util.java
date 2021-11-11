@@ -103,12 +103,11 @@ class Util {
         return false;
     }
 
-    private static void closeQuietly(Closeable closeable) {
+    static void closeQuietly(Closeable closeable) {
         if (closeable != null) {
             try {
                 closeable.close();
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (Exception ignore) {
             }
         }
     }

@@ -9,19 +9,25 @@ public class Main {
     private static void testKV() throws IOException {
         FastKVConfig.setLogger(TestHelper.logger);
 
-
         String path = "./out/";
         String name = "main";
         FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
         FastKV kv = new FastKV.Builder(path, name).encoder(encoders).build();
-        //FastKV kv = new FastKV.Builder(path, name).build();
-        if(!kv.getBoolean("flag")){
-            kv.putBoolean("flag" , true);
+        // FastKV kv = new FastKV.Builder(path, name).build();
+
+        if (!kv.getBoolean("flag")) {
+            setValues(kv);
+            kv.putBoolean("flag", true);
         }
 
         // kv.clear();
 
-        if(!kv.contains("bool_key")){
+        KVViewer.printFastKV(kv);
+        HexViewer.printFile(path + name + ".kva", 160);
+    }
+
+    private static void setValues(FastKV kv) {
+        if (!kv.contains("bool_key")) {
             String boolKey = "bool_key";
             kv.putBoolean(boolKey, true);
 
@@ -49,12 +55,7 @@ public class Main {
             list.add(200L);
             list.add(300L);
             kv.putObject(objectKey, list, LongListEncoder.INSTANCE);
-
-            // List<Long> list2 = kv.getObject("long_list");
         }
-
-        KVViewer.printFastKV(kv);
-        HexViewer.printFile(path + name + ".kva", 160);
     }
 
     public static void main(String[] args) throws Exception {
