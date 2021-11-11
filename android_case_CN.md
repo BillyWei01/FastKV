@@ -17,7 +17,7 @@ FastPreferences的实现大概如下：
 
 ```java
 public class FastPreferences implements SharedPreferences {
-    private static final String IMPORT_FLAG = "import_flag";
+    private static final String IMPORT_FLAG = "kv_import_flag";
 
     protected final FastKV kv;
     protected final FastEditor editor = new FastEditor();
@@ -54,8 +54,9 @@ public class FastPreferences implements SharedPreferences {
 }
 ```
 
-FastPreferences是SharedPreferences的实现类，其内部用FastKV存储key-value。
-用FastPreferences替换SDK的SharedPreferencesImpl（由context.getSharedPreferences返回)之后，由于接口不变，不需要改动其他代码。
+FastPreferences是SharedPreferences的实现类，其内部用FastKV存储key-value。<br>
+用FastPreferences替换SDK的SharedPreferencesImpl（由context.getSharedPreferences返回)之后，由于接口不变，不需要改动其他代码。<br>
+代码链接：[FastPreferences.java](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/fastkv/FastPreferences.java) 
 
 ## 2. Kotlin下的用法
 
@@ -146,3 +147,5 @@ class BooleanProperty(private val key: String, private val defValue: Boolean) :
 }
 // ...省略其他实现...
 ```
+
+代码链接：[KVData](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/fastkv/KVData.kt)
