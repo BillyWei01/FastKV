@@ -13,50 +13,8 @@ public class CommonStore {
 }
 ```
 
-FastPreferences的实现大概如下：
-
-```java
-public class FastPreferences implements SharedPreferences {
-    private static final String IMPORT_FLAG = "kv_import_flag";
-
-    protected final FastKV kv;
-    protected final FastEditor editor = new FastEditor();
-
-    public FastPreferences(String path, String name) {
-        kv = new FastKV.Builder(path, name).build();
-    }
-
-    public static SharedPreferences adapt(Context context, String name, boolean deleteOldData) {
-        String path = context.getFilesDir().getAbsolutePath() + "/fastkv";
-        FastPreferences newPreferences = new FastPreferences(path, name);
-        if (!newPreferences.contains(IMPORT_FLAG)) {
-            SharedPreferences oldPreferences = context.getSharedPreferences(name, Context.MODE_PRIVATE);
-            //noinspection unchecked
-            Map<String, Object> allData = (Map<String, Object>) oldPreferences.getAll();
-            FastKV kv = newPreferences.getKV();
-            kv.putAll(allData);
-            kv.putBoolean(IMPORT_FLAG, true);
-            if (deleteOldData) {
-                oldPreferences.edit().clear().apply();
-            }
-        }
-        return newPreferences;
-    }
-    
-    private class FastEditor implements SharedPreferences.Editor {
-        @Override
-        public Editor putString(String key, @Nullable String value) {
-            kv.putString(key, value);
-            return this;
-        }
-    }
-    // ...
-}
-```
-
-FastPreferences是SharedPreferences的实现类，其内部用FastKV存储key-value。<br>
-用FastPreferences替换SDK的SharedPreferencesImpl（由context.getSharedPreferences返回)之后，由于接口不变，不需要改动其他代码。<br>
-代码链接：[FastPreferences.java](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/fastkv/FastPreferences.java) 
+FastPreferences的代码实现：[FastPreferences.java](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/fastkv/FastPreferences.java) <br>
+FastPreferences是SharedPreferences的实现类，用FastPreferences替换SDK的SharedPreferencesImpl（由context.getSharedPreferences返回)之后，由于接口不变，不需要改动其他代码。<br>
 
 ## 2. Kotlin下的用法
 
