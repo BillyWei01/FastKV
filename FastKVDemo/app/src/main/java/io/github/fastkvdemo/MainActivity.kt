@@ -58,7 +58,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        Log.i("MyTag", "pageSize:" + Utils.getPageSize())
+        // Log.i("MyTag", "pageSize:" + Utils.getPageSize())
     }
 
     @SuppressLint("SetTextI18n")
@@ -80,7 +80,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun printLaunchTime() {
-        case3()
+        case1()
     }
 
     /**

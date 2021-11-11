@@ -1,21 +1,28 @@
 package io.github.fastkvdemo.fastkv;
 
-import android.content.Context;
-import android.content.SharedPreferences;
-
 import androidx.annotation.Nullable;
 
-import java.io.File;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
+
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
 import io.fastkv.FastKV;
 
 public class FastPreferences implements SharedPreferences {
-    private static final String IMPORT_FLAG = "import_flag";
-
     protected final FastKV kv;
     protected final FastEditor editor = new FastEditor();
+
+    private static class HandlerHolder {
+        private static final Handler handler = new Handler(Looper.getMainLooper());
+    }
+
+    private final Object mLock = new Object();
+    private final ArrayList<OnSharedPreferenceChangeListener> listeners = new ArrayList<>();
 
     public FastPreferences(String path, String name) {
         kv = new FastKV.Builder(path, name).build();
@@ -24,25 +31,26 @@ public class FastPreferences implements SharedPreferences {
     /**
      * Adapt old SharePreferences,
      * return a new SharedPreferences with storage strategy of FastKV.
-     *
+     * <p>
      * Node: The old SharePreferences must implement getAll() method,
      * otherwise can not import old data to new files.
      *
-     * @param context The context
-     * @param name The name of SharePreferences
+     * @param context       The context
+     * @param name          The name of SharePreferences
      * @param deleteOldData If set true, delete old data after import
      * @return The Wrapper of FastKV, which implement SharePreferences.
      */
     public static SharedPreferences adapt(Context context, String name, boolean deleteOldData) {
         String path = context.getFilesDir().getAbsolutePath() + "/fastkv";
         FastPreferences newPreferences = new FastPreferences(path, name);
-        if (!newPreferences.contains(IMPORT_FLAG)) {
+        final String flag = "kv_import_flag";
+        if (!newPreferences.contains(flag)) {
             SharedPreferences oldPreferences = context.getSharedPreferences(name, Context.MODE_PRIVATE);
             //noinspection unchecked
             Map<String, Object> allData = (Map<String, Object>) oldPreferences.getAll();
             FastKV kv = newPreferences.getKV();
             kv.putAll(allData);
-            kv.putBoolean(IMPORT_FLAG, true);
+            kv.putBoolean(flag, true);
             if (deleteOldData) {
                 oldPreferences.edit().clear().apply();
             }
@@ -104,60 +112,99 @@ public class FastPreferences implements SharedPreferences {
 
     @Override
     public void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
-
+        if (listener == null) {
+            return;
+        }
+        synchronized (mLock) {
+            if (!listeners.contains(listener)) {
+                listeners.add(listener);
+            }
+        }
     }
 
     @Override
     public void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
+        synchronized (mLock) {
+            listeners.remove(listener);
+        }
+    }
 
+    private void notifyChanged(String key) {
+        synchronized (mLock) {
+            if (!listeners.isEmpty()) {
+                if (Looper.myLooper() == Looper.getMainLooper()) {
+                    notifyListeners(listeners, key);
+                } else {
+                    HandlerHolder.handler.post(() -> {
+                        synchronized (mLock) {
+                            notifyListeners(listeners, key);
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    private void notifyListeners(ArrayList<OnSharedPreferenceChangeListener> listeners, String key) {
+        for (OnSharedPreferenceChangeListener listener : listeners) {
+            listener.onSharedPreferenceChanged(this, key);
+        }
     }
 
     private class FastEditor implements SharedPreferences.Editor {
         @Override
         public Editor putString(String key, @Nullable String value) {
             kv.putString(key, value);
+            notifyChanged(key);
             return this;
         }
 
         @Override
         public Editor putStringSet(String key, @Nullable Set<String> values) {
             kv.putStringSet(key, values);
+            notifyChanged(key);
             return this;
         }
 
         @Override
         public Editor putInt(String key, int value) {
             kv.putInt(key, value);
+            notifyChanged(key);
             return this;
         }
 
         @Override
         public Editor putLong(String key, long value) {
             kv.putLong(key, value);
+            notifyChanged(key);
             return this;
         }
 
         @Override
         public Editor putFloat(String key, float value) {
             kv.putFloat(key, value);
+            notifyChanged(key);
             return this;
         }
 
         @Override
         public Editor putBoolean(String key, boolean value) {
             kv.putBoolean(key, value);
+            notifyChanged(key);
             return this;
         }
 
         @Override
         public Editor remove(String key) {
             kv.remove(key);
+            notifyChanged(key);
             return this;
         }
 
         @Override
         public Editor clear() {
             kv.clear();
+            notifyChanged(null);
             return this;
         }
 
