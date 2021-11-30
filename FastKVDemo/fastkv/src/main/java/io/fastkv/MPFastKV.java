@@ -26,13 +26,12 @@ import io.fastkv.Container.*;
 
 /**
  * Multiprocess FastKV <br>
- *
+ * <p>
  * This class support cross process storage and update notify.
  * It implement API of SharePreferences, so it could use as SharePreferences.<br>
- *
+ * <p>
  * Note:
- * To support cross process storage, MPFastKV needs to do many state checks,
- * it's much slower than {@link FastKV}.
+ * To support cross process storage, MPFastKV needs to do many state checks, it's slower than {@link FastKV}.
  * So if you don't need to access the data in multiprocess, just use FastKV.
  */
 @SuppressWarnings("rawtypes")
@@ -109,7 +108,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         if (fastBuffer == null) {
             fastBuffer = new FastBuffer(PAGE_SIZE);
         }
-        getUpdateHash();
         if (logger != null) {
             long t = (System.nanoTime() - start) / 1000000;
             info("loading finish, data len:" + dataEnd + ", get keys:" + data.size() + ", use time:" + t + " ms");
@@ -300,6 +298,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             try {
                 alignAToBuffer();
                 aBuffer.put(buffer.hb, 0, dataEnd);
+                getUpdateHash();
                 if (bAccessFile.length() != bufferLen) {
                     bAccessFile.setLength(bufferLen);
                 }
@@ -697,7 +696,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 if (result) {
                     needFullWrite = false;
                 }
-                getUpdateHash();
                 return result;
             }
 
@@ -761,7 +759,13 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     }
 
     private void lockAndCheckUpdate() {
-        if (bChannel != null && bFileLock == null) {
+        if (bFileLock != null) {
+            return;
+        }
+        if (bChannel == null) {
+            loadFromABFile();
+        }
+        if (bChannel != null) {
             try {
                 bFileLock = bChannel.lock();
                 checkUpdate();
@@ -928,7 +932,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         }
     }
 
-    protected void resetData(){
+    protected void resetData() {
         super.resetData();
         updateHash = 0;
     }
@@ -1304,17 +1308,23 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     private final Handler kvHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(Message msg) {
-            int code = msg.what;
-            if (code == MSG_REFRESH) {
-                refreshExecutor.execute(MPFastKV.this::refresh);
-            } else if (code == MSG_RELEASE) {
-                apply();
-            } else if (code == MSG_DATA_CHANGE) {
-                notifyChangedKeys();
-            } else if (code == MSG_CLEAR) {
-                synchronized (MPFastKV.this) {
-                    notifyListeners(listeners, null);
-                }
+            switch (msg.what) {
+                case MSG_REFRESH:
+                    refreshExecutor.execute(MPFastKV.this::refresh);
+                    break;
+                case MSG_RELEASE:
+                    apply();
+                    break;
+                case MSG_DATA_CHANGE:
+                    notifyChangedKeys();
+                    break;
+                case MSG_CLEAR:
+                    synchronized (MPFastKV.this) {
+                        notifyListeners(listeners, null);
+                    }
+                    break;
+                default:
+                    break;
             }
         }
     };
@@ -1337,7 +1347,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         public void onEvent(int event, String path) {
             // Delay a few time to filter frequency callback.
             if (!kvHandler.hasMessages(MSG_REFRESH)) {
-                kvHandler.sendEmptyMessageDelayed(MSG_REFRESH, 50);
+                kvHandler.sendEmptyMessageDelayed(MSG_REFRESH, 30L);
             }
         }
     }
@@ -1401,7 +1411,8 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     }
 
     @Override
-    public synchronized @NonNull String toString() {
+    public synchronized @NonNull
+    String toString() {
         return "MPFastKV: path:" + path + " name:" + name;
     }
 }

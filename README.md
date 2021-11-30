@@ -30,7 +30,7 @@ FastKV有以下特点：
    - 通过double-write等方法确保数据的完整性。
    - 在API抛IO异常时提供降级处理。
 7. 代码精简
-   - FastKV由纯Java实现，编译成jar包后体积仅40K。
+   - FastKV由纯Java实现，编译成jar包后体积只有几十K。
    
 ## 2. 使用方法
 
