@@ -41,11 +41,23 @@ It can be used on  platforms with JVM environment, such as Android.
 
 ### 2.1 Import
 FastKV had been publish to Maven Central:
+
+For Android (include SharePreferences API, support multiprocess):
+
 ```gradle
 dependencies {
     implementation 'io.github.billywei01:fastkv:1.0.5'
 }
 ```
+
+For Java (Pure Java API, not support multiprocess):
+
+```gradle
+dependencies {
+    implementation 'io.github.billywei01:fastkv-java:1.0.5'
+}
+```
+
 
 ### 2.2 Initialization
 ```kotlin

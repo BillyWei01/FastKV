@@ -35,10 +35,19 @@ FastKV有以下特点：
 ## 2. 使用方法
 
 ### 2.1 导入
-FastKV 已发布到Maven中央仓库，路径如下:
+FastKV 已发布到Maven中央仓库，分别发布了两个jar包，按需添加依赖即可。
+
+其中一个包含封装了SharePreferences接口和支持多进程：
 ```gradle
 dependencies {
     implementation 'io.github.billywei01:fastkv:1.0.5'
+}
+```
+
+另一个仅Java接口&不支持多进程的：
+```gradle
+dependencies {
+    implementation 'io.github.billywei01:fastkv-java:1.0.5'
 }
 ```
 
@@ -120,8 +129,9 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
 
 ### 2.4 用法 For Android
-相对于常规用法，Android平台主要是多了SharePreferences API, 以及支持Kotlin。<br/>
+相对于常规用法，Android平台主要是多了SharePreferences API, 以及支持Kotlin，支持多进程等。<br/>
 具体参考：[用法 For Android](android_case_CN.md)
+
 
 ## 3. 性能测试
 - 测试数据：搜集APP中的SharePreferenses汇总的部份key-value数据（经过随机混淆）得到总共四百多个key-value。<br>
