@@ -28,7 +28,7 @@ import io.fastkv.Container.*;
  * Multiprocess FastKV <br>
  * <p>
  * This class support cross process storage and update notify.
- * It implement API of SharePreferences, so it could use as SharePreferences.<br>
+ * It implements API of SharePreferences, so it could be used as SharePreferences.<br>
  * <p>
  * Note:
  * To support cross process storage, MPFastKV needs to do many state checks, it's slower than {@link FastKV}.
