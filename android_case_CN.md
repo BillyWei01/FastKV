@@ -9,7 +9,7 @@ public class CommonStore {
     // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
 
     // 导入原SP数据
-    public static final SharedPreferences preferences = FastPreferences.adapt(GlobalConfig.appContext, NAME, false);
+    public static final SharedPreferences preferences = FastPreferences.adapt(GlobalConfig.appContext, NAME);
 }
 ```
 
