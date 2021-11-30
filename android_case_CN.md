@@ -19,7 +19,7 @@ FastPreferences是SharedPreferences的实现类，用FastPreferences替换SDK的
 ## 2. 多进程
 项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/MPFastKV.java)。<br>
 MPFastKV除了支持多进程读写之外，还会实现了SharedPreferences的接口，包括支持注册OnSharedPreferenceChangeListener，其中一个进程修改了数据，所有的进程都会感知（通过OnSharedPreferenceChangeListener回调）。<br>
-具体用法可参考 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/MultiProcessTestActivity.kt) 和 [TestService](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/TestService.kt)
+具体用法可参考 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt) 和 [TestService](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/TestService.kt)
 
 需要提醒的是，由于支持多进程需要维护更多的状态 [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/MPFastKV.java) 的写入要比 [FastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/FastKV.java) 慢不少，所以在不需要多进程访问的情况下，尽量用 [FastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/FastKV.java) 或 [FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/FastPreferences.java)。
 
