@@ -58,7 +58,14 @@ public class FastPreferences implements SharedPreferences {
 FastPreferences is the implementation class of SharedPreferences, which uses FastKV to store key-values.
 Replacing the SDK's SharedPreferencesImpl with FastPreferences, no need to change other codes because FastPreferences has the same API with SharedPreferencesImpl.
 
-## 2. Kotlin 
+## 2. Multiprocess
+The library support an multiprocess API：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/MPFastKV.java).<br>
+
+Use case: 
+[MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt) and [TestService](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/TestService.kt)
+
+
+## 3. Kotlin 
 
 Kotlin is compatible with java, so you could directly use FastKV or SharedPreferences APIs in Kotlin.
 In addition, kotlin provides the syntax of delegate, which can be used to improve key-value API's accessing.
@@ -148,4 +155,5 @@ class BooleanProperty(private val key: String, private val defValue: Boolean) :
 // ...
 ```
 
+Code Link: [KVData](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/fastkv/KVData.kt)
 

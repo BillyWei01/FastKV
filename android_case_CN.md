@@ -113,7 +113,11 @@ class BooleanProperty(private val key: String, private val defValue: Boolean) :
 // ...省略其他实现...
 ```
 
-代码链接：[KVData](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/fastkv/KVData.kt)
+KVData未包含在maven发布的jar包中，这里主要是用法展示。<br>
+感兴趣的朋友直接copy项目中的代码即可。<br>
+代码链接：[KVData](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/fastkv/KVData.kt)
+
+
 
 
 
