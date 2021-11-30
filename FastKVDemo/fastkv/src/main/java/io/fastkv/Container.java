@@ -1,5 +1,8 @@
 package io.fastkv;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * struct of primary type (boolean/int/float/long/double):
  * [type|keyLen|keyData|value]
@@ -19,6 +22,8 @@ class Container {
         int offset;
 
         abstract byte getType();
+
+        abstract boolean equalTo(BaseContainer other);
     }
 
     static class BooleanContainer extends BaseContainer {
@@ -32,6 +37,12 @@ class Container {
         @Override
         byte getType() {
             return DataType.BOOLEAN;
+        }
+
+        @Override
+        boolean equalTo(BaseContainer other) {
+            return other.getType() == DataType.BOOLEAN &&
+                    ((BooleanContainer) other).value == this.value;
         }
     }
 
@@ -47,6 +58,12 @@ class Container {
         byte getType() {
             return DataType.INT;
         }
+
+        @Override
+        boolean equalTo(BaseContainer other) {
+            return other.getType() == DataType.INT &&
+                    ((IntContainer) other).value == this.value;
+        }
     }
 
     static class FloatContainer extends BaseContainer {
@@ -60,6 +77,12 @@ class Container {
         @Override
         byte getType() {
             return DataType.FLOAT;
+        }
+
+        @Override
+        boolean equalTo(BaseContainer other) {
+            return other.getType() == DataType.FLOAT &&
+                    ((FloatContainer) other).value == this.value;
         }
     }
 
@@ -75,6 +98,12 @@ class Container {
         byte getType() {
             return DataType.LONG;
         }
+
+        @Override
+        boolean equalTo(BaseContainer other) {
+            return other.getType() == DataType.LONG &&
+                    ((LongContainer) other).value == this.value;
+        }
     }
 
     static class DoubleContainer extends BaseContainer {
@@ -88,6 +117,12 @@ class Container {
         @Override
         byte getType() {
             return DataType.DOUBLE;
+        }
+
+        @Override
+        boolean equalTo(BaseContainer other) {
+            return other.getType() == DataType.DOUBLE &&
+                    ((DoubleContainer) other).value == this.value;
         }
     }
 
@@ -115,6 +150,13 @@ class Container {
         byte getType() {
             return DataType.STRING;
         }
+
+        @Override
+        boolean equalTo(BaseContainer other) {
+            return other.getType() == DataType.STRING &&
+                    ((StringContainer) other).external == this.external &&
+                    Objects.equals(((StringContainer) other).value, this.value);
+        }
     }
 
     static class ArrayContainer extends VarContainer {
@@ -127,6 +169,26 @@ class Container {
         byte getType() {
             return DataType.ARRAY;
         }
+
+        @Override
+        boolean equalTo(BaseContainer other) {
+            if (other.getType() != DataType.ARRAY) return false;
+            Object otherValue = ((ArrayContainer) other).value;
+            if (value == otherValue) return true;
+            if (value != null && otherValue != null) {
+                if (value instanceof String) {
+                    return value.equals(otherValue);
+                }
+                if (value instanceof byte[]) {
+                    if (otherValue instanceof byte[]) {
+                        return Arrays.equals((byte[]) value, (byte[]) otherValue);
+                    } else {
+                        return false;
+                    }
+                }
+            }
+            return false;
+        }
     }
 
     static class ObjectContainer extends VarContainer {
@@ -137,6 +199,12 @@ class Container {
         @Override
         byte getType() {
             return DataType.OBJECT;
+        }
+
+        @Override
+        boolean equalTo(BaseContainer other) {
+            return other.getType() == DataType.OBJECT &&
+                    Objects.equals(((ObjectContainer) other).value, this.value);
         }
     }
 }

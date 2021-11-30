@@ -13,11 +13,18 @@ public class CommonStore {
 }
 ```
 
-FastPreferences的代码实现：[FastPreferences.java](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/fastkv/FastPreferences.java) <br>
+FastPreferences的代码实现：[FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/FastPreferences.java) <br>
 FastPreferences是SharedPreferences的实现类，用FastPreferences替换SDK的SharedPreferencesImpl（由context.getSharedPreferences返回)之后，由于接口不变，不需要改动其他代码。<br>
 
-## 2. Kotlin下的用法
+## 2. 多进程
+项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/MPFastKV.java)。<br>
+MPFastKV除了支持多进程读写之外，还会实现了SharedPreferences的接口，包括支持注册OnSharedPreferenceChangeListener，其中一个进程修改了数据，所有的进程都会感知（通过OnSharedPreferenceChangeListener回调）。<br>
+具体用法可参考 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/MultiProcessTestActivity.kt) 和 [TestService](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/TestService.kt)
 
+需要提醒的是，由于支持多进程需要维护更多的状态 [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/MPFastKV.java) 的写入要比 [FastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/FastKV.java) 慢不少，所以在不需要多进程访问的情况下，尽量用 [FastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/FastKV.java) 或 [FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/FastPreferences.java)。
+
+
+## 3. Kotlin API
 Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。
 此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。
 
@@ -107,3 +114,8 @@ class BooleanProperty(private val key: String, private val defValue: Boolean) :
 ```
 
 代码链接：[KVData](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/github/fastkvdemo/fastkv/KVData.kt)
+
+
+
+
+

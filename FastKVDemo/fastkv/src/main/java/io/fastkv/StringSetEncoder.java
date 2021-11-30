@@ -1,5 +1,7 @@
 package io.fastkv;
 
+import androidx.annotation.NonNull;
+
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -15,7 +17,7 @@ class StringSetEncoder implements FastKV.Encoder<Set<String>> {
     }
 
     @Override
-    public byte[] encode(Set<String> src) {
+    public byte[] encode(@NonNull Set<String> src) {
         if (src.isEmpty()) {
             return new byte[0];
         }
@@ -48,7 +50,7 @@ class StringSetEncoder implements FastKV.Encoder<Set<String>> {
     }
 
     @Override
-    public Set<String> decode(byte[] bytes, int offset, int length) {
+    public Set<String> decode(@NonNull byte[] bytes, int offset, int length) {
         Set<String> set = new LinkedHashSet<>();
         if (length > 0) {
             FastBuffer buffer = new FastBuffer(bytes, offset);

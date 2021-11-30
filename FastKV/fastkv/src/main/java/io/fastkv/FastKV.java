@@ -9,6 +9,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 
 import io.fastkv.Container.*;
 
@@ -76,6 +77,8 @@ public class FastKV {
 
     // Only take effect when mode is not NON_BLOCKING
     private boolean autoCommit = true;
+
+    private final Executor executor = new LimitExecutor();
 
     FastKV(final String path, final String name, Encoder[] encoders, int writingMode) {
         this.path = path;
@@ -951,7 +954,7 @@ public class FastKV {
 
     private boolean commitToCFile() {
         if (writingMode == ASYNC_BLOCKING) {
-            FastKVConfig.getExecutor().execute(this::writeToCFile);
+            executor.execute(this::writeToCFile);
         } else if (writingMode == SYNC_BLOCKING) {
             return writeToCFile();
         }

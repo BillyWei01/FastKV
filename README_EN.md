@@ -21,16 +21,20 @@ It can be used on  platforms with JVM environment, such as Android.
     - Support storage objects.
     - Built in encoder with Set<String> (for compatibility with SharePreferences).
 
-4. Easy to use
+4. Support multiprocess
+   - The project supply an implement to support multiprocess（MPFastKV).
+   - Support listener for changed values for a certain key, one process write, all processes known.
+
+5. Easy to use
     - FastKV provides rich API interfaces, including getAll() and putAll() methods, it is convenient to migrate the data of frameworks such as sharepreferences to FastKV. 
 
-5. Stable and reliable
+6. Stable and reliable
     - When FastKV writes data in non-blocking way (mmap), it writes two files one by one,  to ensure that at least one file is complete at any time;
     - FastKV checks the integrity of the files when loading, if one file is incomplete, it will be restored with another file which is complete.
     - If mmap API fails, it will be degraded to the blocking I/O; 
      and it will try to restore to mmap mode when reloading.
 
-6. Simple code
+7. Simple code
     - FastKV is implemented in pure Java and the jar package is less than 40K.
    
 ## 2. Getting Start
@@ -39,7 +43,7 @@ It can be used on  platforms with JVM environment, such as Android.
 FastKV had been publish to Maven Central:
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.0.4'
+    implementation 'io.github.billywei01:fastkv:1.0.5'
 }
 ```
 

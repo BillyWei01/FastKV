@@ -1,6 +1,7 @@
 package io.fastkv.fastkvdemo
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
@@ -14,6 +15,7 @@ import io.fastkv.fastkvdemo.storage.CommonStoreV2
 import io.fastkv.fastkvdemo.util.runBlock
 import kotlinx.android.synthetic.main.activity_main.account_info_tv
 import kotlinx.android.synthetic.main.activity_main.login_btn
+import kotlinx.android.synthetic.main.activity_main.test_multi_process_btn
 import kotlinx.android.synthetic.main.activity_main.test_performance_btn
 import kotlinx.android.synthetic.main.activity_main.tips_tv
 import kotlinx.android.synthetic.main.activity_main.user_info_tv
@@ -42,12 +44,17 @@ class MainActivity : AppCompatActivity() {
             updateAccountInfo()
         }
 
+        test_multi_process_btn.setOnClickListener {
+            val intent = Intent(this, MultiProcessTestActivity::class.java)
+            startActivity(intent)
+        }
+
         test_performance_btn.setOnClickListener {
             tips_tv.text = getString(R.string.running_tips)
             tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
             test_performance_btn.isEnabled = false
             serialChannel.runBlock {
-                BenchMark.start()
+                Benchmark.start()
                 GlobalScope.launch(Dispatchers.Main) {
                     tips_tv.text = getString(R.string.test_tips)
                     tips_tv.setTextColor(Color.parseColor("#FF009900"))

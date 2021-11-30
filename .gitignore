@@ -4,3 +4,6 @@ FastKV/build/
 FastKV/.DS_Store
 FastKV/out/
 .DS_Store
+/build
+FastKVDemo/fastkv/build
+FastKVDemo/app/build

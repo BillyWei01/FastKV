@@ -19,20 +19,20 @@ public class Main {
             setValues(kv);
             kv.putBoolean("flag", true);
         }
-
-        // kv.clear();
+        kv.putInt("int_key", kv.getInt("int_key") + 1);
 
         KVViewer.printFastKV(kv);
         HexViewer.printFile(path + name + ".kva", 160);
     }
 
     private static void setValues(FastKV kv) {
+        System.out.println("setValue");
         if (!kv.contains("bool_key")) {
             String boolKey = "bool_key";
             kv.putBoolean(boolKey, true);
 
             String intKey = "int_key";
-            kv.putInt(intKey, 12345);
+            kv.putInt(intKey, 100);
 
             String floatKey = "float_key";
             kv.putFloat(floatKey, 3.1415f);

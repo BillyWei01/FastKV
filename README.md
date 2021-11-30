@@ -15,19 +15,22 @@ FastKV有以下特点：
    - 除了mmap这种非阻塞的写入方式，FastKV也支持常规的阻塞式写入方式，
      并且支持同步阻塞和异步阻塞（分别类似于SharePreferences的commit和apply)。
 3. 支持多种类型
-   - 支持常用的boolean/int/float/long/double/String等基础类型；
-   - 支持ByteArray (byte[])；
+   - 支持常用的boolean/int/float/long/double/String等基础类型。
+   - 支持ByteArray (byte[])。
    - 支持存储自定义对象。
-   - 内置Set<String>的编码器。(为了方便兼容SharePreferences)。
-4. 方便易用
+   - 内置Set<String>的编码器 (兼容SharePreferences)。
+4. 支持多进程
+   - 项目提供了支持多进程的存储类（MPFastKV)。
+   - 支持监听文件内容变化，其中一个进程修改文件，所有进程皆可感知。
+5. 方便易用
    - FastKV提供了了丰富的API接口，开箱即用。
    - 提供的接口其中包括getAll()和putAll()方法，
      所以很方便迁移SharePreferences等框架的数据到FastKV, 当然，迁移FastKV的数据到其他框架也很方便。
-5. 稳定可靠
+6. 稳定可靠
    - 通过double-write等方法确保数据的完整性。
    - 在API抛IO异常时提供降级处理。
-6. 代码精简
-   - FastKV由纯Java实现，编译成jar包后体积仅30多K。
+7. 代码精简
+   - FastKV由纯Java实现，编译成jar包后体积仅40K。
    
 ## 2. 使用方法
 
@@ -35,7 +38,7 @@ FastKV有以下特点：
 FastKV 已发布到Maven中央仓库，路径如下:
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.0.4'
+    implementation 'io.github.billywei01:fastkv:1.0.5'
 }
 ```
 

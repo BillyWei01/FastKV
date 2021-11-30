@@ -25,14 +25,14 @@ import java.io.File
 import java.io.IOException
 import java.util.*
 
-object BenchMark {
+object Benchmark {
     private const val TAG = "Benchmark"
     private val sp = GlobalConfig.appContext.getSharedPreferences("sp", Context.MODE_PRIVATE)
     private val dataStore = PreferenceDataStoreFactory.create { File(PathManager.filesDir, "data_store.preferences_pb") }
     private val mmkv = MMKV.defaultMMKV()
     private val fastkv = FastKV.Builder(fastKVDir, "fastkv").build()
 
-    private const val MILLION = 1000000
+    private const val MILLION = 1000000L
     private var hadWarmingUp = false
     suspend fun start() {
         try {
@@ -57,11 +57,13 @@ object BenchMark {
         val time = LongArray(4)
         Arrays.fill(time, 0L)
         inputList = ArrayList(srcList)
+
+        Log.w(TAG, "We remove DataStore's case because it writes too slow")
         for (i in 0..0) {
             val t1 = System.nanoTime()
             applyToSp(inputList)
             val t2 = System.nanoTime()
-            applyToDataStore(inputList)
+            // applyToDataStore(inputList)
             val t3 = System.nanoTime()
             putToMMKV(inputList)
             val t4 = System.nanoTime()
@@ -86,9 +88,7 @@ object BenchMark {
             applyToSp(inputList)
             val t2 = System.nanoTime()
             // DataStore writes too slow.
-            // You could remove it to accelerate the test (without result for DataStore).
             // applyToDataStore(inputList)
-            applyToDataStore(inputList)
             val t3 = System.nanoTime()
             putToMMKV(inputList)
             val t4 = System.nanoTime()
@@ -139,7 +139,7 @@ object BenchMark {
     private suspend fun warmingUp(srcList: ArrayList<Pair<String, Any>>, r: Random) {
         if (!hadWarmingUp) {
             applyToSp(srcList)
-            applyToDataStore(srcList)
+            //applyToDataStore(srcList)
             putToMMKV(srcList)
             putToFastKV(srcList)
 

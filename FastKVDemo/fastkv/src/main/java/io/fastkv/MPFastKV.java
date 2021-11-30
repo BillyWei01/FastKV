@@ -1,6 +1,13 @@
 package io.fastkv;
 
+import android.content.SharedPreferences;
+import android.os.FileObserver;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -8,41 +15,67 @@ import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
+import io.fastkv.FastKV.*;
 import io.fastkv.Container.*;
 
+/**
+ * Multiprocess FastKV <br>
+ *
+ * This class support cross process storage and update notify.
+ * It implement API of SharePreferences, so it could use as SharePreferences.<br>
+ *
+ * Note:
+ * To support cross process storage, MPFastKV needs to do many state checks,
+ * it's much slower than {@link FastKV}.
+ * So if you don't need to access the data in multiprocess, just use FastKV.
+ */
 @SuppressWarnings("rawtypes")
-public final class FastKV extends AbsFastKV {
+public final class MPFastKV extends AbsFastKV implements SharedPreferences, SharedPreferences.Editor {
+    private static final int MSG_REFRESH = 1;
+    private static final int MSG_RELEASE = 2;
+    private static final int MSG_DATA_CHANGE = 3;
+    private static final int MSG_CLEAR = 4;
+    private static final int RELEASE_TIMEOUT = 3000;
+
+    private static final Random random = new Random();
+
+    private final File aFile;
+    private final File bFile;
+    private RandomAccessFile aAccessFile;
+    private RandomAccessFile bAccessFile;
     private FileChannel aChannel;
     private FileChannel bChannel;
     private MappedByteBuffer aBuffer;
-    private MappedByteBuffer bBuffer;
+    private FileLock bFileLock;
 
+    private int[] updateStartAndSize = new int[16];
+    private int updateCount = 0;
     private int updateStart;
     private int updateSize;
-    private int removeStart;
-    private boolean sizeChanged;
+    private final List<String> deletedFiles = new ArrayList<>();
 
-    // The default writing mode is non-blocking (write partial data with mmap).
-    // If mmap API throw IOException, degrade to blocking mode (write all data to disk with blocking I/O).
-    // User could assign to using blocking mode by FastKV.Builder
-    static final int NON_BLOCKING = 0;
-    static final int ASYNC_BLOCKING = 1;
-    static final int SYNC_BLOCKING = 2;
-    private int writingMode;
+    private long updateHash;
+    private boolean needFullWrite = false;
 
-    // Only take effect when mode is not NON_BLOCKING
-    private boolean autoCommit = true;
+    private final Executor applyExecutor = new LimitExecutor();
+    private final Executor refreshExecutor = new LimitExecutor();
 
-    private final Executor executor = new LimitExecutor();
+    // We need to keep reference to the observer in case of gc recycle it.
+    @SuppressWarnings("FieldCanBeLocal")
+    private final KVFileObserver fileObserver;
+    private final Set<String> changedKey = new HashSet<>();
+    private final ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners = new ArrayList<>();
 
-    FastKV(final String path, final String name, Encoder[] encoders, int writingMode) {
+    MPFastKV(final String path, final String name, Encoder[] encoders, boolean needWatchFileChange) {
         super(path, name, encoders);
-        this.writingMode = writingMode;
+        aFile = new File(path, name + A_SUFFIX);
+        bFile = new File(path, name + B_SUFFIX);
 
         synchronized (data) {
             FastKVConfig.getExecutor().execute(this::loadData);
@@ -54,6 +87,13 @@ public final class FastKV extends AbsFastKV {
                 }
             }
         }
+
+        if (needWatchFileChange) {
+            fileObserver = new KVFileObserver(bFile.getPath());
+            fileObserver.startWatching();
+        } else {
+            fileObserver = null;
+        }
     }
 
     private synchronized void loadData() {
@@ -63,12 +103,13 @@ public final class FastKV extends AbsFastKV {
             data.notify();
         }
         long start = System.nanoTime();
-        if (!loadFromCFile() && writingMode == NON_BLOCKING) {
+        if (!loadFromCFile()) {
             loadFromABFile();
         }
         if (fastBuffer == null) {
             fastBuffer = new FastBuffer(PAGE_SIZE);
         }
+        getUpdateHash();
         if (logger != null) {
             long t = (System.nanoTime() - start) / 1000000;
             info("loading finish, data len:" + dataEnd + ", get keys:" + data.size() + ", use time:" + t + " ms");
@@ -76,101 +117,145 @@ public final class FastKV extends AbsFastKV {
     }
 
     private void loadFromABFile() {
-        File aFile = new File(path, name + A_SUFFIX);
-        File bFile = new File(path, name + B_SUFFIX);
         try {
             if (!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) {
                 error(new Exception(OPEN_FILE_FAILED));
-                toBlockingMode();
                 return;
             }
-            RandomAccessFile aAccessFile = new RandomAccessFile(aFile, "rw");
-            RandomAccessFile bAccessFile = new RandomAccessFile(bFile, "rw");
+            aAccessFile = new RandomAccessFile(aFile, "rw");
+            bAccessFile = new RandomAccessFile(bFile, "rw");
             long aFileLen = aAccessFile.length();
             long bFileLen = bAccessFile.length();
             aChannel = aAccessFile.getChannel();
             bChannel = bAccessFile.getChannel();
+            FileLock lock = bChannel.lock();
             try {
-                aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, aFileLen > 0 ? aFileLen : PAGE_SIZE);
-                aBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, bFileLen > 0 ? bFileLen : PAGE_SIZE);
-                bBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            } catch (IOException e) {
-                error(e);
-                toBlockingMode();
-                tryBlockingIO(aFile, bFile);
-                return;
-            }
-            fastBuffer = new FastBuffer(aBuffer.capacity());
-
-            if (aFileLen == 0 && bFileLen == 0) {
-                dataEnd = DATA_START;
-            } else {
-                int aDataSize = aBuffer.getInt();
-                long aCheckSum = aBuffer.getLong();
-                int bDataSize = bBuffer.getInt();
-                long bCheckSum = bBuffer.getLong();
-
-                boolean isAValid = false;
-                if (aDataSize >= 0 && (aDataSize <= aFileLen - DATA_START)) {
-                    dataEnd = DATA_START + aDataSize;
-                    aBuffer.rewind();
-                    aBuffer.get(fastBuffer.hb, 0, dataEnd);
-                    if (aCheckSum == fastBuffer.getChecksum(DATA_START, aDataSize) && parseData() == 0) {
-                        checksum = aCheckSum;
-                        isAValid = true;
-                    }
+                try {
+                    aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, aFileLen > 0 ? aFileLen : PAGE_SIZE);
+                    aBuffer.order(ByteOrder.LITTLE_ENDIAN);
+                } catch (IOException e) {
+                    error(e);
+                    tryBlockingIO(aFile, bFile);
+                    return;
                 }
-                if (isAValid) {
-                    if (aFileLen != bFileLen || !isABFileEqual()) {
-                        warning(new Exception("B file error"));
-                        copyBuffer(aBuffer, bBuffer, dataEnd);
-                    }
+
+                if (aFileLen == 0 && bFileLen == 0) {
+                    dataEnd = DATA_START;
+                    bAccessFile.setLength(PAGE_SIZE);
+                    bChannel.truncate(PAGE_SIZE);
                 } else {
-                    boolean isBValid = false;
-                    if (bDataSize >= 0 && (bDataSize <= bFileLen - DATA_START)) {
-                        data.clear();
-                        clearInvalid();
-                        dataEnd = DATA_START + bDataSize;
-                        if (fastBuffer.hb.length != bBuffer.capacity()) {
-                            fastBuffer = new FastBuffer(bBuffer.capacity());
+                    if (loadWithBlockingIO(bFile)) {
+                        boolean isAEqualB = false;
+                        if (aFileLen == bFileLen && fastBuffer.hb.length == aBuffer.capacity()) {
+                            byte[] b = fastBuffer.hb;
+                            byte[] a = new byte[dataEnd];
+                            aBuffer.get(a, 0, dataEnd);
+                            int i = 0;
+                            for (; i < dataEnd; i++) {
+                                if (a[i] != b[i]) break;
+                            }
+                            isAEqualB = i == dataEnd;
                         }
-                        bBuffer.rewind();
-                        bBuffer.get(fastBuffer.hb, 0, dataEnd);
-                        if (bCheckSum == fastBuffer.getChecksum(DATA_START, bDataSize) && parseData() == 0) {
+                        if (!isAEqualB) {
                             warning(new Exception("A file error"));
-                            copyBuffer(bBuffer, aBuffer, dataEnd);
-                            checksum = bCheckSum;
-                            isBValid = true;
+                            fullWriteBufferToA();
                         }
-                    }
-                    if (!isBValid) {
-                        error(BOTH_FILES_ERROR);
-                        clearData();
+                    } else {
+                        updateCount = 0;
+                        resetData();
+                        if (fastBuffer == null || fastBuffer.hb.length != aBuffer.capacity()) {
+                            fastBuffer = new FastBuffer(aBuffer.capacity());
+                        }
+                        int aDataSize = aBuffer.getInt();
+                        boolean isAValid = false;
+                        if (aDataSize >= 0 && (aDataSize <= aFileLen - DATA_START)) {
+                            dataEnd = DATA_START + aDataSize;
+                            long aCheckSum = aBuffer.getLong(4);
+                            aBuffer.rewind();
+                            aBuffer.get(fastBuffer.hb, 0, dataEnd);
+                            if (aCheckSum == fastBuffer.getChecksum(DATA_START, aDataSize) && parseData() == 0) {
+                                checksum = aCheckSum;
+                                isAValid = true;
+                            }
+                        }
+                        if (isAValid) {
+                            warning(new Exception("B file error"));
+                            fullWriteAToB();
+                        } else {
+                            error(BOTH_FILES_ERROR);
+                            clearData();
+                        }
                     }
                 }
+                getUpdateHash();
+            } finally {
+                lock.release();
             }
         } catch (Exception e) {
             error(e);
             resetMemory();
-            toBlockingMode();
         }
     }
 
-    private boolean isABFileEqual() {
-        FastBuffer tempBuffer = new FastBuffer(dataEnd);
-        bBuffer.rewind();
-        bBuffer.get(tempBuffer.hb, 0, dataEnd);
-        byte[] a = fastBuffer.hb;
-        byte[] b = tempBuffer.hb;
-        for (int i = 0; i < dataEnd; i++) {
-            if (a[i] != b[i]) {
-                return false;
+    private void getUpdateHash() {
+        if (aBuffer != null && dataEnd + 8 < aBuffer.capacity()) {
+            updateHash = aBuffer.getLong(dataEnd);
+        }
+    }
+
+    private void fullWriteAToB() {
+        try {
+            if (!Util.makeFileIfNotExist(bFile)) {
+                return;
             }
+            setBFileSize(aBuffer.capacity());
+            syncAToB(0, dataEnd);
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+
+    private void fullWriteBufferToA() {
+        try {
+            if (alignAToBuffer()) {
+                aBuffer.position(0);
+                aBuffer.put(fastBuffer.hb, 0, dataEnd);
+            }
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+
+    private boolean alignAToBuffer() {
+        int bufferSize = fastBuffer.hb.length;
+        try {
+            if (aAccessFile == null) {
+                if (!Util.makeFileIfNotExist(aFile)) {
+                    return false;
+                }
+                aAccessFile = new RandomAccessFile(aFile, "rw");
+            }
+            if (aAccessFile.length() != bufferSize) {
+                aAccessFile.setLength(bufferSize);
+            }
+            if (aChannel == null) {
+                aChannel = aAccessFile.getChannel();
+            } else if (aChannel.size() != bufferSize) {
+                aChannel.truncate(bufferSize);
+            }
+            if (aBuffer == null || aBuffer.capacity() != bufferSize) {
+                aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, bufferSize);
+                aBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            }
+        } catch (Exception e) {
+            error(e);
+            return false;
         }
         return true;
     }
 
+    // MPFastKV do not write data to CFile,
+    // just in case of user write data with FastKV at first and then change to MPFastKV
     private boolean loadFromCFile() {
         boolean hadWriteToABFile = false;
         File cFile = new File(path, name + C_SUFFIX);
@@ -184,29 +269,14 @@ public final class FastKV extends AbsFastKV {
             }
             if (srcFile != null) {
                 if (loadWithBlockingIO(srcFile)) {
-                    if (writingMode == NON_BLOCKING) {
-                        if (writeToABFile(fastBuffer)) {
-                            info("recover from c file");
-                            hadWriteToABFile = true;
-                            deleteCFiles();
-                        } else {
-                            writingMode = ASYNC_BLOCKING;
-                        }
+                    if (writeToABFile(fastBuffer)) {
+                        info("recover from c file");
+                        hadWriteToABFile = true;
                     }
                 } else {
                     resetMemory();
-                    deleteCFiles();
                 }
-            } else {
-                // Handle the case:
-                // User opening with non-blocking mode at first, and change to blocking mode in later.
-                if (writingMode != NON_BLOCKING) {
-                    File aFile = new File(path, name + A_SUFFIX);
-                    File bFile = new File(path, name + B_SUFFIX);
-                    if (aFile.exists() && bFile.exists()) {
-                        tryBlockingIO(aFile, bFile);
-                    }
-                }
+                deleteCFiles();
             }
         } catch (Exception e) {
             error(e);
@@ -215,25 +285,32 @@ public final class FastKV extends AbsFastKV {
     }
 
     private boolean writeToABFile(FastBuffer buffer) {
-        int fileLen = buffer.hb.length;
-        File aFile = new File(path, name + A_SUFFIX);
-        File bFile = new File(path, name + B_SUFFIX);
+        int bufferLen = buffer.hb.length;
         try {
             if (!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) {
                 throw new Exception(OPEN_FILE_FAILED);
             }
-            RandomAccessFile aAccessFile = new RandomAccessFile(aFile, "rw");
-            RandomAccessFile bAccessFile = new RandomAccessFile(bFile, "rw");
-            aAccessFile.setLength(fileLen);
-            bAccessFile.setLength(fileLen);
-            aChannel = aAccessFile.getChannel();
-            bChannel = bAccessFile.getChannel();
-            aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
-            aBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
-            bBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            aBuffer.put(buffer.hb, 0, dataEnd);
-            bBuffer.put(buffer.hb, 0, dataEnd);
+            if (bAccessFile == null) {
+                bAccessFile = new RandomAccessFile(bFile, "rw");
+            }
+            if (bChannel == null) {
+                bChannel = bAccessFile.getChannel();
+            }
+            FileLock lock = bFileLock == null ? bChannel.lock() : null;
+            try {
+                alignAToBuffer();
+                aBuffer.put(buffer.hb, 0, dataEnd);
+                if (bAccessFile.length() != bufferLen) {
+                    bAccessFile.setLength(bufferLen);
+                }
+                bChannel.truncate(bufferLen);
+                syncAToB(0, dataEnd);
+                bChannel.force(false);
+            } finally {
+                if (lock != null) {
+                    lock.release();
+                }
+            }
             return true;
         } catch (Exception e) {
             error(e);
@@ -241,33 +318,60 @@ public final class FastKV extends AbsFastKV {
         return false;
     }
 
-    private void copyBuffer(MappedByteBuffer src, MappedByteBuffer des, int end) {
-        if (src.capacity() != des.capacity()) {
-            try {
-                FileChannel channel = (des == bBuffer) ? bChannel : aChannel;
-                MappedByteBuffer newBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, src.capacity());
-                newBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                if (des == bBuffer) {
-                    bBuffer = newBuffer;
-                } else {
-                    aBuffer = newBuffer;
-                }
-                des = newBuffer;
-            } catch (IOException e) {
-                error(e);
-                toBlockingMode();
-                return;
-            }
+    private void syncAToB(int offset, int length) throws IOException {
+        MappedByteBuffer buffer = aBuffer;
+        buffer.position(offset);
+        buffer.limit(offset + length);
+        bChannel.position(offset);
+        while (buffer.hasRemaining()) {
+            bChannel.write(buffer);
         }
-        src.rewind();
-        des.rewind();
-        src.limit(end);
-        des.put(src);
-        src.limit(src.capacity());
+        buffer.limit(buffer.capacity());
     }
 
-    public synchronized void putBoolean(String key, boolean value) {
+    private void syncBufferToA(int offset, int length) {
+        byte[] bytes = fastBuffer.hb;
+        aBuffer.position(offset);
+        aBuffer.put(bytes, offset, length);
+    }
+
+    @Nullable
+    @Override
+    public Set<String> getStringSet(String key, @Nullable Set<String> defValues) {
+        Set<String> set = getStringSet(key);
+        return set != null ? set : defValues;
+    }
+
+    @Override
+    public Editor edit() {
+        return this;
+    }
+
+    private void notifyListeners(ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners, String key) {
+        for (SharedPreferences.OnSharedPreferenceChangeListener listener : listeners) {
+            listener.onSharedPreferenceChanged(this, key);
+        }
+    }
+
+    @Override
+    public synchronized void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
+        if (listener == null) {
+            return;
+        }
+        if (!listeners.contains(listener)) {
+            listeners.add(listener);
+        }
+    }
+
+    @Override
+    public synchronized void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
+        listeners.remove(listener);
+    }
+
+    @Override
+    public synchronized Editor putBoolean(String key, boolean value) {
         checkKey(key);
+        lockAndCheckUpdate();
         BooleanContainer c = (BooleanContainer) data.get(key);
         if (c == null) {
             wrapHeader(key, DataType.BOOLEAN);
@@ -275,16 +379,19 @@ public final class FastKV extends AbsFastKV {
             fastBuffer.put((byte) (value ? 1 : 0));
             updateChange();
             data.put(key, new BooleanContainer(offset, value));
-            checkIfCommit();
+            markChanged(key);
         } else if (c.value != value) {
             c.value = value;
             updateBoolean((byte) (value ? 1 : 0), c.offset);
-            checkIfCommit();
+            markChanged(key);
         }
+        return this;
     }
 
-    public synchronized void putInt(String key, int value) {
+    @Override
+    public synchronized Editor putInt(String key, int value) {
         checkKey(key);
+        lockAndCheckUpdate();
         IntContainer c = (IntContainer) data.get(key);
         if (c == null) {
             wrapHeader(key, DataType.INT);
@@ -292,17 +399,20 @@ public final class FastKV extends AbsFastKV {
             fastBuffer.putInt(value);
             updateChange();
             data.put(key, new IntContainer(offset, value));
-            checkIfCommit();
+            markChanged(key);
         } else if (c.value != value) {
             long sum = (value ^ c.value) & 0xFFFFFFFFL;
             c.value = value;
             updateInt32(value, sum, c.offset);
-            checkIfCommit();
+            markChanged(key);
         }
+        return this;
     }
 
-    public synchronized void putFloat(String key, float value) {
+    @Override
+    public synchronized Editor putFloat(String key, float value) {
         checkKey(key);
+        lockAndCheckUpdate();
         FloatContainer c = (FloatContainer) data.get(key);
         if (c == null) {
             wrapHeader(key, DataType.FLOAT);
@@ -310,18 +420,21 @@ public final class FastKV extends AbsFastKV {
             fastBuffer.putInt(Float.floatToRawIntBits(value));
             updateChange();
             data.put(key, new FloatContainer(offset, value));
-            checkIfCommit();
+            markChanged(key);
         } else if (c.value != value) {
             int newValue = Float.floatToRawIntBits(value);
             long sum = (Float.floatToRawIntBits(c.value) ^ newValue) & 0xFFFFFFFFL;
             c.value = value;
             updateInt32(newValue, sum, c.offset);
-            checkIfCommit();
+            markChanged(key);
         }
+        return this;
     }
 
-    public synchronized void putLong(String key, long value) {
+    @Override
+    public synchronized Editor putLong(String key, long value) {
         checkKey(key);
+        lockAndCheckUpdate();
         LongContainer c = (LongContainer) data.get(key);
         if (c == null) {
             wrapHeader(key, DataType.LONG);
@@ -329,17 +442,19 @@ public final class FastKV extends AbsFastKV {
             fastBuffer.putLong(value);
             updateChange();
             data.put(key, new LongContainer(offset, value));
-            checkIfCommit();
+            markChanged(key);
         } else if (c.value != value) {
             long sum = value ^ c.value;
             c.value = value;
             updateInt64(value, sum, c.offset);
-            checkIfCommit();
+            markChanged(key);
         }
+        return this;
     }
 
     public synchronized void putDouble(String key, double value) {
         checkKey(key);
+        lockAndCheckUpdate();
         DoubleContainer c = (DoubleContainer) data.get(key);
         if (c == null) {
             wrapHeader(key, DataType.DOUBLE);
@@ -347,21 +462,24 @@ public final class FastKV extends AbsFastKV {
             fastBuffer.putLong(Double.doubleToRawLongBits(value));
             updateChange();
             data.put(key, new DoubleContainer(offset, value));
-            checkIfCommit();
+            markChanged(key);
         } else if (c.value != value) {
             long newValue = Double.doubleToRawLongBits(value);
             long sum = Double.doubleToRawLongBits(c.value) ^ newValue;
             c.value = value;
             updateInt64(newValue, sum, c.offset);
-            checkIfCommit();
+            markChanged(key);
         }
     }
 
-    public synchronized void putString(String key, String value) {
+    @Override
+    public synchronized Editor putString(String key, String value) {
         checkKey(key);
         if (value == null) {
             remove(key);
         } else {
+            lockAndCheckUpdate();
+            markChanged(key);
             StringContainer c = (StringContainer) data.get(key);
             if (value.length() * 3 < INTERNAL_LIMIT) {
                 // putString is a frequently operation,
@@ -372,6 +490,7 @@ public final class FastKV extends AbsFastKV {
                 addOrUpdate(key, value, bytes, c, DataType.STRING);
             }
         }
+        return this;
     }
 
     public synchronized void putArray(String key, byte[] value) {
@@ -379,6 +498,8 @@ public final class FastKV extends AbsFastKV {
         if (value == null) {
             remove(key);
         } else {
+            lockAndCheckUpdate();
+            markChanged(key);
             ArrayContainer c = (ArrayContainer) data.get(key);
             addOrUpdate(key, value, value, c, DataType.ARRAY);
         }
@@ -408,6 +529,7 @@ public final class FastKV extends AbsFastKV {
             remove(key);
             return;
         }
+
         byte[] obj = null;
         try {
             obj = encoder.encode(value);
@@ -427,19 +549,24 @@ public final class FastKV extends AbsFastKV {
         buffer.putBytes(obj);
         byte[] bytes = buffer.hb;
 
+        lockAndCheckUpdate();
+        markChanged(key);
         ObjectContainer c = (ObjectContainer) data.get(key);
         addOrUpdate(key, value, bytes, c, DataType.OBJECT);
     }
 
-    public synchronized void putStringSet(String key, Set<String> set) {
+    public synchronized Editor putStringSet(String key, Set<String> set) {
         if (set == null) {
             remove(key);
         } else {
             putObject(key, set, StringSetEncoder.INSTANCE);
         }
+        return this;
     }
 
-    public synchronized void remove(String key) {
+    public synchronized Editor remove(String key) {
+        lockAndCheckUpdate();
+        markChanged(key);
         BaseContainer container = data.get(key);
         if (container != null) {
             String oldFileName = null;
@@ -454,29 +581,12 @@ public final class FastKV extends AbsFastKV {
                 remove(type, c.start, c.offset + c.valueSize);
                 oldFileName = c.external ? (String) c.value : null;
             }
-            byte newByte = (byte) (type | DataType.DELETE_MASK);
-            if (writingMode == NON_BLOCKING) {
-                aBuffer.putLong(4, checksum);
-                aBuffer.put(removeStart, newByte);
-                bBuffer.putLong(4, checksum);
-                bBuffer.put(removeStart, newByte);
-            } else {
-                fastBuffer.putLong(4, checksum);
-            }
-            removeStart = 0;
             if (oldFileName != null) {
-                Util.deleteFile(new File(path + name, oldFileName));
+                deletedFiles.add(oldFileName);
             }
             checkGC();
-            checkIfCommit();
         }
-    }
-
-    public synchronized void clear() {
-        clearData();
-        if (writingMode != NON_BLOCKING) {
-            deleteCFiles();
-        }
+        return this;
     }
 
     public void putAll(Map<String, Object> values) {
@@ -532,109 +642,295 @@ public final class FastKV extends AbsFastKV {
         }
     }
 
-    /**
-     * Forces any changes to be written to the storage device containing the mapped file.
-     * No need to call this unless what's had written is very import.
-     * The system crash or power off before data syncing to disk might make recently update loss.
-     */
     public synchronized void force() {
-        if (writingMode == NON_BLOCKING) {
-            aBuffer.force();
-            bBuffer.force();
-        }
-    }
-
-    /**
-     * When you open file with mode of SYNC_BLOCKING or ASYNC_BLOCKING,
-     * It will auto commit after every putting or removing, by default.
-     * If you need to batch update several key-values, you could call this method at first,
-     * and call {@link #commit()} after updating, that method will recover {@link #autoCommit} to 'true' again.
-     */
-    public synchronized void disableAutoCommit() {
-        this.autoCommit = false;
-    }
-
-    public synchronized boolean commit() {
-        autoCommit = true;
-        return commitToCFile();
-    }
-
-    private void checkIfCommit() {
-        if (writingMode != NON_BLOCKING && autoCommit) {
-            commitToCFile();
-        }
-    }
-
-    private boolean commitToCFile() {
-        if (writingMode == ASYNC_BLOCKING) {
-            executor.execute(this::writeToCFile);
-        } else if (writingMode == SYNC_BLOCKING) {
-            return writeToCFile();
-        }
-        return true;
-    }
-
-    private synchronized boolean writeToCFile() {
         try {
-            File tmpFile = new File(path, name + TEMP_SUFFIX);
-            if (Util.makeFileIfNotExist(tmpFile)) {
-                RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw");
-                accessFile.setLength(dataEnd);
-                accessFile.write(fastBuffer.hb, 0, dataEnd);
-                accessFile.close();
-                File cFile = new File(path, name + C_SUFFIX);
-                if (!cFile.exists() || cFile.delete()) {
-                    if (tmpFile.renameTo(cFile)) {
-                        return true;
-                    } else {
-                        warning(new Exception("rename failed"));
-                    }
-                }
+            if (aBuffer != null) {
+                aBuffer.force();
+            }
+            if (bChannel != null) {
+                bChannel.force(false);
             }
         } catch (Exception e) {
             error(e);
         }
+    }
+
+    @Override
+    public boolean commit() {
+        return updateFile();
+    }
+
+    @Override
+    public void apply() {
+        applyExecutor.execute(this::updateFile);
+    }
+
+    private boolean fullWrite() {
+        fastBuffer.position = 0;
+        int dataSize = fastBuffer.getInt();
+        checksum = fastBuffer.getLong();
+        dataEnd = DATA_START + dataSize;
+        if (checksum == fastBuffer.getChecksum(DATA_START, dataSize)) {
+            return writeToABFile(fastBuffer);
+        } else {
+            clearData();
+            return true;
+        }
+    }
+
+    private synchronized boolean updateFile() {
+        if (bFileLock == null) {
+            return false;
+        }
+        if (fastBuffer == null || (updateCount == 0 && !needFullWrite)) {
+            releaseLock();
+            return false;
+        }
+
+        try {
+            int dataSize = dataEnd - DATA_START;
+            fastBuffer.putInt(0, dataSize);
+            fastBuffer.putLong(4, checksum);
+
+            if (needFullWrite) {
+                boolean result = fullWrite();
+                if (result) {
+                    needFullWrite = false;
+                }
+                getUpdateHash();
+                return result;
+            }
+
+            if (!alignAToBuffer()) {
+                if (aBuffer != null) {
+                    // If aBuffer can't align to dataBuffer (Not enough memory?)，
+                    // drop the update
+                    reloadFromABuffer();
+                } else {
+                    needFullWrite = true;
+                }
+                return false;
+            }
+            setBFileSize(aBuffer.capacity());
+
+            // update A Aile
+            //syncBufferToA(0, DATA_START);
+            aBuffer.putInt(0, dataSize);
+            aBuffer.putLong(4, checksum);
+            for (int i = 0; i < updateCount; i += 2) {
+                int start = updateStartAndSize[i];
+                int size = updateStartAndSize[i + 1];
+                syncBufferToA(start, size);
+            }
+            if (dataEnd + 8 < aBuffer.capacity()) {
+                updateHash = random.nextLong() ^ System.currentTimeMillis();
+                aBuffer.putLong(dataEnd, updateHash);
+            }
+
+            // update B File
+            syncAToB(0, DATA_START);
+            for (int i = 0; i < updateCount; i += 2) {
+                int start = updateStartAndSize[i];
+                int size = updateStartAndSize[i + 1];
+                syncAToB(start, size);
+            }
+
+            if (!deletedFiles.isEmpty()) {
+                for (String oldFileName : deletedFiles) {
+                    Util.deleteFile(new File(path + name, oldFileName));
+                }
+            }
+
+            if (fastBuffer.hb.length - dataEnd > TRUNCATE_THRESHOLD) {
+                truncate();
+            }
+
+            return true;
+        } catch (Exception e) {
+            error(e);
+            needFullWrite = true;
+        } finally {
+            updateCount = 0;
+            if (!deletedFiles.isEmpty()) {
+                deletedFiles.clear();
+            }
+            releaseLock();
+            kvHandler.sendEmptyMessage(MSG_DATA_CHANGE);
+        }
         return false;
     }
 
-    private void toBlockingMode() {
-        writingMode = ASYNC_BLOCKING;
-        Util.closeQuietly(aChannel);
-        Util.closeQuietly(bChannel);
-        aChannel = null;
-        bChannel = null;
-        aBuffer = null;
-        bBuffer = null;
+    private void lockAndCheckUpdate() {
+        if (bChannel != null && bFileLock == null) {
+            try {
+                bFileLock = bChannel.lock();
+                checkUpdate();
+                // In case of user forget to release lock, set a timeout to release lock.
+                kvHandler.sendEmptyMessageDelayed(MSG_RELEASE, RELEASE_TIMEOUT);
+            } catch (Exception e) {
+                error(e);
+            }
+        }
+    }
+
+    private void releaseLock() {
+        if (bFileLock != null) {
+            try {
+                bFileLock.release();
+            } catch (Exception e) {
+                error(e);
+            }
+            bFileLock = null;
+            kvHandler.removeMessages(MSG_RELEASE);
+        }
+    }
+
+    private void reloadFromABuffer() {
+        if (aBuffer == null) {
+            return;
+        }
+        reloadData();
+        getUpdateHash();
+        fastBuffer.position = 0;
+        int dataSize = fastBuffer.getInt();
+        checksum = fastBuffer.getLong();
+        dataEnd = DATA_START + dataSize;
+        if (checksum != fastBuffer.getChecksum(DATA_START, dataSize) || parseData() != 0) {
+            clearData();
+        }
+    }
+
+    private void reloadData() {
+        data.clear();
+        clearInvalid();
+        int capacity = aBuffer.capacity();
+        if (fastBuffer == null) {
+            fastBuffer = new FastBuffer(capacity);
+        } else if (fastBuffer.hb.length != capacity) {
+            fastBuffer.hb = new byte[capacity];
+        }
+        aBuffer.rewind();
+        aBuffer.get(fastBuffer.hb, 0, dataEnd);
+    }
+
+    private void checkUpdate() throws IOException {
+        MappedByteBuffer buffer = aBuffer;
+        if (buffer == null) {
+            return;
+        }
+        int capacity = buffer.capacity();
+        int dataSize = buffer.getInt(0);
+        if (dataSize < 0 || dataSize > capacity) {
+            throw new IllegalStateException("Invalid file");
+        }
+        long sum = buffer.getLong(4);
+        int end = DATA_START + dataSize;
+        long hash = updateHash;
+        if (end < buffer.capacity() - 8) {
+            hash = buffer.getLong(end);
+        }
+        if (end != dataEnd || sum != checksum || hash != updateHash) {
+            int fileLen = (int) aFile.length();
+            if (fileLen <= 0) {
+                error("invalid file length");
+                return;
+            }
+            if (aBuffer.capacity() != fileLen) {
+                aChannel.truncate(fileLen);
+                aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
+                aBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            }
+            if (bChannel.size() != fileLen) {
+                bChannel.truncate(fileLen);
+            }
+            HashMap<String, BaseContainer> oldData = new HashMap<>(data);
+            dataEnd = end;
+            checksum = sum;
+            updateHash = hash;
+            reloadData();
+            if (sum == fastBuffer.getChecksum(DATA_START, dataSize) && parseData() == 0) {
+                checkDiff(oldData);
+            } else {
+                clearData();
+            }
+        }
+    }
+
+    private void checkDiff(HashMap<String, BaseContainer> oldData) {
+        Set<String> newSet = new HashSet<>(data.keySet());
+        Set<String> oldSet = new HashSet<>(oldData.keySet());
+        Set<String> common = new HashSet<>(newSet);
+        common.retainAll(oldSet);
+        newSet.removeAll(common);
+        oldSet.removeAll(common);
+        if (!listeners.isEmpty()) {
+            changedKey.clear();
+            changedKey.addAll(newSet);
+            changedKey.addAll(oldSet);
+            for (String key : common) {
+                BaseContainer oldValue = oldData.get(key);
+                BaseContainer newValue = data.get(key);
+                if (oldValue != null && !oldValue.equalTo(newValue)) {
+                    changedKey.add(key);
+                }
+            }
+            if (!changedKey.isEmpty()) {
+                kvHandler.sendEmptyMessage(MSG_DATA_CHANGE);
+            }
+        }
+    }
+
+    private void markChanged(String key) {
+        if (!listeners.isEmpty()) {
+            changedKey.add(key);
+        }
+    }
+
+    /**
+     * Clear all data, take effect immediately (no need to call commit/apply).
+     */
+    public synchronized Editor clear() {
+        lockAndCheckUpdate();
+        clearData();
+        releaseLock();
+        return this;
     }
 
     private void clearData() {
-        if (writingMode == NON_BLOCKING) {
-            try {
-                resetBuffer(aBuffer);
-                resetBuffer(bBuffer);
-            } catch (IOException e) {
-                toBlockingMode();
-            }
-        }
         resetMemory();
+        try {
+            alignAToBuffer();
+            aBuffer.putInt(0, 0);
+            aBuffer.putLong(4, 0L);
+            getUpdateHash();
+            if (Util.makeFileIfNotExist(bFile)) {
+                setBFileSize(PAGE_SIZE);
+                syncAToB(0, DATA_START);
+            }
+        } catch (Exception e) {
+            error(e);
+            needFullWrite = true;
+        }
         Util.deleteFile(new File(path + name));
+        kvHandler.sendEmptyMessage(MSG_CLEAR);
     }
 
-    private void resetBuffer(MappedByteBuffer buffer) throws IOException {
-        if (buffer.capacity() != PAGE_SIZE) {
-            FileChannel channel = buffer == aBuffer ? aChannel : bChannel;
-            channel.truncate(PAGE_SIZE);
-            MappedByteBuffer newBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, PAGE_SIZE);
-            newBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            if (buffer == aBuffer) {
-                aBuffer = newBuffer;
-            } else {
-                bBuffer = newBuffer;
-            }
-            buffer = newBuffer;
+    private void setBFileSize(int size) throws IOException {
+        if (bAccessFile == null) {
+            bAccessFile = new RandomAccessFile(bFile, "rw");
         }
-        buffer.putInt(0, 0);
-        buffer.putLong(4, 0L);
+        if (bChannel == null) {
+            bChannel = bAccessFile.getChannel();
+        }
+        if (bChannel.size() != size) {
+            bAccessFile.setLength(size);
+            bChannel.truncate(size);
+        }
+    }
+
+    protected void resetData(){
+        super.resetData();
+        updateHash = 0;
     }
 
     private void checkKey(String key) {
@@ -662,112 +958,54 @@ public final class FastKV extends AbsFastKV {
         putKey(key, keySize);
     }
 
-    private void updateChange() {
-        checksum ^= fastBuffer.getChecksum(updateStart, updateSize);
-        if (writingMode == NON_BLOCKING) {
-            // When size of changed data is more than 8 bytes,
-            // checksum might fail to check the integrity in small probability.
-            // So we make the dataLen to be negative,
-            // if crash happen when writing data to mmap memory,
-            // we can know that the writing was not completely.
-            aBuffer.putInt(0, -1);
-            syncABBuffer(aBuffer);
-            aBuffer.putInt(0, dataEnd - DATA_START);
-
-            // bBuffer doesn't need to mark dataLen's part before writing bytes,
-            // cause aBuffer has already written completely.
-            // We just need to have one file to be completely at least at any time.
-            syncABBuffer(bBuffer);
-        } else {
-            if (sizeChanged) {
-                fastBuffer.putInt(0, dataEnd - DATA_START);
-            }
-            fastBuffer.putLong(4, checksum);
+    private void addUpdate(int start, int size) {
+        int count = updateCount;
+        int capacity = updateStartAndSize.length;
+        if ((count << 1) >= capacity) {
+            int[] newArray = new int[capacity << 1];
+            System.arraycopy(updateStartAndSize, 0, newArray, 0, capacity);
+            updateStartAndSize = newArray;
         }
-        sizeChanged = false;
-        removeStart = 0;
-        updateSize = 0;
+        updateStartAndSize[count] = start;
+        updateStartAndSize[count + 1] = size;
+        updateCount = count + 2;
     }
 
-    private void syncABBuffer(MappedByteBuffer buffer) {
-        if (sizeChanged && buffer != aBuffer) {
-            buffer.putInt(0, dataEnd - DATA_START);
-        }
-        buffer.putLong(4, checksum);
-        if (removeStart != 0) {
-            buffer.put(removeStart, fastBuffer.hb[removeStart]);
-        }
+    private void updateChange() {
+        checksum ^= fastBuffer.getChecksum(updateStart, updateSize);
         if (updateSize != 0) {
-            buffer.position(updateStart);
-            buffer.put(fastBuffer.hb, updateStart, updateSize);
+            addUpdate(updateStart, updateSize);
+            updateSize = 0;
         }
     }
 
     private void ensureSize(int allocate) {
         int capacity = fastBuffer.hb.length;
-        int expected = dataEnd + allocate;
+        int expected = dataEnd + allocate + 8;
         if (expected >= capacity) {
-            if (invalidBytes > allocate && invalidBytes > bytesThreshold()) {
-                gc(allocate);
-            } else {
-                int newCapacity = getNewCapacity(capacity, expected);
-                byte[] bytes = new byte[newCapacity];
-                System.arraycopy(fastBuffer.hb, 0, bytes, 0, dataEnd);
-                fastBuffer.hb = bytes;
-                if (writingMode == NON_BLOCKING) {
-                    try {
-                        aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, newCapacity);
-                        aBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                        bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, newCapacity);
-                        bBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                    } catch (IOException e) {
-                        error(new Exception(MAP_FAILED, e));
-                        fastBuffer.putInt(0, dataEnd - DATA_START);
-                        fastBuffer.putLong(4, checksum);
-                        toBlockingMode();
-                    }
-                }
-            }
+            int newCapacity = getNewCapacity(capacity, expected);
+            byte[] bytes = new byte[newCapacity];
+            System.arraycopy(fastBuffer.hb, 0, bytes, 0, dataEnd);
+            fastBuffer.hb = bytes;
         }
     }
 
     private void updateBoolean(byte value, int offset) {
         checksum ^= shiftCheckSum(1L, offset);
-        if (writingMode == NON_BLOCKING) {
-            aBuffer.putLong(4, checksum);
-            aBuffer.put(offset, value);
-            bBuffer.putLong(4, checksum);
-            bBuffer.put(offset, value);
-        } else {
-            fastBuffer.putLong(4, checksum);
-        }
         fastBuffer.hb[offset] = value;
+        addUpdate(offset, 1);
     }
 
     private void updateInt32(int value, long sum, int offset) {
         checksum ^= shiftCheckSum(sum, offset);
-        if (writingMode == NON_BLOCKING) {
-            aBuffer.putLong(4, checksum);
-            aBuffer.putInt(offset, value);
-            bBuffer.putLong(4, checksum);
-            bBuffer.putInt(offset, value);
-        } else {
-            fastBuffer.putLong(4, checksum);
-        }
         fastBuffer.putInt(offset, value);
+        addUpdate(offset, 4);
     }
 
     private void updateInt64(long value, long sum, int offset) {
         checksum ^= shiftCheckSum(sum, offset);
-        if (writingMode == NON_BLOCKING) {
-            aBuffer.putLong(4, checksum);
-            aBuffer.putLong(offset, value);
-            bBuffer.putLong(4, checksum);
-            bBuffer.putLong(offset, value);
-        } else {
-            fastBuffer.putLong(4, checksum);
-        }
         fastBuffer.putLong(offset, value);
+        addUpdate(offset, 8);
     }
 
     private void updateBytes(int offset, byte[] bytes) {
@@ -776,18 +1014,7 @@ public final class FastKV extends AbsFastKV {
         fastBuffer.position = offset;
         fastBuffer.putBytes(bytes);
         checksum ^= fastBuffer.getChecksum(offset, size);
-        if (writingMode == NON_BLOCKING) {
-            aBuffer.putInt(0, -1);
-            aBuffer.putLong(4, checksum);
-            aBuffer.position(offset);
-            aBuffer.put(bytes);
-            aBuffer.putInt(0, dataEnd - DATA_START);
-            bBuffer.putLong(4, checksum);
-            bBuffer.position(offset);
-            bBuffer.put(bytes);
-        } else {
-            fastBuffer.putLong(4, checksum);
-        }
+        addUpdate(offset, size);
     }
 
     private void preparePutBytes() {
@@ -795,7 +1022,6 @@ public final class FastKV extends AbsFastKV {
         updateStart = dataEnd;
         dataEnd += updateSize;
         fastBuffer.position = updateStart;
-        sizeChanged = true;
     }
 
     private void putKey(String key, int keySize) {
@@ -861,7 +1087,6 @@ public final class FastKV extends AbsFastKV {
                 if (c.external) {
                     oldFileName = (String) c.value;
                 }
-
                 c.external = false;
                 c.start = updateStart;
                 c.offset = updateStart + preSize;
@@ -873,10 +1098,9 @@ public final class FastKV extends AbsFastKV {
                 checkGC();
             }
             if (oldFileName != null) {
-                Util.deleteFile(new File(path + name, oldFileName));
+                deletedFiles.add(oldFileName);
             }
         }
-        checkIfCommit();
     }
 
     private void addOrUpdate(String key, Object value, byte[] bytes, VarContainer c, byte type) {
@@ -890,7 +1114,6 @@ public final class FastKV extends AbsFastKV {
                 c.value = value;
             }
         }
-        checkIfCommit();
     }
 
     private void addObject(String key, Object value, byte[] bytes, byte type) {
@@ -940,7 +1163,7 @@ public final class FastKV extends AbsFastKV {
             updateChange();
             checkGC();
             if (oldFileName != null) {
-                Util.deleteFile(new File(path + name, oldFileName));
+                deletedFiles.add(oldFileName);
             }
         }
     }
@@ -981,17 +1204,16 @@ public final class FastKV extends AbsFastKV {
         int shift = (start & 7) << 3;
         checksum ^= ((long) (newByte ^ oldByte) & 0xFF) << shift;
         fastBuffer.hb[start] = newByte;
-        removeStart = start;
+        addUpdate(start, 1);
     }
 
     private void checkGC() {
-        if (invalidBytes >= (bytesThreshold() << 1)
-                || invalids.size() >= (dataEnd < (1 << 14) ? BASE_GC_KEYS_THRESHOLD : BASE_GC_KEYS_THRESHOLD << 1)) {
-            gc(0);
+        if (invalidBytes >= bytesThreshold() || invalids.size() >= BASE_GC_KEYS_THRESHOLD) {
+            gc();
         }
     }
 
-    void gc(int allocate) {
+    void gc() {
         Collections.sort(invalids);
         mergeInvalids();
 
@@ -1037,76 +1259,95 @@ public final class FastKV extends AbsFastKV {
         }
         dataEnd = newDataEnd;
 
-        if (writingMode == NON_BLOCKING) {
-            aBuffer.putInt(0, -1);
-            aBuffer.putLong(4, checksum);
-            aBuffer.position(gcStart);
-            aBuffer.put(fastBuffer.hb, gcStart, updateSize);
-            aBuffer.putInt(0, newDataSize);
-            bBuffer.putInt(0, newDataSize);
-            bBuffer.putLong(4, checksum);
-            bBuffer.position(gcStart);
-            bBuffer.put(fastBuffer.hb, gcStart, updateSize);
-        } else {
-            fastBuffer.putInt(0, newDataSize);
-            fastBuffer.putLong(4, checksum);
+        int minUpdateStart = gcStart;
+        for (int i = 0; i < updateCount; i += 2) {
+            int s = updateStartAndSize[i];
+            if (s < minUpdateStart) {
+                minUpdateStart = s;
+            }
         }
+        updateStartAndSize[0] = minUpdateStart;
+        updateStartAndSize[1] = dataEnd - minUpdateStart;
+        updateCount = 2;
 
         updateOffset(gcStart, srcToShift);
-        int expectedEnd = newDataEnd + allocate;
-        if (fastBuffer.hb.length - expectedEnd > TRUNCATE_THRESHOLD) {
-            truncate(expectedEnd);
-        }
         info(GC_FINISH);
     }
 
-    private void truncate(int expectedEnd) {
+    private void truncate() {
         // reserve at least one page space
-        int newCapacity = getNewCapacity(PAGE_SIZE, expectedEnd + PAGE_SIZE);
+        int newCapacity = getNewCapacity(PAGE_SIZE, dataEnd + PAGE_SIZE);
         if (newCapacity >= fastBuffer.hb.length) {
             return;
         }
         byte[] bytes = new byte[newCapacity];
         System.arraycopy(fastBuffer.hb, 0, bytes, 0, dataEnd);
         fastBuffer.hb = bytes;
-        if (writingMode == NON_BLOCKING) {
-            try {
-                aChannel.truncate(newCapacity);
-                aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, newCapacity);
-                aBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                bChannel.truncate(newCapacity);
-                bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, newCapacity);
-                bBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            } catch (IOException e) {
-                error(new Exception(MAP_FAILED, e));
-                toBlockingMode();
-            }
+        try {
+            aChannel.truncate(newCapacity);
+            aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, newCapacity);
+            aBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            bAccessFile.setLength(newCapacity);
+            bChannel.truncate(newCapacity);
+        } catch (Exception e) {
+            error(new Exception(MAP_FAILED, e));
+            needFullWrite = true;
         }
         info(TRUNCATE_FINISH);
     }
 
-    public interface Logger {
-        void i(@NonNull String name, @NonNull String message);
-
-        void w(@NonNull String name, @NonNull Exception e);
-
-        void e(@NonNull String name, @NonNull Exception e);
+    private synchronized void refresh() {
+        lockAndCheckUpdate();
+        releaseLock();
     }
 
-    public interface Encoder<T> {
-        String tag();
+    private final Handler kvHandler = new Handler(Looper.getMainLooper()) {
+        @Override
+        public void handleMessage(Message msg) {
+            int code = msg.what;
+            if (code == MSG_REFRESH) {
+                refreshExecutor.execute(MPFastKV.this::refresh);
+            } else if (code == MSG_RELEASE) {
+                apply();
+            } else if (code == MSG_DATA_CHANGE) {
+                notifyChangedKeys();
+            } else if (code == MSG_CLEAR) {
+                synchronized (MPFastKV.this) {
+                    notifyListeners(listeners, null);
+                }
+            }
+        }
+    };
 
-        byte[] encode(@NonNull T obj);
+    private synchronized void notifyChangedKeys() {
+        if (!changedKey.isEmpty()) {
+            for (String key : changedKey) {
+                notifyListeners(listeners, key);
+            }
+            changedKey.clear();
+        }
+    }
 
-        T decode(@NonNull byte[] bytes, int offset, int length);
+    private class KVFileObserver extends FileObserver {
+        public KVFileObserver(String path) {
+            super(path, FileObserver.MODIFY);
+        }
+
+        @Override
+        public void onEvent(int event, String path) {
+            // Delay a few time to filter frequency callback.
+            if (!kvHandler.hasMessages(MSG_REFRESH)) {
+                kvHandler.sendEmptyMessageDelayed(MSG_REFRESH, 50);
+            }
+        }
     }
 
     public static class Builder {
-        private static final Map<String, FastKV> INSTANCE_MAP = new ConcurrentHashMap<>();
+        private static final Map<String, MPFastKV> INSTANCE_MAP = new ConcurrentHashMap<>();
         private final String path;
         private final String name;
         private Encoder[] encoders;
-        private int writingMode = NON_BLOCKING;
+        private boolean needWatchFileChange = true;
 
         public Builder(String path, String name) {
             if (path == null || path.isEmpty()) {
@@ -1131,42 +1372,26 @@ public final class FastKV extends AbsFastKV {
         }
 
         /**
-         * Assigned writing mode to SYNC_BLOCKING.
-         * <p>
-         * In non-blocking mode (write data with mmap),
-         * it might loss update if the system crash or power off before flush data to disk.
-         * You could use {@link #force()} to avoid loss update, or use SYNC_BLOCKING mode.
-         * <p>
-         * In blocking mode, every update will write all data to the file, which is expensive cost.
-         * <p>
-         * So it's recommended to use blocking mode only if the data is every important.
-         * <p>
+         * If there are multi processes access one file, we need to watch the file's changes generally.
+         * But if only one process will update the file,
+         * that process is unnecessary to watch changes (other processes won't change the file).
+         * In that case, call this method will benefit to efficiency.
          *
          * @return the builder
          */
-        public Builder blocking() {
-            writingMode = SYNC_BLOCKING;
+        public Builder disableWatchFileChange() {
+            needWatchFileChange = false;
             return this;
         }
 
-        /**
-         * Similar to {@link #blocking()}, but put writing task to async thread.
-         *
-         * @return the builder
-         */
-        public Builder asyncBlocking() {
-            writingMode = ASYNC_BLOCKING;
-            return this;
-        }
-
-        public FastKV build() {
+        public MPFastKV build() {
             String key = path + name;
-            FastKV kv = INSTANCE_MAP.get(key);
+            MPFastKV kv = INSTANCE_MAP.get(key);
             if (kv == null) {
                 synchronized (Builder.class) {
                     kv = INSTANCE_MAP.get(key);
                     if (kv == null) {
-                        kv = new FastKV(path, name, encoders, writingMode);
+                        kv = new MPFastKV(path, name, encoders, needWatchFileChange);
                         INSTANCE_MAP.put(key, kv);
                     }
                 }
@@ -1177,6 +1402,6 @@ public final class FastKV extends AbsFastKV {
 
     @Override
     public synchronized @NonNull String toString() {
-        return "FastKV: path:" + path + " name:" + name;
+        return "MPFastKV: path:" + path + " name:" + name;
     }
 }

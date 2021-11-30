@@ -14,7 +14,7 @@ public final class FastKVConfig {
     }
 
     /**
-     * It's highly recommended to set your own Executor for reusing threads in common thread pool.
+     * It's highly recommended setting your own Executor for reusing threads in common thread pool.
      *
      * @param executor The executor for loading or writing.
      */
