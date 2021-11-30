@@ -74,9 +74,7 @@ object Benchmark {
             time[2] += t4 - t3
             time[3] += t5 - t4
         }
-        Log.i(
-            TAG,
-            "Fill, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
+        Log.i(TAG, "Fill, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
         Arrays.fill(time, 0L)
@@ -102,13 +100,11 @@ object Benchmark {
             time[1] += b
             time[2] += c
             time[3] += d
-            Log.d(
-                TAG, "Update, sp: " + a / MILLION + ", dataStore: " + b / MILLION
+            Log.d(TAG, "Update, sp: " + a / MILLION + ", dataStore: " + b / MILLION
                         + ", mmkv: " + c / MILLION + ", fastkv:" + d / MILLION
             )
         }
-        Log.i(
-            TAG, "Update total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
+        Log.i(TAG, "Update total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
 
@@ -129,8 +125,7 @@ object Benchmark {
             time[2] += t4 - t3
             time[3] += t5 - t4
         }
-        Log.i(
-            TAG, "Read total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
+        Log.i(TAG, "Read total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
                     + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
         )
     }

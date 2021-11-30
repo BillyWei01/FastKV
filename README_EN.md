@@ -147,8 +147,8 @@ See: [Android Case](android_case.md)
 Because some key values are accessed more and others accessed less in normally, 
 I make a normally distributed sequence to test the accessing.
 
+- Test Code：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
 - Comparison component: Sharepreferences/DataStore/MMKV
-
 - Device: Huawei Horor 20s
 
 Result:
