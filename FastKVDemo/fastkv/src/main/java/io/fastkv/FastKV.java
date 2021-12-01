@@ -637,17 +637,6 @@ public final class FastKV extends AbsFastKV {
         buffer.putLong(4, 0L);
     }
 
-    private void checkKey(String key) {
-        if (key == null || key.isEmpty()) {
-            throw new IllegalArgumentException("key is empty");
-        }
-    }
-
-    private void checkKeySize(int keySize) {
-        if (keySize > 0xFF) {
-            throw new IllegalArgumentException("key's length must less than 256");
-        }
-    }
 
     private void wrapHeader(String key, byte type) {
         wrapHeader(key, type, TYPE_SIZE[type]);

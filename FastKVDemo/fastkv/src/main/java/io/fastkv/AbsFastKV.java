@@ -221,6 +221,19 @@ abstract class AbsFastKV {
         return 0;
     }
 
+    protected final void checkKey(String key) {
+        if (key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is empty");
+        }
+    }
+
+    protected final void checkKeySize(int keySize) {
+        if (keySize > 0xFF) {
+            throw new IllegalArgumentException("key's length must less than 256");
+        }
+    }
+
+
     protected final void checkValueSize(int size, boolean external) {
         if (external) {
             if (size != Util.NAME_SIZE) {

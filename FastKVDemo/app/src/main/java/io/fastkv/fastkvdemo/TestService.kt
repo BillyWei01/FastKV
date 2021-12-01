@@ -30,8 +30,10 @@ class TestService : Service() {
             if (key == null) {
                 Log.i(TAG, "clear")
             } else {
-                val value = sp?.getInt(key, 0)
-                Log.i(TAG, "data change, key:$key value:$value")
+                if (key == "server" || key == "client") {
+                    val value = sp.getInt(key, 0)
+                    Log.i(TAG, "data change, key:$key value:$value")
+                }
             }
         }
 

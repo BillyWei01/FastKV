@@ -33,8 +33,10 @@ class MultiProcessTestActivity : AppCompatActivity(), Observer {
             if (key == null) {
                 Log.i(TAG, "clear")
             } else {
-                val value = sp?.getInt(key, 0)
-                Log.i(TAG, "data change, key:$key value:$value")
+                if (key == "server" || key == "client") {
+                    val value = sp.getInt(key, 0)
+                    Log.i(TAG, "data change, key:$key value:$value")
+                }
             }
             EventManager.notify(Events.MP_TEST_KV_CHANGE)
         }
@@ -100,12 +102,12 @@ class MultiProcessTestActivity : AppCompatActivity(), Observer {
     }
 
     override fun onEvent(event: Int, vararg args: Any?) {
-        if(event == Events.MP_TEST_KV_CHANGE){
+        if (event == Events.MP_TEST_KV_CHANGE) {
             message_tv.text = mpTestKv.all.toString()
         }
     }
 
-    override fun listEvents(): IntArray {
+    override fun listenEvents(): IntArray {
         return intArrayOf(Events.MP_TEST_KV_CHANGE)
     }
 }

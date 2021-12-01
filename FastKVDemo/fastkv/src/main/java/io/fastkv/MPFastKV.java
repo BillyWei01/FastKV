@@ -853,7 +853,9 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             updateHash = hash;
             reloadData();
             if (sum == fastBuffer.getChecksum(DATA_START, dataSize) && parseData() == 0) {
-                checkDiff(oldData);
+                if (!listeners.isEmpty()) {
+                    checkDiff(oldData);
+                }
             } else {
                 clearData();
             }
@@ -867,20 +869,17 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         common.retainAll(oldSet);
         newSet.removeAll(common);
         oldSet.removeAll(common);
-        if (!listeners.isEmpty()) {
-            changedKey.clear();
-            changedKey.addAll(newSet);
-            changedKey.addAll(oldSet);
-            for (String key : common) {
-                BaseContainer oldValue = oldData.get(key);
-                BaseContainer newValue = data.get(key);
-                if (oldValue != null && !oldValue.equalTo(newValue)) {
-                    changedKey.add(key);
-                }
+        changedKey.addAll(newSet);
+        changedKey.addAll(oldSet);
+        for (String key : common) {
+            BaseContainer oldValue = oldData.get(key);
+            BaseContainer newValue = data.get(key);
+            if (oldValue != null && !oldValue.equalTo(newValue)) {
+                changedKey.add(key);
             }
-            if (!changedKey.isEmpty()) {
-                kvHandler.sendEmptyMessage(MSG_DATA_CHANGE);
-            }
+        }
+        if (!changedKey.isEmpty()) {
+            kvHandler.sendEmptyMessage(MSG_DATA_CHANGE);
         }
     }
 
@@ -935,18 +934,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     protected void resetData() {
         super.resetData();
         updateHash = 0;
-    }
-
-    private void checkKey(String key) {
-        if (key == null || key.isEmpty()) {
-            throw new IllegalArgumentException("key is empty");
-        }
-    }
-
-    private void checkKeySize(int keySize) {
-        if (keySize > 0xFF) {
-            throw new IllegalArgumentException("key's length must less than 256");
-        }
     }
 
     private void wrapHeader(String key, byte type) {
@@ -1330,12 +1317,10 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     };
 
     private synchronized void notifyChangedKeys() {
-        if (!changedKey.isEmpty()) {
-            for (String key : changedKey) {
-                notifyListeners(listeners, key);
-            }
-            changedKey.clear();
+        for (String key : changedKey) {
+            notifyListeners(listeners, key);
         }
+        changedKey.clear();
     }
 
     private class KVFileObserver extends FileObserver {
@@ -1345,7 +1330,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
         @Override
         public void onEvent(int event, String path) {
-            // Delay a few time to filter frequency callback.
+            // Delay a few time to filter frequency callbacks.
             if (!kvHandler.hasMessages(MSG_REFRESH)) {
                 kvHandler.sendEmptyMessageDelayed(MSG_REFRESH, 30L);
             }

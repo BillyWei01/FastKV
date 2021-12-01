@@ -40,7 +40,7 @@ FastKV 已发布到Maven中央仓库，分别发布了两个jar包，按需添�
 其中一个包含封装了SharePreferences接口和支持多进程：
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.1.0'
+    implementation 'io.github.billywei01:fastkv:1.1.1'
 }
 ```
 
@@ -87,17 +87,16 @@ dependencies {
     FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
     FastKV kv = new FastKV.Builder(path, name).encoder(encoders).build();
         
-    String objectKey = "long_list";
     List<Long> list = new ArrayList<>();
     list.add(100L);
     list.add(200L);
     list.add(300L);
-    kv.putObject(objectKey, list, LongListEncoder.INSTANCE);
+    kv.putObject("long_list", list, LongListEncoder.INSTANCE);
 
     List<Long> list2 = kv.getObject("long_list");
 ```
 
-除了支持基本类型外，FastKV还会支持写入对象，只需在构建FastKV实例时传入对象的编码器即可。
+除了支持基本类型外，FastKV还支持写入对象，只需在构建FastKV实例时传入对象的编码器即可。
 编码器为实现FastKV.Encoder的对象。
 比如上面的LongListEncoder的实现如下：
 

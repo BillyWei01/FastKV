@@ -11,13 +11,13 @@ object EventManager {
 
     @Synchronized
     fun register(observer: Observer?) {
-        observer?.listEvents()?.forEach { event ->
+        observer?.listenEvents()?.forEach { event ->
             var observerList = observers.get(event)
             if (observerList == null) {
                 observerList = LinkedList()
+                observerList.add(observer)
                 observers.put(event, observerList)
-            }
-            if (observer !in observerList) {
+            } else if (observer !in observerList) {
                 observerList.add(observer)
             }
         }
@@ -25,7 +25,7 @@ object EventManager {
 
     @Synchronized
     fun unregister(observer: Observer?) {
-        observer?.listEvents()?.forEach { event ->
+        observer?.listenEvents()?.forEach { event ->
             observers.get(event)?.removeLastOccurrence(observer)
         }
     }

@@ -5,7 +5,7 @@ import android.util.Log
 import com.tencent.mmkv.MMKV
 import io.fastkv.FastKVConfig
 import io.fastkv.fastkvdemo.fastkv.FastKVLogger
-import io.fastkv.fastkvdemo.util.ChannelExecutorService
+import io.fastkv.fastkvdemo.util.ChannelExecutor
 
 class AppApplication : Application() {
     override fun onCreate() {
@@ -13,7 +13,7 @@ class AppApplication : Application() {
         GlobalConfig.appContext = this
 
         FastKVConfig.setLogger(FastKVLogger)
-        FastKVConfig.setExecutor(ChannelExecutorService(4))
+        FastKVConfig.setExecutor(ChannelExecutor(4))
 
         // filter other processes,
         // in case files damaged in multiprocess mode
