@@ -37,10 +37,10 @@ import io.fastkv.Container.*;
 @SuppressWarnings("rawtypes")
 public final class MPFastKV extends AbsFastKV implements SharedPreferences, SharedPreferences.Editor {
     private static final int MSG_REFRESH = 1;
-    private static final int MSG_RELEASE = 2;
+    private static final int MSG_APPLY = 2;
     private static final int MSG_DATA_CHANGE = 3;
     private static final int MSG_CLEAR = 4;
-    private static final int RELEASE_TIMEOUT = 3000;
+    private static final int LOCK_TIMEOUT = 3000;
 
     private static final Random random = new Random();
 
@@ -769,8 +769,9 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             try {
                 bFileLock = bChannel.lock();
                 checkUpdate();
-                // In case of user forget to release lock, set a timeout to release lock.
-                kvHandler.sendEmptyMessageDelayed(MSG_RELEASE, RELEASE_TIMEOUT);
+                // In case of user forget to release lock,
+                // set a timeout to apply data (will release lock as well).
+                kvHandler.sendEmptyMessageDelayed(MSG_APPLY, LOCK_TIMEOUT);
             } catch (Exception e) {
                 error(e);
             }
@@ -785,7 +786,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 error(e);
             }
             bFileLock = null;
-            kvHandler.removeMessages(MSG_RELEASE);
+            kvHandler.removeMessages(MSG_APPLY);
         }
     }
 
@@ -1299,7 +1300,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 case MSG_REFRESH:
                     refreshExecutor.execute(MPFastKV.this::refresh);
                     break;
-                case MSG_RELEASE:
+                case MSG_APPLY:
                     apply();
                     break;
                 case MSG_DATA_CHANGE:

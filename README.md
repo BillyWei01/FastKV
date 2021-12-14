@@ -40,7 +40,7 @@ FastKV 已发布到Maven中央仓库，分别发布了两个jar包，按需添�
 其中一个包含封装了SharePreferences接口和支持多进程：
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.1.1'
+    implementation 'io.github.billywei01:fastkv:1.1.2'
 }
 ```
 

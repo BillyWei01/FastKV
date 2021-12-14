@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import io.fastkv.Container.*;
 
 @SuppressWarnings("rawtypes")
 abstract class AbsFastKV {
@@ -44,7 +45,7 @@ abstract class AbsFastKV {
 
     protected int dataEnd;
     protected long checksum;
-    protected final HashMap<String, Container.BaseContainer> data = new HashMap<>();
+    protected final HashMap<String, BaseContainer> data = new HashMap<>();
     protected boolean startLoading = false;
 
     protected FastBuffer fastBuffer;
@@ -152,19 +153,19 @@ abstract class AbsFastKV {
                 if (type <= DataType.DOUBLE) {
                     switch (type) {
                         case DataType.BOOLEAN:
-                            data.put(key, new Container.BooleanContainer(pos, buffer.get() == 1));
+                            data.put(key, new BooleanContainer(pos, buffer.get() == 1));
                             break;
                         case DataType.INT:
-                            data.put(key, new Container.IntContainer(pos, buffer.getInt()));
+                            data.put(key, new IntContainer(pos, buffer.getInt()));
                             break;
                         case DataType.LONG:
-                            data.put(key, new Container.LongContainer(pos, buffer.getLong()));
+                            data.put(key, new LongContainer(pos, buffer.getLong()));
                             break;
                         case DataType.FLOAT:
-                            data.put(key, new Container.FloatContainer(pos, buffer.getFloat()));
+                            data.put(key, new FloatContainer(pos, buffer.getFloat()));
                             break;
                         default:
-                            data.put(key, new Container.DoubleContainer(pos, buffer.getDouble()));
+                            data.put(key, new DoubleContainer(pos, buffer.getDouble()));
                             break;
                     }
                 } else {
@@ -174,16 +175,16 @@ abstract class AbsFastKV {
                     switch (type) {
                         case DataType.STRING:
                             String str = buffer.getString(size);
-                            data.put(key, new Container.StringContainer(start, pos + 2, str, size, external));
+                            data.put(key, new StringContainer(start, pos + 2, str, size, external));
                             break;
                         case DataType.ARRAY:
                             Object value = external ? buffer.getString(size) : buffer.getBytes(size);
-                            data.put(key, new Container.ArrayContainer(start, pos + 2, value, size, external));
+                            data.put(key, new ArrayContainer(start, pos + 2, value, size, external));
                             break;
                         default:
                             if (external) {
                                 String fileName = buffer.getString(size);
-                                data.put(key, new Container.ObjectContainer(start, pos + 2, fileName, size, true));
+                                data.put(key, new ObjectContainer(start, pos + 2, fileName, size, true));
                             } else {
                                 int tagSize = buffer.get() & 0xFF;
                                 String tag = buffer.getString(tagSize);
@@ -196,7 +197,7 @@ abstract class AbsFastKV {
                                     try {
                                         Object obj = encoder.decode(buffer.hb, buffer.position, objectSize);
                                         if (obj != null) {
-                                            data.put(key, new Container.ObjectContainer(start, pos + 2, obj, size, false));
+                                            data.put(key, new ObjectContainer(start, pos + 2, obj, size, false));
                                         }
                                     } catch (Exception e) {
                                         error(e);
@@ -275,14 +276,14 @@ abstract class AbsFastKV {
     }
 
     protected final void updateOffset(int gcStart, int[] srcToShift) {
-        Collection<Container.BaseContainer> values = data.values();
-        for (Container.BaseContainer c : values) {
+        Collection<BaseContainer> values = data.values();
+        for (BaseContainer c : values) {
             if (c.offset > gcStart) {
                 int index = Util.binarySearch(srcToShift, c.offset);
                 int shift = srcToShift[(index << 1) + 1];
                 c.offset -= shift;
                 if (c.getType() >= DataType.STRING) {
-                    ((Container.VarContainer) c).start -= shift;
+                    ((VarContainer) c).start -= shift;
                 }
             }
         }
@@ -385,7 +386,7 @@ abstract class AbsFastKV {
     }
 
     public synchronized boolean getBoolean(String key, boolean defValue) {
-        Container.BooleanContainer c = (Container.BooleanContainer) data.get(key);
+        BooleanContainer c = (BooleanContainer) data.get(key);
         return c == null ? defValue : c.value;
     }
 
@@ -394,7 +395,7 @@ abstract class AbsFastKV {
     }
 
     public synchronized int getInt(String key, int defValue) {
-        Container.IntContainer c = (Container.IntContainer) data.get(key);
+        IntContainer c = (IntContainer) data.get(key);
         return c == null ? defValue : c.value;
     }
 
@@ -403,17 +404,17 @@ abstract class AbsFastKV {
     }
 
     public synchronized float getFloat(String key, float defValue) {
-        Container.FloatContainer c = (Container.FloatContainer) data.get(key);
+        FloatContainer c = (FloatContainer) data.get(key);
         return c == null ? defValue : c.value;
     }
 
     public synchronized long getLong(String key) {
-        Container.LongContainer c = (Container.LongContainer) data.get(key);
+        LongContainer c = (LongContainer) data.get(key);
         return c == null ? 0L : c.value;
     }
 
     public synchronized long getLong(String key, long defValue) {
-        Container.LongContainer c = (Container.LongContainer) data.get(key);
+        LongContainer c = (LongContainer) data.get(key);
         return c == null ? defValue : c.value;
     }
 
@@ -422,7 +423,7 @@ abstract class AbsFastKV {
     }
 
     public synchronized double getDouble(String key, double defValue) {
-        Container.DoubleContainer c = (Container.DoubleContainer) data.get(key);
+        DoubleContainer c = (DoubleContainer) data.get(key);
         return c == null ? defValue : c.value;
     }
 
@@ -431,14 +432,14 @@ abstract class AbsFastKV {
     }
 
     public synchronized String getString(String key, String defValue) {
-        Container.StringContainer c = (Container.StringContainer) data.get(key);
+        StringContainer c = (StringContainer) data.get(key);
         if (c != null) {
             return c.external ? getStringFromFile(c) : (String) c.value;
         }
         return defValue;
     }
 
-    private String getStringFromFile(Container.StringContainer c) {
+    private String getStringFromFile(StringContainer c) {
         String fileName = (String) c.value;
         File file = new File(path + name, fileName);
         try {
@@ -457,14 +458,14 @@ abstract class AbsFastKV {
     }
 
     public synchronized byte[] getArray(String key, byte[] defValue) {
-        Container.ArrayContainer c = (Container.ArrayContainer) data.get(key);
+        ArrayContainer c = (ArrayContainer) data.get(key);
         if (c != null) {
             return c.external ? getArrayFromFile(c) : (byte[]) c.value;
         }
         return defValue;
     }
 
-    private byte[] getArrayFromFile(Container.ArrayContainer c) {
+    private byte[] getArrayFromFile(ArrayContainer c) {
         File file = new File(path + name, (String) c.value);
         try {
             byte[] a = Util.getBytes(file);
@@ -477,14 +478,14 @@ abstract class AbsFastKV {
 
     @SuppressWarnings("unchecked")
     public synchronized <T> T getObject(String key) {
-        Container.ObjectContainer c = (Container.ObjectContainer) data.get(key);
+        ObjectContainer c = (ObjectContainer) data.get(key);
         if (c != null) {
             return c.external ? (T) getObjectFromFile(c) : (T) c.value;
         }
         return null;
     }
 
-    private Object getObjectFromFile(Container.ObjectContainer c) {
+    private Object getObjectFromFile(ObjectContainer c) {
         File file = new File(path + name, (String) c.value);
         try {
             byte[] bytes = Util.getBytes(file);
@@ -517,37 +518,37 @@ abstract class AbsFastKV {
             return new HashMap<>();
         }
         Map<String, Object> result = new HashMap<>(size * 4 / 3 + 1);
-        for (Map.Entry<String, Container.BaseContainer> entry : data.entrySet()) {
+        for (Map.Entry<String, BaseContainer> entry : data.entrySet()) {
             String key = entry.getKey();
-            Container.BaseContainer c = entry.getValue();
+            BaseContainer c = entry.getValue();
             Object value = null;
             switch (c.getType()) {
                 case DataType.BOOLEAN:
-                    value = ((Container.BooleanContainer) c).value;
+                    value = ((BooleanContainer) c).value;
                     break;
                 case DataType.INT:
-                    value = ((Container.IntContainer) c).value;
+                    value = ((IntContainer) c).value;
                     break;
                 case DataType.FLOAT:
-                    value = ((Container.FloatContainer) c).value;
+                    value = ((FloatContainer) c).value;
                     break;
                 case DataType.LONG:
-                    value = ((Container.LongContainer) c).value;
+                    value = ((LongContainer) c).value;
                     break;
                 case DataType.DOUBLE:
-                    value = ((Container.DoubleContainer) c).value;
+                    value = ((DoubleContainer) c).value;
                     break;
                 case DataType.STRING:
-                    Container.StringContainer sc = (Container.StringContainer) c;
+                    StringContainer sc = (StringContainer) c;
                     value = sc.external ? getStringFromFile(sc) : sc.value;
                     break;
                 case DataType.ARRAY:
-                    Container.ArrayContainer ac = (Container.ArrayContainer) c;
+                    ArrayContainer ac = (ArrayContainer) c;
                     value = ac.external ? getArrayFromFile(ac) : ac.value;
                     break;
                 case DataType.OBJECT:
-                    Container.ObjectContainer oc = (Container.ObjectContainer) c;
-                    value = oc.external ? getObjectFromFile(oc) : ((Container.ObjectContainer) c).value;
+                    ObjectContainer oc = (ObjectContainer) c;
+                    value = oc.external ? getObjectFromFile(oc) : ((ObjectContainer) c).value;
                     break;
             }
             result.put(key, value);
