@@ -157,8 +157,8 @@ FastKV  | 19 | 1
 
 现实中通常情况下不会有此差距，因为一般而言不会几百个key-value写到同一个文件，此处仅为显示极端情况下的对比，读者可自行调整参数看对比数据。
 
-## 原理
-参考：[实现要点](implementation_doc.md)
+## 4. 参考链接
+https://juejin.cn/post/7018522454171582500
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.
