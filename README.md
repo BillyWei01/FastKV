@@ -149,7 +149,7 @@ FastKV  | 19 | 1
 
 - SharePreferences提交用的是apply, 耗时依然不少。
 - DataStore写入很慢。
-- MMKV的读取比SharePreferences/DataStore要慢一些，写入则比之快许多。
+- MMKV的读取比SharePreferences/DataStore要慢，写入则比之快不少。
 - FastKV无论读取还是写入都比其他方式要快。
 
 现实中通常情况下不会有此差距，因为一般而言不会几百个key-value写到同一个文件，此处仅为显示极端情况下的对比，读者可自行调整参数看对比数据。
