@@ -51,7 +51,7 @@ dependencies {
 }
 ```
 
-### 2.2 初始化
+### 2.2 初始化 （可省略）
 ```kotlin
     FastKVConfig.setLogger(FastKVLogger)
     FastKVConfig.setExecutor(ChannelExecutorService(4))
@@ -70,6 +70,7 @@ dependencies {
     }
 
 ```
+ 
 
 ### 2.3 数据读写
 - 基本用法
