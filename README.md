@@ -51,7 +51,7 @@ dependencies {
 }
 ```
 
-### 2.2 初始化 （可省略）
+### 2.2 初始化
 ```kotlin
     FastKVConfig.setLogger(FastKVLogger)
     FastKVConfig.setExecutor(ChannelExecutorService(4))
