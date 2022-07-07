@@ -29,8 +29,8 @@ It can be used on  platforms with JVM environment, such as Android.
     - FastKV provides rich API interfaces, including getAll() and putAll() methods, it is convenient to migrate the data of frameworks such as sharepreferences to FastKV. 
 
 6. Stable and reliable
-    - When FastKV writes data in non-blocking way (mmap), it writes two files one by one,  to ensure that at least one file is complete at any time;
-    - FastKV checks the integrity of the files when loading, if one file is incomplete, it will be restored with another file which is complete.
+    - When FastKV writes data in non-blocking way (mmap), it writes two files one by one,  to ensure that at least one file is integrate at any time;
+    - FastKV checks the integrity of the files when loading, if one file is not integrate, it will be restored with another file which is integrate.
     - If mmap API fails, it will be degraded to the blocking I/O; 
      and it will try to restore to mmap mode when reloading.
 
