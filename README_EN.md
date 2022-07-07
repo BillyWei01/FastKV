@@ -95,12 +95,11 @@ The log interface provides three levels of callbacks.
     FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
     FastKV kv = new FastKV.Builder(path, name).encoder(encoders).build();
         
-    String objectKey = "long_list";
     List<Long> list = new ArrayList<>();
     list.add(100L);
     list.add(200L);
     list.add(300L);
-    kv.putObject(objectKey, list, LongListEncoder.INSTANCE);
+    kv.putObject("long_list", list, LongListEncoder.INSTANCE);
 
     List<Long> list2 = kv.getObject("long_list");
 ```
