@@ -7,7 +7,7 @@ It can be used on  platforms with JVM environment, such as Android.
 ## 1. Features
 1. Efficient
     - Binary coding: the size after coding is much smaller than text coding such as XML;
-    - Incremental update: FastKV records the offset of each key-value relative to the file,
+    - Incremental update: FastKV records the offset of each key-value relative to the file head,
       updating can be written directly at the right location.
     - By default, data is recorded with mmap . When updating data, it can be written directly to memory without IO blocking.
     - For a value which length is larger than the threshold, it will be written to another file separately,  only it's file name will be cached. In that way, it will not slow down other key-value's accessing.
@@ -19,7 +19,7 @@ It can be used on  platforms with JVM environment, such as Android.
     - Support primitive types such as Boolean / int / float / long / double / string;
     - Support ByteArray (byte []);
     - Support storage objects.
-    - Built in encoder with Set<String> (for compatibility with SharePreferences).
+    - Built in StringSet encoder(for compatibility with SharePreferences).
 
 4. Support multiprocess
    - The project supply an implement to support multiprocess（MPFastKV).
