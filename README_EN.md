@@ -158,7 +158,7 @@ FastKV  | 19 | 1
 
 - SharePreferences use the apply mode. When use commit mode, it will be much slower.
 - DataStore writes data very slow.
-- MMKV read slower then SharePreferences/DataStore，but much faster in writing.
+- MMKV read slower than SharePreferences/DataStore，but much faster in writing.
 - FastKV is the fastest both in writing or reading.
 
 The test above writes hundreds of key-values on one file, so the results have a big difference.
