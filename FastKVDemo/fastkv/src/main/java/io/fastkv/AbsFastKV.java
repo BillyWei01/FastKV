@@ -346,6 +346,12 @@ abstract class AbsFastKV {
         }
     }
 
+    protected final void error(Throwable t) {
+        if (logger != null) {
+            logger.e(name, new Exception(t));
+        }
+    }
+
     protected final void error(Exception e) {
         if (logger != null) {
             logger.e(name, e);

@@ -2,8 +2,10 @@ package io.fastkv;
 
 import java.nio.charset.StandardCharsets;
 
-public class FastBuffer {
+class FastBuffer {
     private static final int MAX_CHAR_LEN = 2048;
+    private static final String INVALID_STRING = "Invalid String";
+
     private char[] charBuf = null;
 
     public byte[] hb;
@@ -162,7 +164,7 @@ public class FastBuffer {
         } else if (len == 0) {
             return "";
         } else {
-            String str = decodeStr(len);
+            String str = len > MAX_CHAR_LEN ? new String(hb, position, len, StandardCharsets.UTF_8) : decodeStr(len);
             position += len;
             return str;
         }
@@ -201,22 +203,22 @@ public class FastBuffer {
     }
 
     private char[] getCharBuf(int len) {
-        if (charBuf == null) {
+        char[] buf = charBuf;
+        if (buf == null) {
             if (len <= 256) {
-                charBuf = new char[256];
+                buf = new char[256];
             } else {
-                charBuf = new char[MAX_CHAR_LEN];
+                buf = new char[MAX_CHAR_LEN];
             }
-        } else if (charBuf.length < len) {
-            charBuf = new char[MAX_CHAR_LEN];
+            charBuf = buf;
+        } else if (buf.length < len) {
+            buf = new char[MAX_CHAR_LEN];
+            charBuf = buf;
         }
-        return charBuf;
+        return buf;
     }
 
-    private String decodeStr(int len) {
-        if (len > MAX_CHAR_LEN) {
-            return new String(hb, position, len, StandardCharsets.UTF_8);
-        }
+    private synchronized String decodeStr(int len) {
         char[] buf = getCharBuf(len);
         byte[] src = hb;
         int i = position;
@@ -228,22 +230,37 @@ public class FastBuffer {
                 buf[j++] = (char) b1;
             } else if (b1 < (byte) 0xE0) {
                 byte b2 = src[i++];
+                if (b1 < (byte) 0xC2 || b2 > (byte) 0xBF) {
+                    throw new IllegalArgumentException(INVALID_STRING);
+                }
                 buf[j++] = (char) (((b1 & 0x1F) << 6) | (b2 & 0x3F));
             } else if (b1 < (byte) 0xF0) {
                 byte b2 = src[i++];
                 byte b3 = src[i++];
+                if ((b1 == (byte) 0xE0 && b2 < (byte) 0xA0)
+                        || (b1 == (byte) 0xED && b2 >= (byte) 0xA0)
+                        || b2 > (byte) 0xBF
+                        || b3 > (byte) 0xBF) {
+                    throw new IllegalArgumentException(INVALID_STRING);
+                }
                 buf[j++] = (char) (((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F));
             } else {
                 byte b2 = src[i++];
                 byte b3 = src[i++];
                 byte b4 = src[i++];
+                if (b2 > (byte) 0xBF
+                        || (((b1 << 28) + (b2 - (byte) 0x90)) >> 30) != 0
+                        || b3 > (byte) 0xBF
+                        || b4 > (byte) 0xBF) {
+                    throw new IllegalArgumentException(INVALID_STRING);
+                }
                 int cp = ((b1 & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);
                 buf[j++] = (char) (0xD7C0 + (cp >>> 10));
                 buf[j++] = (char) (0xDC00 + (cp & 0x3FF));
             }
         }
         if (i > limit) {
-            throw new IllegalArgumentException("Invalid String");
+            throw new IllegalArgumentException(INVALID_STRING);
         }
         return new String(buf, 0, j);
     }

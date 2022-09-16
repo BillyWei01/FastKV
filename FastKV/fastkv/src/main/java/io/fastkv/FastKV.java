@@ -707,7 +707,7 @@ public class FastKV {
         } else {
             StringContainer c = (StringContainer) data.get(key);
             if (value.length() * 3 < INTERNAL_LIMIT) {
-                // putString is a frequently operation,
+                // putString is a frequent operation,
                 // so we make some redundant code to speed up putString method.
                 fastPutString(key, value, c);
             } else {
@@ -1078,14 +1078,14 @@ public class FastKV {
             // checksum might fail to check the integrity in small probability.
             // So we make the dataLen to be negative,
             // if crash happen when writing data to mmap memory,
-            // we can know that the writing was not completely.
+            // we can know that the writing had not accomplished.
             aBuffer.putInt(0, -1);
             syncABBuffer(aBuffer);
             aBuffer.putInt(0, dataEnd - DATA_START);
 
             // bBuffer doesn't need to mark dataLen's part before writing bytes,
             // cause aBuffer has already written completely.
-            // We just need to have one file to be completely at least at any time.
+            // We just need to have one file to be integrated at least at any time.
             syncABBuffer(bBuffer);
         } else {
             if (sizeChanged) {

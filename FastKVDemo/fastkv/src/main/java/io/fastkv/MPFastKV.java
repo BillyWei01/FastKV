@@ -245,7 +245,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, bufferSize);
                 aBuffer.order(ByteOrder.LITTLE_ENDIAN);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             error(e);
             return false;
         }
@@ -321,6 +321,9 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         MappedByteBuffer buffer = aBuffer;
         buffer.position(offset);
         buffer.limit(offset + length);
+        if (bChannel.size() != buffer.capacity()) {
+            bChannel.truncate(buffer.capacity());
+        }
         bChannel.position(offset);
         while (buffer.hasRemaining()) {
             bChannel.write(buffer);
@@ -481,7 +484,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             markChanged(key);
             StringContainer c = (StringContainer) data.get(key);
             if (value.length() * 3 < INTERNAL_LIMIT) {
-                // putString is a frequently operation,
+                // putString is a frequent operation,
                 // so we make some redundant code to speed up putString method.
                 fastPutString(key, value, c);
             } else {
@@ -744,7 +747,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             }
 
             return true;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             error(e);
             needFullWrite = true;
         } finally {
@@ -768,11 +771,14 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         if (bChannel != null) {
             try {
                 bFileLock = bChannel.lock();
-                checkUpdate();
-                // In case of user forget to release lock,
-                // set a timeout to apply data (will release lock as well).
-                kvHandler.sendEmptyMessageDelayed(MSG_APPLY, LOCK_TIMEOUT);
-            } catch (Exception e) {
+                try {
+                    checkUpdate();
+                } finally {
+                    // In case of user forget to release lock,
+                    // set a timeout to apply data (will release lock as well).
+                    kvHandler.sendEmptyMessageDelayed(MSG_APPLY, LOCK_TIMEOUT);
+                }
+            } catch (Throwable e) {
                 error(e);
             }
         }
@@ -820,13 +826,30 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
     private void checkUpdate() throws IOException {
         MappedByteBuffer buffer = aBuffer;
-        if (buffer == null) {
+        if (buffer == null || aFile == null) {
             return;
+        }
+        int fileLen = (int) aFile.length();
+        if (fileLen <= 0) {
+            error("invalid file length");
+            return;
+        }
+        if (aBuffer.capacity() != fileLen) {
+            aChannel.truncate(fileLen);
+            buffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
+            if (buffer == null) {
+                return;
+            }
+            aBuffer = buffer;
+            aBuffer.order(ByteOrder.LITTLE_ENDIAN);
+        }
+        if (bChannel.size() != fileLen) {
+            bChannel.truncate(fileLen);
         }
         int capacity = buffer.capacity();
         int dataSize = buffer.getInt(0);
         if (dataSize < 0 || dataSize > capacity) {
-            throw new IllegalStateException("Invalid file");
+            throw new IllegalStateException("Invalid file, dataSize:" + dataSize + ", capacity:"+capacity);
         }
         long sum = buffer.getLong(4);
         int end = DATA_START + dataSize;
@@ -835,26 +858,13 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             hash = buffer.getLong(end);
         }
         if (end != dataEnd || sum != checksum || hash != updateHash) {
-            int fileLen = (int) aFile.length();
-            if (fileLen <= 0) {
-                error("invalid file length");
-                return;
-            }
-            if (aBuffer.capacity() != fileLen) {
-                aChannel.truncate(fileLen);
-                aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
-                aBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            }
-            if (bChannel.size() != fileLen) {
-                bChannel.truncate(fileLen);
-            }
-            HashMap<String, BaseContainer> oldData = new HashMap<>(data);
             dataEnd = end;
             checksum = sum;
             updateHash = hash;
+            HashMap<String, BaseContainer> oldData = listeners.isEmpty() ? null : new HashMap<>(data);
             reloadData();
             if (sum == fastBuffer.getChecksum(DATA_START, dataSize) && parseData() == 0) {
-                if (!listeners.isEmpty()) {
+                if (oldData != null) {
                     checkDiff(oldData);
                 }
             } else {
@@ -911,7 +921,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 setBFileSize(PAGE_SIZE);
                 syncAToB(0, DATA_START);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             error(e);
             needFullWrite = true;
         }

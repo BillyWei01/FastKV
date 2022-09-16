@@ -4,14 +4,13 @@ import java.io.File;
 import java.io.IOException;
 
 public class HexViewer {
-    private static final int POW = 4;
-    private static final int LINE_BYTES = 1 << 4;
+    private static final int LINE_BYTES = 16;
 
-    private static char[] ascii = new char[128];
+    private static final char[] ascii = new char[128];
 
     static final char[] DIGITS = {
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-            'a', 'b', 'c', 'd', 'e', 'f'};
+            'A', 'B', 'V', 'D', 'E', 'F'};
 
     static {
         for (char i = '0'; i <= '9'; i++) {
@@ -30,23 +29,48 @@ public class HexViewer {
         }
     }
 
+    static byte[] getBytes(File file, int length) throws IOException {
+        if (!file.isFile()) {
+            return null;
+        }
+        long readCount = Math.min(length, file.length());
+        if ((readCount >> 32) != 0) {
+            throw new IllegalArgumentException("file too large, path:" + file.getPath());
+        }
+        byte[] bytes = new byte[(int) length];
+        Util.readBytes(file, bytes, (int) readCount);
+        return bytes;
+    }
+
     public static void printFile(String path, int limit) throws IOException {
         File file = new File(path);
         if (!file.isFile()) {
             System.out.println("file " + path + " not exist");
             return;
         }
+        if (limit <= 0) {
+            System.out.println("limit <= 0");
+            return;
+        }
+        limit = align(limit);
 
-        byte[] bytes = Util.getBytes(file);
+        byte[] bytes = getBytes(file, limit);
         if (bytes == null || bytes.length == 0) {
             System.out.println("file " + path + " is empty");
             return;
         }
-        if (limit <= 0) {
-            limit = bytes.length;
+        printBytes(bytes);
+    }
+
+    public static void printBytes(byte[] bytes) {
+        int limit = align(bytes.length);
+        if (bytes.length < limit) {
+            System.out.println("extend size to: " + limit);
+            byte[] newBytes = new byte[limit];
+            System.arraycopy(bytes, 0, newBytes, 0, bytes.length);
+            bytes = newBytes;
         }
-        limit = align(limit);
-        StringBuilder builder = new StringBuilder(50 * (limit >> POW));
+        StringBuilder builder = new StringBuilder(50 * (limit / LINE_BYTES));
         for (int i = 0; i < limit; i += LINE_BYTES) {
             builder.append(int2Hex(i)).append(':');
             for (int j = i, end = i + LINE_BYTES; j < end; j++) {
@@ -65,7 +89,7 @@ public class HexViewer {
             }
             builder.append('\n');
         }
-        System.out.print(builder.toString());
+        System.out.print(builder);
     }
 
 
@@ -84,7 +108,7 @@ public class HexViewer {
     private static int align(int limit) {
         int mask = LINE_BYTES - 1;
         if ((limit & mask) != 0) {
-            return ((limit + LINE_BYTES) >> POW) << POW;
+            return ((limit + LINE_BYTES) / LINE_BYTES) * LINE_BYTES;
         }
         return limit;
     }
