@@ -14,10 +14,11 @@ It can be used on  platforms with JVM environment, such as Android.
     - For a value which length is larger than the threshold, it will be written to another file separately,  
       only it's file name will be cached. In that way, it will not slow down accessing of other key-value .
 
-2. Support multiple writing mode
-   - In addition to the non-blocking writing mode (with mmap), FastKV also supports synchronous blocking and asynchronous blocking (similar to commit and apply of SharePreferences).
+2. Support different writing modes
+   - In addition to the non-blocking IO (with mmap), 
+   FastKV also supports synchronous blocking and asynchronous blocking IO (similar to commit and apply of SharePreferences).
 
-3. Support multiple types
+3. Support various types
     - Support primitive types such as Boolean / int / float / long / double / string;
     - Support ByteArray (byte []);
     - Support storage objects.
