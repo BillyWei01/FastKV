@@ -69,8 +69,8 @@ dependencies {
 ```
 
 Initialization is optional.<br/>
-You could set log callback and executor as needed.<br/>
-It is recommended to pass in your own thread pool to reuse threads.
+You could set log callback and executor.<br/>
+It is recommended to set your own thread pool to reuse threads.
 
 The log interface provides three levels of callbacks.
 ```java
