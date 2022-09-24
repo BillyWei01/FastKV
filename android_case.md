@@ -58,8 +58,8 @@ public class FastPreferences implements SharedPreferences {
 FastPreferences is the implementation class of SharedPreferences, which uses FastKV to store key-values.
 Replacing the SDK's SharedPreferencesImpl with FastPreferences, no need to change other codes because FastPreferences has the same API with SharedPreferencesImpl.
 
-## 2. Multiprocess
- Multiprocess impleament：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/MPFastKV.java).<br>
+## 2. Multi-Process
+ Multi-Process impleament：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/fastkv/src/main/java/io/fastkv/MPFastKV.java).<br>
 
 Use case: 
 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt) and [TestService](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/TestService.kt)
