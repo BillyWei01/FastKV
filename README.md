@@ -38,7 +38,7 @@ It can be used on  platforms with JVM environment, such as Android.
      and it will try to restore to mmap mode when reloading.
 
 7. Simple code
-    - FastKV is implemented in pure Java and the jar's size has only tens of KB.
+    - FastKV is implemented in pure Java and size of jar is less then 100KB.
    
 ## 2. Getting Start
 
