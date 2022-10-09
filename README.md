@@ -26,7 +26,7 @@ It can be used on  platforms with JVM environment, such as Android.
 
 4. Support multi-process
    - The project supply an implement to support multi-process (MPFastKV).
-   - Support listener for changed values for a certain key, one process write, all processes known.
+   - Support listener for changed values, one process write, all processes known.
 
 5. Easy to use
     - FastKV provides rich API interfaces, including getAll() and putAll() methods, it is convenient to migrate the data of frameworks such as SharePreferences to FastKV. 
