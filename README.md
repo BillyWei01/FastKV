@@ -2,7 +2,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.billywei01/fastkv)](https://search.maven.org/artifact/io.github.billywei01/fastkv)｜[中文文档](README_CN.md)
 
 
-FastKV is an efficient and reliable key-value storage library written with Java.<br/>
+FastKV is an efficient key-value storage library written with Java.<br/>
 It can be used on  platforms with JVM environment, such as Android.
 
 ## 1. Features
