@@ -2,7 +2,7 @@
 
 ## 1. 概述
 FastKV是用Java编写的高效可靠的key-value存储库。<br>
-可以用于各种有JVM环境的运行平台，如Android。
+可以用于各种有JVM环境的运行平台(如Android)。
 
 FastKV有以下特点：
 1. 读写速度快
@@ -27,7 +27,7 @@ FastKV有以下特点：
      所以很方便迁移SharePreferences等框架的数据到FastKV, 当然，迁移FastKV的数据到其他框架也很简单。
 6. 稳定可靠
    - 通过double-write等方法确保数据的完整性。
-   - 在API抛IO异常时提供降级处理。
+   - 在API抛IO异常时自动降级处理。
 7. 代码精简
    - FastKV由纯Java实现，编译成jar包后体积只有几十K。
    
