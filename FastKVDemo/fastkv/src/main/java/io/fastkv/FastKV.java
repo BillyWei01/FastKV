@@ -27,6 +27,8 @@ public final class FastKV extends AbsFastKV {
     private int removeStart;
     private boolean sizeChanged;
 
+    private final List<String> deletedFiles = new ArrayList<>();
+
     // The default writing mode is non-blocking (write partial data with mmap).
     // If mmap API throw IOException, degrade to blocking mode (write all data to disk with blocking I/O).
     // User could assign to using blocking mode by FastKV.Builder
@@ -38,7 +40,8 @@ public final class FastKV extends AbsFastKV {
     // Only take effect when mode is not NON_BLOCKING
     private boolean autoCommit = true;
 
-    private final Executor executor = new LimitExecutor();
+    private final Executor applyExecutor = new LimitExecutor();
+    private final TagExecutor externalExecutor = new TagExecutor();
 
     FastKV(final String path, final String name, Encoder[] encoders, int writingMode) {
         super(path, name, encoders);
@@ -442,13 +445,15 @@ public final class FastKV extends AbsFastKV {
     public synchronized void remove(String key) {
         BaseContainer container = data.get(key);
         if (container != null) {
-            String oldFileName = null;
+            final String oldFileName;
             data.remove(key);
+            bigValueCache.remove(key);
             byte type = container.getType();
             if (type <= DataType.DOUBLE) {
                 int keySize = FastBuffer.getStringSize(key);
                 int start = container.offset - (2 + keySize);
                 remove(type, start, container.offset + TYPE_SIZE[type]);
+                oldFileName = null;
             } else {
                 VarContainer c = (VarContainer) container;
                 remove(type, c.start, c.offset + c.valueSize);
@@ -465,7 +470,11 @@ public final class FastKV extends AbsFastKV {
             }
             removeStart = 0;
             if (oldFileName != null) {
-                Util.deleteFile(new File(path + name, oldFileName));
+                if (writingMode == NON_BLOCKING) {
+                    FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
+                } else {
+                    deletedFiles.add(oldFileName);
+                }
             }
             checkGC();
             checkIfCommit();
@@ -567,7 +576,7 @@ public final class FastKV extends AbsFastKV {
 
     private boolean commitToCFile() {
         if (writingMode == ASYNC_BLOCKING) {
-            executor.execute(this::writeToCFile);
+            applyExecutor.execute(this::writeToCFile);
         } else if (writingMode == SYNC_BLOCKING) {
             return writeToCFile();
         }
@@ -585,6 +594,7 @@ public final class FastKV extends AbsFastKV {
                 File cFile = new File(path, name + C_SUFFIX);
                 if (!cFile.exists() || cFile.delete()) {
                     if (tmpFile.renameTo(cFile)) {
+                        clearDeletedFiles();
                         return true;
                     } else {
                         warning(new Exception("rename failed"));
@@ -595,6 +605,15 @@ public final class FastKV extends AbsFastKV {
             error(e);
         }
         return false;
+    }
+
+    private void clearDeletedFiles() {
+        if (!deletedFiles.isEmpty()) {
+            for (String oldFileName : deletedFiles) {
+                FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
+            }
+            deletedFiles.clear();
+        }
     }
 
     private void toBlockingMode() {
@@ -809,52 +828,54 @@ public final class FastKV extends AbsFastKV {
     }
 
     private void fastPutString(String key, String value, StringContainer c) {
-        int stringSize = FastBuffer.getStringSize(value);
+        int stringLen = FastBuffer.getStringSize(value);
         if (c == null) {
-            int keySize = FastBuffer.getStringSize(key);
-            checkKeySize(keySize);
-            int preSize = 4 + keySize;
-            updateSize = preSize + stringSize;
+            int keyLen = FastBuffer.getStringSize(key);
+            checkKeySize(keyLen);
+            // 4 bytes = type:1, keyLen: 1, stringLen:2
+            // preSize include size of [type|keyLen|key|stringLen], which is "4+lengthOf(key)"
+            int preSize = 4 + keyLen;
+            updateSize = preSize + stringLen;
             preparePutBytes();
             fastBuffer.put(DataType.STRING);
-            putKey(key, keySize);
-            putStringValue(value, stringSize);
-            data.put(key, new StringContainer(updateStart, updateStart + preSize, value, stringSize, false));
+            putKey(key, keyLen);
+            putStringValue(value, stringLen);
+            data.put(key, new StringContainer(updateStart, updateStart + preSize, value, stringLen, false));
             updateChange();
         } else {
-            String oldFileName = null;
+            final String oldFileName;
             boolean needCheckGC = false;
+            // preSize: bytes count from start to value offset
             int preSize = c.offset - c.start;
-            if (c.valueSize == stringSize) {
+            if (c.valueSize == stringLen) {
                 checksum ^= fastBuffer.getChecksum(c.offset, c.valueSize);
-                if (stringSize == value.length()) {
+                if (stringLen == value.length()) {
                     //noinspection deprecation
-                    value.getBytes(0, stringSize, fastBuffer.hb, c.offset);
+                    value.getBytes(0, stringLen, fastBuffer.hb, c.offset);
                 } else {
                     fastBuffer.position = c.offset;
                     fastBuffer.putString(value);
                 }
                 updateStart = c.offset;
-                updateSize = stringSize;
+                updateSize = stringLen;
+                oldFileName = null;
             } else {
-                updateSize = preSize + stringSize;
+                updateSize = preSize + stringLen;
                 preparePutBytes();
                 fastBuffer.put(DataType.STRING);
                 int keyBytes = preSize - 3;
                 System.arraycopy(fastBuffer.hb, c.start + 1, fastBuffer.hb, fastBuffer.position, keyBytes);
                 fastBuffer.position += keyBytes;
-                putStringValue(value, stringSize);
+                putStringValue(value, stringLen);
 
                 remove(DataType.STRING, c.start, c.offset + c.valueSize);
                 needCheckGC = true;
-                if (c.external) {
-                    oldFileName = (String) c.value;
-                }
+                oldFileName = c.external ? (String) c.value : null;
 
                 c.external = false;
                 c.start = updateStart;
                 c.offset = updateStart + preSize;
-                c.valueSize = stringSize;
+                c.valueSize = stringLen;
             }
             c.value = value;
             updateChange();
@@ -862,7 +883,11 @@ public final class FastKV extends AbsFastKV {
                 checkGC();
             }
             if (oldFileName != null) {
-                Util.deleteFile(new File(path + name, oldFileName));
+                if (writingMode == NON_BLOCKING) {
+                    FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
+                } else {
+                    deletedFiles.add(oldFileName);
+                }
             }
         }
         checkIfCommit();
@@ -872,11 +897,11 @@ public final class FastKV extends AbsFastKV {
         if (c == null) {
             addObject(key, value, bytes, type);
         } else {
-            if (c.external || c.valueSize != bytes.length) {
-                updateObject(key, value, bytes, c);
-            } else {
+            if (!c.external && c.valueSize == bytes.length) {
                 updateBytes(c.offset, bytes);
                 c.value = value;
+            } else {
+                updateObject(key, value, bytes, c);
             }
         }
         checkIfCommit();
@@ -889,6 +914,7 @@ public final class FastKV extends AbsFastKV {
             Object v;
             boolean external = tempExternalName != null;
             if (external) {
+                bigValueCache.put(key, value);
                 size = Util.NAME_SIZE;
                 v = tempExternalName;
                 tempExternalName = null;
@@ -919,6 +945,7 @@ public final class FastKV extends AbsFastKV {
             c.offset = offset;
             c.external = external;
             if (external) {
+                bigValueCache.put(key, value);
                 c.value = tempExternalName;
                 c.valueSize = Util.NAME_SIZE;
                 tempExternalName = null;
@@ -929,7 +956,11 @@ public final class FastKV extends AbsFastKV {
             updateChange();
             checkGC();
             if (oldFileName != null) {
-                Util.deleteFile(new File(path + name, oldFileName));
+                if (writingMode == NON_BLOCKING) {
+                    FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
+                } else {
+                    deletedFiles.add(oldFileName);
+                }
             }
         }
     }
@@ -941,17 +972,17 @@ public final class FastKV extends AbsFastKV {
         } else {
             info("large value, key: " + key + ", size: " + value.length);
             String fileName = Util.randomName();
-            File file = new File(path + name, fileName);
-            if (Util.saveBytes(file, value)) {
-                tempExternalName = fileName;
-                byte[] fileNameBytes = new byte[Util.NAME_SIZE];
-                //noinspection deprecation
-                fileName.getBytes(0, Util.NAME_SIZE, fileNameBytes, 0);
-                return wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
-            } else {
-                error("save large value failed");
-                return 0;
-            }
+
+            // The reference of 'value' will not be gc before 'saveBytes' finish,
+            // So before the value saving to disk, it could be read with 'externalCache'.
+            externalCache.put(fileName, value);
+            externalExecutor.execute(key, () -> Util.saveBytes(new File(path + name, fileName), value));
+
+            tempExternalName = fileName;
+            byte[] fileNameBytes = new byte[Util.NAME_SIZE];
+            //noinspection deprecation
+            fileName.getBytes(0, Util.NAME_SIZE, fileNameBytes, 0);
+            return wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
         }
     }
 
@@ -1165,7 +1196,8 @@ public final class FastKV extends AbsFastKV {
     }
 
     @Override
-    public synchronized @NonNull String toString() {
+    public synchronized @NonNull
+    String toString() {
         return "FastKV: path:" + path + " name:" + name;
     }
 }

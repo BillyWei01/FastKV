@@ -24,9 +24,6 @@ public class LongListEncoder implements FastKV.Encoder<List<Long>> {
 
     @Override
     public List<Long> decode(byte[] bytes, int offset, int length) {
-        PackDecoder decoder = PackDecoder.newInstance(bytes, offset, length);
-        List<Long> list = decoder.getLongList(0);
-        decoder.recycle();
-        return (list != null) ? list : new ArrayList<>();
+        return PackDecoder.newInstance(bytes, offset, length).getLongList(0);
     }
 }

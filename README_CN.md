@@ -39,14 +39,14 @@ FastKV 已发布到Maven中央仓库，分别发布了两个jar包，按需添�
 其中一个包含封装了SharePreferences接口和支持多进程：
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.1.3'
+    implementation 'io.github.billywei01:fastkv:1.1.4'
 }
 ```
 
 另一个仅Java接口（不包含Android SDK, 可在Java环境下调用），不支持多进程：
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv-java:1.1.3'
+    implementation 'io.github.billywei01:fastkv-java:1.1.4'
 }
 ```
 
@@ -58,18 +58,6 @@ dependencies {
 初始化可以按需设置日志回调和Executor。
 建议传入自己的线程池，以复用线程。
 
-日志接口提供三个级别的回调，按需实现即可。
-```java
-    public interface Logger {
-        void i(String name, String message);
-
-        void w(String name, Exception e);
-
-        void e(String name, Exception e);
-    }
-
-```
- 
 
 ### 2.3 数据读写
 - 基本用法

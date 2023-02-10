@@ -49,7 +49,7 @@ For Android (include SharePreferences API, support multi-process):
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.1.3'
+    implementation 'io.github.billywei01:fastkv:1.1.4'
 }
 ```
 
@@ -57,7 +57,7 @@ For Java (Pure Java API, not support multi-process):
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv-java:1.1.3'
+    implementation 'io.github.billywei01:fastkv-java:1.1.4'
 }
 ```
 
@@ -72,17 +72,6 @@ Initialization is optional.<br/>
 You could set log callback and executor.<br/>
 It is recommended to set your own thread pool to reuse threads.
 
-The log interface provides three levels of callbacks.
-```java
-    public interface Logger {
-        void i(String name, String message);
-
-        void w(String name, Exception e);
-
-        void e(String name, Exception e);
-    }
-
-```
 
 ### 2.3 Read/Write
 - Basic case

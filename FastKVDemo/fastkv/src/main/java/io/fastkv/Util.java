@@ -98,7 +98,7 @@ class Util {
             if (!file.exists() || file.delete()) {
                 return tmpFile.renameTo(file);
             }
-        } catch (Exception ignore) {
+        } catch (Throwable ignore) {
         }
         return false;
     }
@@ -107,7 +107,7 @@ class Util {
         if (closeable != null) {
             try {
                 closeable.close();
-            } catch (Exception ignore) {
+            } catch (Throwable ignore) {
             }
         }
     }
@@ -117,7 +117,7 @@ class Util {
             if (file.exists()) {
                 deleteRecursive(file);
             }
-        } catch (Exception ignore) {
+        } catch (Throwable ignore) {
         }
     }
 

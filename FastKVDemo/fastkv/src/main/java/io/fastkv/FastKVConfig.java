@@ -5,8 +5,15 @@ import java.util.concurrent.*;
 public final class FastKVConfig {
     static FastKV.Logger sLogger;
     static volatile Executor sExecutor;
+    static int internalLimit = 8192;
 
     private FastKVConfig() {
+    }
+
+    public static void setInternalLimit(int limit) {
+        if (limit >= 2048 && limit <= 0xFFFF) {
+            internalLimit = limit;
+        }
     }
 
     public static void setLogger(FastKV.Logger logger) {

@@ -268,79 +268,74 @@ public class FastKVTest {
     @Test
     public void testBigValue() {
         String name = "test_big_value";
-        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).build();
+
+        FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{TestObjectEncoder.INSTANCE};
+        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).encoder(encoders).build();
 
         testBigString(kv1, name);
         testBigArray(kv1, name);
-        testBigObject(name);
+        testBigObject(kv1, name);
     }
 
     private void testBigString(FastKV kv1, String name) {
         kv1.clear();
-        String longStr = TestHelper.makeString(6000);
+        String longStr = TestHelper.makeString(10000);
         kv1.putString("str", longStr);
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
+        FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name).build();
         Assert.assertEquals(longStr, kv2.getString("str"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
         kv1.putString("str", "hello");
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
-        Assert.assertEquals("hello", kv3.getString("str"));
+        Assert.assertEquals("hello", kv2.getString("str"));
 
         kv1.putString("str", longStr);
-        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
-        Assert.assertEquals(longStr, kv4.getString("str"));
+        kv1.putString("str2", longStr);
+        Assert.assertEquals(longStr, kv2.getString("str"));
+        Assert.assertEquals(longStr, kv2.getString("str2"));
     }
 
     private void testBigArray(FastKV kv1, String name) {
         kv1.clear();
-        byte[] longArray = new byte[6000];
+        byte[] longArray = new byte[10000];
         kv1.putArray("array", longArray);
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
+        FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name).build();
         Assert.assertArrayEquals(longArray, kv2.getArray("array"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
         byte[] shortArray = "hello".getBytes(StandardCharsets.UTF_8);
         kv1.putArray("array", shortArray);
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
-        Assert.assertArrayEquals(shortArray, kv3.getArray("array"));
+        Assert.assertArrayEquals(shortArray, kv2.getArray("array"));
 
         kv1.putArray("array", longArray);
-        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, FastKV.NON_BLOCKING);
-        Assert.assertArrayEquals(longArray, kv4.getArray("array"));
+        Assert.assertArrayEquals(longArray, kv2.getArray("array"));
     }
 
-    private void testBigObject(String name) {
-        FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{TestObjectEncoder.INSTANCE};
-        FastKV kv1 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
+    private void testBigObject(FastKV kv1, String name) {
         kv1.clear();
-        String longStr = TestHelper.makeString(6000);
+        String longStr = TestHelper.makeString(10000);
         TestObject obj = new TestObject(12345, longStr);
         kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
 
-        FastKV kv2 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
-        Assert.assertEquals(obj, kv2.getObject("obj"));
-        Assert.assertEquals(100, kv2.getInt("int"));
+        Assert.assertEquals(obj, kv1.getObject("obj"));
+        Assert.assertEquals(100, kv1.getInt("int"));
 
         obj.id = 123456;
         obj.info = "hello";
         kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
-        Assert.assertEquals(obj, kv3.getObject("obj"));
+        Assert.assertEquals(obj, kv1.getObject("obj"));
 
         obj.id = 123457;
         obj.info = longStr;
         kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
-        FastKV kv4 = new FastKV(TestHelper.DIR, name, encoders, FastKV.NON_BLOCKING);
-        Assert.assertEquals(obj, kv4.getObject("obj"));
+        Assert.assertEquals(obj, kv1.getObject("obj"));
     }
 
     private void setValue(String[] values, Random r) {

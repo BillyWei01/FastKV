@@ -738,7 +738,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
             if (!deletedFiles.isEmpty()) {
                 for (String oldFileName : deletedFiles) {
-                    Util.deleteFile(new File(path + name, oldFileName));
+                    FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
                 }
             }
 
@@ -1048,41 +1048,44 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     }
 
     private void fastPutString(String key, String value, StringContainer c) {
-        int stringSize = FastBuffer.getStringSize(value);
+        int stringLen = FastBuffer.getStringSize(value);
         if (c == null) {
-            int keySize = FastBuffer.getStringSize(key);
-            checkKeySize(keySize);
-            int preSize = 4 + keySize;
-            updateSize = preSize + stringSize;
+            int keyLen = FastBuffer.getStringSize(key);
+            checkKeySize(keyLen);
+            // 4 bytes = type:1, keyLen: 1, stringLen:2
+            // preSize include size of [type|keyLen|key|stringLen], which is "4+lengthOf(key)"
+            int preSize = 4 + keyLen;
+            updateSize = preSize + stringLen;
             preparePutBytes();
             fastBuffer.put(DataType.STRING);
-            putKey(key, keySize);
-            putStringValue(value, stringSize);
-            data.put(key, new StringContainer(updateStart, updateStart + preSize, value, stringSize, false));
+            putKey(key, keyLen);
+            putStringValue(value, stringLen);
+            data.put(key, new StringContainer(updateStart, updateStart + preSize, value, stringLen, false));
             updateChange();
         } else {
             String oldFileName = null;
             boolean needCheckGC = false;
+            // preSize: bytes count from start to value offset
             int preSize = c.offset - c.start;
-            if (c.valueSize == stringSize) {
+            if (c.valueSize == stringLen) {
                 checksum ^= fastBuffer.getChecksum(c.offset, c.valueSize);
-                if (stringSize == value.length()) {
+                if (stringLen == value.length()) {
                     //noinspection deprecation
-                    value.getBytes(0, stringSize, fastBuffer.hb, c.offset);
+                    value.getBytes(0, stringLen, fastBuffer.hb, c.offset);
                 } else {
                     fastBuffer.position = c.offset;
                     fastBuffer.putString(value);
                 }
                 updateStart = c.offset;
-                updateSize = stringSize;
+                updateSize = stringLen;
             } else {
-                updateSize = preSize + stringSize;
+                updateSize = preSize + stringLen;
                 preparePutBytes();
                 fastBuffer.put(DataType.STRING);
                 int keyBytes = preSize - 3;
                 System.arraycopy(fastBuffer.hb, c.start + 1, fastBuffer.hb, fastBuffer.position, keyBytes);
                 fastBuffer.position += keyBytes;
-                putStringValue(value, stringSize);
+                putStringValue(value, stringLen);
 
                 remove(DataType.STRING, c.start, c.offset + c.valueSize);
                 needCheckGC = true;
@@ -1092,7 +1095,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 c.external = false;
                 c.start = updateStart;
                 c.offset = updateStart + preSize;
-                c.valueSize = stringSize;
+                c.valueSize = stringLen;
             }
             c.value = value;
             updateChange();
@@ -1109,11 +1112,11 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         if (c == null) {
             addObject(key, value, bytes, type);
         } else {
-            if (c.external || c.valueSize != bytes.length) {
-                updateObject(key, value, bytes, c);
-            } else {
+            if (!c.external && c.valueSize == bytes.length) {
                 updateBytes(c.offset, bytes);
                 c.value = value;
+            } else {
+                updateObject(key, value, bytes, c);
             }
         }
     }
@@ -1125,6 +1128,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             Object v;
             boolean external = tempExternalName != null;
             if (external) {
+                bigValueCache.put(key, value);
                 size = Util.NAME_SIZE;
                 v = tempExternalName;
                 tempExternalName = null;
@@ -1155,6 +1159,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             c.offset = offset;
             c.external = external;
             if (external) {
+                bigValueCache.put(key, value);
                 c.value = tempExternalName;
                 c.valueSize = Util.NAME_SIZE;
                 tempExternalName = null;

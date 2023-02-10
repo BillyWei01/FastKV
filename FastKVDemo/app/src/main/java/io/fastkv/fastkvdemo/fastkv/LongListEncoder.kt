@@ -13,10 +13,7 @@ object LongListEncoder : FastKV.Encoder<List<Long>> {
         return PackEncoder().putLongList(0, obj).bytes
     }
 
-    override fun decode(bytes: ByteArray, offset: Int, length: Int): List<Long> {
-        val decoder = PackDecoder.newInstance(bytes, offset, length)
-        val list = decoder.getLongList(0)
-        decoder.recycle()
-        return list ?: listOf()
+    override fun decode(bytes: ByteArray, offset: Int, length: Int): List<Long>? {
+        return PackDecoder.newInstance(bytes, offset, length).getLongList(0)
     }
 }

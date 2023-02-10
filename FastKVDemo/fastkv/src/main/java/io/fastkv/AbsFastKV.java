@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import io.fastkv.Container.*;
+import io.fastkv.FastKV.Encoder;
 
 @SuppressWarnings("rawtypes")
 abstract class AbsFastKV {
@@ -32,7 +33,7 @@ abstract class AbsFastKV {
     protected static final int DATA_START = 12;
     protected static final int BASE_GC_KEYS_THRESHOLD = 80;
     protected static final int BASE_GC_BYTES_THRESHOLD = 4096;
-    protected static final int INTERNAL_LIMIT = 2048;
+    protected final int INTERNAL_LIMIT = FastKVConfig.internalLimit;
 
     protected static final int PAGE_SIZE = Util.getPageSize();
     protected static final int DOUBLE_LIMIT = Math.max(PAGE_SIZE << 1, 1 << 14);
@@ -40,7 +41,7 @@ abstract class AbsFastKV {
 
     protected final String path;
     protected final String name;
-    protected final Map<String, FastKV.Encoder> encoderMap;
+    protected final Map<String, Encoder> encoderMap;
     protected final FastKV.Logger logger = FastKVConfig.sLogger;
 
     protected int dataEnd;
@@ -51,18 +52,20 @@ abstract class AbsFastKV {
     protected FastBuffer fastBuffer;
 
     protected String tempExternalName;
+    protected final WeakCache externalCache = new WeakCache();
+    protected final WeakCache bigValueCache = new WeakCache();
 
     protected int invalidBytes;
     protected final ArrayList<Segment> invalids = new ArrayList<>();
 
-    protected AbsFastKV(final String path, final String name, FastKV.Encoder[] encoders) {
+    protected AbsFastKV(final String path, final String name, Encoder[] encoders) {
         this.path = path;
         this.name = name;
-        Map<String, FastKV.Encoder> map = new HashMap<>();
+        Map<String, Encoder> map = new HashMap<>();
         StringSetEncoder encoder = StringSetEncoder.INSTANCE;
         map.put(encoder.tag(), encoder);
         if (encoders != null && encoders.length > 0) {
-            for (FastKV.Encoder e : encoders) {
+            for (Encoder e : encoders) {
                 String tag = e.tag();
                 if (map.containsKey(tag)) {
                     error("duplicate encoder tag:" + tag);
@@ -171,7 +174,9 @@ abstract class AbsFastKV {
                 } else {
                     int size = buffer.getShort() & 0xFFFF;
                     boolean external = (info & DataType.EXTERNAL_MASK) != 0;
-                    checkValueSize(size, external);
+                    if (external && size != Util.NAME_SIZE) {
+                        throw new IllegalStateException("name size not match");
+                    }
                     switch (type) {
                         case DataType.STRING:
                             String str = buffer.getString(size);
@@ -188,7 +193,7 @@ abstract class AbsFastKV {
                             } else {
                                 int tagSize = buffer.get() & 0xFF;
                                 String tag = buffer.getString(tagSize);
-                                FastKV.Encoder encoder = encoderMap.get(tag);
+                                Encoder encoder = encoderMap.get(tag);
                                 int objectSize = size - (tagSize + 1);
                                 if (objectSize < 0) {
                                     throw new Exception(PARSE_DATA_FAILED);
@@ -231,19 +236,6 @@ abstract class AbsFastKV {
     protected final void checkKeySize(int keySize) {
         if (keySize > 0xFF) {
             throw new IllegalArgumentException("key's length must less than 256");
-        }
-    }
-
-
-    protected final void checkValueSize(int size, boolean external) {
-        if (external) {
-            if (size != Util.NAME_SIZE) {
-                throw new IllegalStateException("name size not match");
-            }
-        } else {
-            if (size < 0 || size >= INTERNAL_LIMIT) {
-                throw new IllegalStateException("value size out of bound");
-            }
         }
     }
 
@@ -318,6 +310,8 @@ abstract class AbsFastKV {
         dataEnd = DATA_START;
         checksum = 0L;
         data.clear();
+        bigValueCache.clear();
+        externalCache.clear();
         clearInvalid();
     }
 
@@ -440,16 +434,30 @@ abstract class AbsFastKV {
     public synchronized String getString(String key, String defValue) {
         StringContainer c = (StringContainer) data.get(key);
         if (c != null) {
-            return c.external ? getStringFromFile(c) : (String) c.value;
+            if (c.external) {
+                Object value = bigValueCache.get(key);
+                if (value instanceof String) {
+                    return (String) value;
+                }
+                String str = getStringFromFile(c);
+                if (!str.isEmpty()) {
+                    bigValueCache.put(key, str);
+                }
+                return str;
+            }
+            return (String) c.value;
         }
         return defValue;
     }
 
     private String getStringFromFile(StringContainer c) {
         String fileName = (String) c.value;
-        File file = new File(path + name, fileName);
+        byte[] cache = (byte[]) externalCache.get(fileName);
         try {
-            byte[] bytes = Util.getBytes(file);
+            if (cache != null) {
+                return new String(cache, StandardCharsets.UTF_8);
+            }
+            byte[] bytes = Util.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 return (bytes.length == 0) ? "" : new String(bytes, StandardCharsets.UTF_8);
             }
@@ -466,15 +474,30 @@ abstract class AbsFastKV {
     public synchronized byte[] getArray(String key, byte[] defValue) {
         ArrayContainer c = (ArrayContainer) data.get(key);
         if (c != null) {
-            return c.external ? getArrayFromFile(c) : (byte[]) c.value;
+            if (c.external) {
+                Object value = bigValueCache.get(key);
+                if (value instanceof byte[]) {
+                    return (byte[]) value;
+                }
+                byte[] bytes = getArrayFromFile(c);
+                if (bytes != null && bytes.length != 0) {
+                    bigValueCache.put(key, bytes);
+                }
+                return bytes;
+            }
+            return (byte[]) c.value;
         }
         return defValue;
     }
 
     private byte[] getArrayFromFile(ArrayContainer c) {
-        File file = new File(path + name, (String) c.value);
+        String fileName = (String) c.value;
+        byte[] cache = (byte[]) externalCache.get(fileName);
+        if (cache != null) {
+            return cache;
+        }
         try {
-            byte[] a = Util.getBytes(file);
+            byte[] a = Util.getBytes(new File(path + name, fileName));
             return a != null ? a : EMPTY_ARRAY;
         } catch (Exception e) {
             error(e);
@@ -486,19 +509,31 @@ abstract class AbsFastKV {
     public synchronized <T> T getObject(String key) {
         ObjectContainer c = (ObjectContainer) data.get(key);
         if (c != null) {
-            return c.external ? (T) getObjectFromFile(c) : (T) c.value;
+            if (c.external) {
+                Object value = bigValueCache.get(key);
+                if (value != null) {
+                    return (T) value;
+                }
+                Object obj = getObjectFromFile(c);
+                if (obj != null) {
+                    bigValueCache.put(key, obj);
+                }
+                return (T) obj;
+            }
+            return (T) c.value;
         }
         return null;
     }
 
     private Object getObjectFromFile(ObjectContainer c) {
-        File file = new File(path + name, (String) c.value);
+        String fileName = (String) c.value;
+        byte[] cache = (byte[]) externalCache.get(fileName);
         try {
-            byte[] bytes = Util.getBytes(file);
+            byte[] bytes = cache != null ? cache : Util.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 int tagSize = bytes[0] & 0xFF;
                 String tag = new String(bytes, 1, tagSize, StandardCharsets.UTF_8);
-                FastKV.Encoder encoder = encoderMap.get(tag);
+                Encoder encoder = encoderMap.get(tag);
                 if (encoder != null) {
                     int offset = 1 + tagSize;
                     return encoder.decode(bytes, offset, bytes.length - offset);
