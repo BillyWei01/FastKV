@@ -65,7 +65,7 @@ dependencies {
 ### 2.2 Initialization
 ```kotlin
     FastKVConfig.setLogger(FastKVLogger)
-    FastKVConfig.setExecutor(ChannelExecutorService(4))
+    FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
 ```
 
 Initialization is optional.<br/>

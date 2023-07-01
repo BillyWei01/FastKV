@@ -53,7 +53,7 @@ dependencies {
 ### 2.2 初始化
 ```kotlin
     FastKVConfig.setLogger(FastKVLogger)
-    FastKVConfig.setExecutor(ChannelExecutorService(4))
+    FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
 ```
 初始化可以按需设置日志回调和Executor。
 建议传入自己的线程池，以复用线程。
