@@ -942,30 +942,34 @@ public class FastKV {
                 } else if (value instanceof byte[]) {
                     putArray(key, (byte[]) value);
                 } else {
-                    if (value instanceof Set) {
-                        Set set = (Set) value;
-                        if (!set.isEmpty() && set.iterator().next() instanceof String) {
-                            //noinspection unchecked
-                            putStringSet(key, (Set<String>) value);
-                        }
-                    } else {
-                        if (encoders != null) {
-                            Encoder encoder = encoders.get(value.getClass());
-                            if (encoder != null) {
-                                //noinspection unchecked
-                                putObject(key, value, encoder);
-                            } else {
-                                warning(new Exception("missing encoder for type:" + value.getClass()));
-                            }
-                        } else {
-                            warning(new Exception("missing encoders"));
-                        }
-                    }
+                    encodeObject(key, value, encoders);
                 }
             }
         }
         if (writingMode != NON_BLOCKING) {
             commit();
+        }
+    }
+
+    private void encodeObject(String key, Object value, Map<Class, Encoder> encoders) {
+        if (value instanceof Set) {
+            Set set = (Set) value;
+            if (set.isEmpty() || set.iterator().next() instanceof String) {
+                //noinspection unchecked
+                putStringSet(key, set);
+                return;
+            }
+        }
+        if (encoders != null) {
+            Encoder encoder = encoders.get(value.getClass());
+            if (encoder != null) {
+                //noinspection unchecked
+                putObject(key, value, encoder);
+            } else {
+                warning(new Exception("missing encoder for type:" + value.getClass()));
+            }
+        } else {
+            warning(new Exception("missing encoders"));
         }
     }
 
