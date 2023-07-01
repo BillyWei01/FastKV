@@ -49,7 +49,7 @@ For Android (include SharePreferences API, support multi-process):
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.1.4'
+    implementation 'io.github.billywei01:fastkv:1.1.5'
 }
 ```
 
@@ -57,7 +57,7 @@ For Java (Pure Java API, not support multi-process):
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv-java:1.1.4'
+    implementation 'io.github.billywei01:fastkv-java:1.1.5'
 }
 ```
 

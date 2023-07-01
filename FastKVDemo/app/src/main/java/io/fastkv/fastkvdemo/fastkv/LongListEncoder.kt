@@ -4,6 +4,7 @@ import io.fastkv.FastKV
 import io.packable.PackDecoder
 import io.packable.PackEncoder
 
+
 object LongListEncoder : FastKV.Encoder<List<Long>> {
     override fun tag(): String {
         return "LongList"
@@ -13,7 +14,7 @@ object LongListEncoder : FastKV.Encoder<List<Long>> {
         return PackEncoder().putLongList(0, obj).bytes
     }
 
-    override fun decode(bytes: ByteArray, offset: Int, length: Int): List<Long>? {
-        return PackDecoder.newInstance(bytes, offset, length).getLongList(0)
+    override fun decode(bytes: ByteArray, offset: Int, length: Int): List<Long> {
+        return ArrayList(PackDecoder.newInstance(bytes, offset, length).getLongList(0))
     }
 }

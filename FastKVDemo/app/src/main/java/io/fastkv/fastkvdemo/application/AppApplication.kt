@@ -6,6 +6,8 @@ import com.tencent.mmkv.MMKV
 import io.fastkv.FastKVConfig
 import io.fastkv.fastkvdemo.fastkv.FastKVLogger
 import io.fastkv.fastkvdemo.util.ChannelExecutor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 
 class AppApplication : Application() {
     override fun onCreate() {
@@ -13,7 +15,7 @@ class AppApplication : Application() {
         GlobalConfig.appContext = this
 
         FastKVConfig.setLogger(FastKVLogger)
-        FastKVConfig.setExecutor(ChannelExecutor(4))
+        FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
 
         // filter other processes,
         // in case files damaged in multiprocess mode

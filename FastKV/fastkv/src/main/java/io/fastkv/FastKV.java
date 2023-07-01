@@ -93,7 +93,7 @@ public class FastKV {
         Map<String, Encoder> map = new HashMap<>();
         StringSetEncoder encoder = StringSetEncoder.INSTANCE;
         map.put(encoder.tag(), encoder);
-        if (encoders != null && encoders.length > 0) {
+        if (encoders != null) {
             for (Encoder e : encoders) {
                 String tag = e.tag();
                 if (map.containsKey(tag)) {
@@ -920,6 +920,9 @@ public class FastKV {
      * @param encoders map of value Class to Encoder
      */
     public synchronized void putAll(Map<String, Object> values, Map<Class, Encoder> encoders) {
+        if (writingMode != NON_BLOCKING) {
+            autoCommit = false;
+        }
         for (Map.Entry<String, Object> entry : values.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
@@ -936,28 +939,33 @@ public class FastKV {
                     putFloat(key, (Float) value);
                 } else if (value instanceof Double) {
                     putDouble(key, (Double) value);
-                } else if (value instanceof Set) {
-                    Set set = (Set) value;
-                    if (!set.isEmpty() && set.iterator().next() instanceof String) {
-                        //noinspection unchecked
-                        putStringSet(key, (Set<String>) value);
-                    }
                 } else if (value instanceof byte[]) {
                     putArray(key, (byte[]) value);
                 } else {
-                    if (encoders != null) {
-                        Encoder encoder = encoders.get(value.getClass());
-                        if (encoder != null) {
+                    if (value instanceof Set) {
+                        Set set = (Set) value;
+                        if (!set.isEmpty() && set.iterator().next() instanceof String) {
                             //noinspection unchecked
-                            putObject(key, value, encoder);
-                        } else {
-                            warning(new Exception("missing encoder for type:" + value.getClass()));
+                            putStringSet(key, (Set<String>) value);
                         }
                     } else {
-                        warning(new Exception("missing encoders"));
+                        if (encoders != null) {
+                            Encoder encoder = encoders.get(value.getClass());
+                            if (encoder != null) {
+                                //noinspection unchecked
+                                putObject(key, value, encoder);
+                            } else {
+                                warning(new Exception("missing encoder for type:" + value.getClass()));
+                            }
+                        } else {
+                            warning(new Exception("missing encoders"));
+                        }
                     }
                 }
             }
+        }
+        if (writingMode != NON_BLOCKING) {
+            commit();
         }
     }
 
@@ -1664,6 +1672,28 @@ public class FastKV {
         }
     }
 
+    /**
+     * If you just need to save data to file and don't want to keep data in memory,
+     * you could call this after put/get data.
+     * Note:
+     * The key-value (kv) must be a temporary variable
+     * to ensure that the associated memory can be reclaimed
+     * after the variable's lifecycle ends.
+     */
+    public synchronized void close() {
+        if (writingMode == NON_BLOCKING) {
+            try {
+                aChannel.close();
+                bChannel.close();
+            } catch (Exception e) {
+                error(e);
+            }
+        }
+        synchronized (Builder.class) {
+            Builder.INSTANCE_MAP.remove(path + name);
+        }
+    }
+
     // All params of Logger && Encoder are not null.
     public interface Logger {
         void i(String name, String message);
@@ -1678,12 +1708,12 @@ public class FastKV {
 
         byte[] encode(T obj);
 
-        // 'bytes' is not null (The caller had checked)
+        // 'bytes' is not null (The caller had checked that)
         T decode(byte[] bytes, int offset, int length);
     }
 
     public static class Builder {
-        private static final Map<String, FastKV> INSTANCE_MAP = new ConcurrentHashMap<>();
+        static final Map<String, FastKV> INSTANCE_MAP = new ConcurrentHashMap<>();
         private final String path;
         private final String name;
         private Encoder[] encoders;

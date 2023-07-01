@@ -64,7 +64,7 @@ abstract class AbsFastKV {
         Map<String, Encoder> map = new HashMap<>();
         StringSetEncoder encoder = StringSetEncoder.INSTANCE;
         map.put(encoder.tag(), encoder);
-        if (encoders != null && encoders.length > 0) {
+        if (encoders != null) {
             for (Encoder e : encoders) {
                 String tag = e.tag();
                 if (map.containsKey(tag)) {

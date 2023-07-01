@@ -2,8 +2,7 @@ import io.fastkv.*;
 import io.fastkv.TestHelper;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class Main {
     private static void testKV() throws IOException {
@@ -13,7 +12,6 @@ public class Main {
         String name = "main";
         FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
         FastKV kv = new FastKV.Builder(path, name).encoder(encoders).build();
-        // FastKV kv = new FastKV.Builder(path, name).build();
 
         if (!kv.getBoolean("flag")) {
             setValues(kv);
@@ -21,12 +19,26 @@ public class Main {
         }
         kv.putInt("int_key", kv.getInt("int_key") + 1);
 
-        KVViewer.printFastKV(kv);
-        HexViewer.printFile(path + name + ".kva", 160);
+//        KVViewer.printFastKV(kv);
+//        HexViewer.printFile(path + name + ".kva", 160);
+
+        FastKV kv2 = new FastKV.Builder(path, name+"2")
+                .encoder(encoders)
+                .asyncBlocking()
+                .build();
+
+        Map<Class, FastKV.Encoder> encoderMap = new HashMap<>();
+        encoderMap.put(ArrayList.class, LongListEncoder.INSTANCE);
+        kv2.putAll(kv.getAll(), encoderMap);
+
+        KVViewer.printFastKV(kv2);
+        HexViewer.printFile(path + name+"2" + ".kvc", 160);
+
+        kv.close();
+        kv2.close();
     }
 
     private static void setValues(FastKV kv) {
-        System.out.println("setValue");
         if (!kv.contains("bool_key")) {
             String boolKey = "bool_key";
             kv.putBoolean(boolKey, true);

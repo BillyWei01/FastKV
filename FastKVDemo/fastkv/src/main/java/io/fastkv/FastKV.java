@@ -500,6 +500,9 @@ public final class FastKV extends AbsFastKV {
      * @param encoders map of value Class to Encoder
      */
     public synchronized void putAll(Map<String, Object> values, Map<Class, Encoder> encoders) {
+        if (writingMode != NON_BLOCKING) {
+            autoCommit = false;
+        }
         for (Map.Entry<String, Object> entry : values.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
@@ -516,28 +519,33 @@ public final class FastKV extends AbsFastKV {
                     putFloat(key, (Float) value);
                 } else if (value instanceof Double) {
                     putDouble(key, (Double) value);
-                } else if (value instanceof Set) {
-                    Set set = (Set) value;
-                    if (!set.isEmpty() && set.iterator().next() instanceof String) {
-                        //noinspection unchecked
-                        putStringSet(key, (Set<String>) value);
-                    }
                 } else if (value instanceof byte[]) {
                     putArray(key, (byte[]) value);
                 } else {
-                    if (encoders != null) {
-                        Encoder encoder = encoders.get(value.getClass());
-                        if (encoder != null) {
+                    if (value instanceof Set) {
+                        Set set = (Set) value;
+                        if (!set.isEmpty() && set.iterator().next() instanceof String) {
                             //noinspection unchecked
-                            putObject(key, value, encoder);
-                        } else {
-                            warning(new Exception("missing encoder for type:" + value.getClass()));
+                            putStringSet(key, (Set<String>) value);
                         }
                     } else {
-                        warning(new Exception("missing encoders"));
+                        if (encoders != null) {
+                            Encoder encoder = encoders.get(value.getClass());
+                            if (encoder != null) {
+                                //noinspection unchecked
+                                putObject(key, value, encoder);
+                            } else {
+                                warning(new Exception("missing encoder for type:" + value.getClass()));
+                            }
+                        } else {
+                            warning(new Exception("missing encoders"));
+                        }
                     }
                 }
             }
+        }
+        if (writingMode != NON_BLOCKING) {
+            commit();
         }
     }
 
@@ -1105,6 +1113,28 @@ public final class FastKV extends AbsFastKV {
         info(TRUNCATE_FINISH);
     }
 
+    /**
+     * If you just need to save data to file and don't want to keep data in memory,
+     * you could call this after put/get data.
+     * Note:
+     * The key-value (kv) must be a temporary variable
+     * to ensure that the associated memory can be reclaimed
+     * after the variable's lifecycle ends.
+     */
+    public synchronized void close() {
+        if (writingMode == NON_BLOCKING) {
+            try {
+                aChannel.close();
+                bChannel.close();
+            } catch (Exception e) {
+                error(e);
+            }
+        }
+        synchronized (Builder.class) {
+            Builder.INSTANCE_MAP.remove(path + name);
+        }
+    }
+
     public interface Logger {
         void i(@NonNull String name, @NonNull String message);
 
@@ -1121,8 +1151,8 @@ public final class FastKV extends AbsFastKV {
         T decode(@NonNull byte[] bytes, int offset, int length);
     }
 
-    public static class Builder {
-        private static final Map<String, FastKV> INSTANCE_MAP = new ConcurrentHashMap<>();
+    public static final class Builder {
+        static final Map<String, FastKV> INSTANCE_MAP = new ConcurrentHashMap<>();
         private final String path;
         private final String name;
         private Encoder[] encoders;

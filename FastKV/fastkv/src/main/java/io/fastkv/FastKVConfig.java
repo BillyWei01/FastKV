@@ -36,7 +36,7 @@ public final class FastKVConfig {
             synchronized (FastKVConfig.class) {
                 if (sExecutor == null) {
                     ThreadPoolExecutor executor = new ThreadPoolExecutor(4, 4,
-                            10, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+                            5, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
                     executor.allowCoreThreadTimeOut(true);
                     sExecutor = executor;
                 }
