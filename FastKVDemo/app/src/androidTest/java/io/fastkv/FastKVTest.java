@@ -15,6 +15,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,12 @@ public class FastKVTest {
 
 
         String stringSetKey = "string_set_key";
-        kv1.putStringSet(stringSetKey, TestHelper.makeStringSet());
+        Set<String> stringSetValue = TestHelper.makeStringSet();
+        kv1.putStringSet(stringSetKey, stringSetValue);
+
+        String stringSetKey2 = "string_set_key2";
+        Set<String> stringSetValue2 = new HashSet<>();
+        kv1.putStringSet(stringSetKey2, stringSetValue2);
 
         String objectKey = "object_key";
         List<Long> list = new ArrayList<>();
@@ -83,7 +89,8 @@ public class FastKVTest {
         Assert.assertEquals(kv1.getLong(longKey), kv2.getLong(longKey));
         Assert.assertTrue(kv1.getDouble(doubleKey) == kv2.getDouble(doubleKey));
         Assert.assertEquals(kv1.getString(stringKey), kv1.getString(stringKey));
-        Assert.assertEquals(kv1.getStringSet(stringSetKey), kv2.getStringSet(stringSetKey));
+        Assert.assertEquals(stringSetValue, kv2.getStringSet(stringSetKey));
+        Assert.assertEquals(stringSetValue2, kv2.getStringSet(stringSetKey2));
         Assert.assertTrue(kv1.getObject(objectKey).equals(kv2.getObject(objectKey)));
         Assert.assertNull(kv2.getObject("foo"));
         Assert.assertNull(kv2.getString("foo2", null));
