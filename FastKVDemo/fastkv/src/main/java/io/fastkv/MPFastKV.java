@@ -108,6 +108,9 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         if (fastBuffer == null) {
             fastBuffer = new FastBuffer(PAGE_SIZE);
         }
+        if (dataEnd == 0) {
+            dataEnd = DATA_START;
+        }
         if (logger != null) {
             long t = (System.nanoTime() - start) / 1000000;
             info("loading finish, data len:" + dataEnd + ", get keys:" + data.size() + ", use time:" + t + " ms");

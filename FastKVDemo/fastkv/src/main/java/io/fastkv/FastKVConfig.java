@@ -3,7 +3,7 @@ package io.fastkv;
 import java.util.concurrent.*;
 
 public final class FastKVConfig {
-    static FastKV.Logger sLogger;
+    static FastKV.Logger sLogger = new DefaultLogger();
     static volatile Executor sExecutor;
     static int internalLimit = 8192;
 

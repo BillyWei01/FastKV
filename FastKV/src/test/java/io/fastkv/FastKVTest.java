@@ -692,8 +692,13 @@ public class FastKVTest {
     }
 
     private void testSync(String name) throws Exception {
+        File cFile = new File(TestHelper.DIR, name + ".kvc");
+        if(cFile.exists()){
+            cFile.delete();
+        }
+
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).blocking().build();
-        kv1.clear();
+        // kv1.clear();
 
         Assert.assertEquals(false, kv1.contains("time"));
 
