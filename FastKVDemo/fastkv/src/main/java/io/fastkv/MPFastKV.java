@@ -44,6 +44,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
     private static final Random random = new Random();
 
+    private final boolean needWatchFileChange;
     private final File aFile;
     private final File bFile;
     private RandomAccessFile aAccessFile;
@@ -66,8 +67,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     private final Executor refreshExecutor = new LimitExecutor();
 
     // We need to keep reference to the observer in case of gc recycle it.
-    @SuppressWarnings("FieldCanBeLocal")
-    private final KVFileObserver fileObserver;
+    private volatile KVFileObserver fileObserver;
     private final Set<String> changedKey = new HashSet<>();
     private final ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners = new ArrayList<>();
 
@@ -75,6 +75,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         super(path, name, encoders);
         aFile = new File(path, name + A_SUFFIX);
         bFile = new File(path, name + B_SUFFIX);
+        this.needWatchFileChange = needWatchFileChange;
 
         synchronized (data) {
             FastKVConfig.getExecutor().execute(this::loadData);
@@ -87,12 +88,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             }
         }
 
-        if (needWatchFileChange) {
-            fileObserver = new KVFileObserver(bFile.getPath());
-            fileObserver.startWatching();
-        } else {
-            fileObserver = null;
-        }
+        trySettingObserver();
     }
 
     private synchronized void loadData() {
@@ -115,11 +111,25 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             long t = (System.nanoTime() - start) / 1000000;
             info("loading finish, data len:" + dataEnd + ", get keys:" + data.size() + ", use time:" + t + " ms");
         }
+        trySettingObserver();
+    }
+
+    private void trySettingObserver() {
+        if (needWatchFileChange && fileObserver == null && bFile != null && bFile.exists()) {
+            fileObserver = new KVFileObserver(bFile.getPath());
+            fileObserver.startWatching();
+        }
     }
 
     private void loadFromABFile() {
         try {
-            if (!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) {
+            int count = 0;
+            while ((!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) && count < 3) {
+                //noinspection BusyWait
+                Thread.sleep(20L);
+                count++;
+            }
+            if (!aFile.exists() || !bFile.exists()) {
                 error(new Exception(OPEN_FILE_FAILED));
                 return;
             }
@@ -209,6 +219,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             if (!Util.makeFileIfNotExist(bFile)) {
                 return;
             }
+            trySettingObserver();
             setBFileSize(aBuffer.capacity());
             syncAToB(0, dataEnd);
         } catch (Exception e) {
@@ -291,6 +302,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             if (!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) {
                 throw new Exception(OPEN_FILE_FAILED);
             }
+            trySettingObserver();
             if (bAccessFile == null) {
                 bAccessFile = new RandomAccessFile(bFile, "rw");
             }
@@ -858,7 +870,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         int capacity = buffer.capacity();
         int dataSize = buffer.getInt(0);
         if (dataSize < 0 || dataSize > capacity) {
-            throw new IllegalStateException("Invalid file, dataSize:" + dataSize + ", capacity:"+capacity);
+            throw new IllegalStateException("Invalid file, dataSize:" + dataSize + ", capacity:" + capacity);
         }
         long sum = buffer.getLong(4);
         int end = DATA_START + dataSize;
@@ -929,6 +941,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             if (Util.makeFileIfNotExist(bFile)) {
                 setBFileSize(PAGE_SIZE);
                 syncAToB(0, DATA_START);
+                trySettingObserver();
             }
         } catch (Throwable e) {
             error(e);
