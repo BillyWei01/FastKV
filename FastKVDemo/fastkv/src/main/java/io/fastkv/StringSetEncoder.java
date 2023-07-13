@@ -5,7 +5,9 @@ import androidx.annotation.NonNull;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-class StringSetEncoder implements FastKV.Encoder<Set<String>> {
+import io.fastkv.interfaces.FastEncoder;
+
+class StringSetEncoder implements FastEncoder<Set<String>> {
     static final StringSetEncoder INSTANCE = new StringSetEncoder();
 
     private StringSetEncoder() {

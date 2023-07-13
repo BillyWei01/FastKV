@@ -3,6 +3,8 @@ package io.fastkv;
 import java.util.Arrays;
 import java.util.Objects;
 
+import io.fastkv.interfaces.FastEncoder;
+
 /**
  * struct of primary type (boolean/int/float/long/double):
  * [type|keyLen|keyData|value]
@@ -192,6 +194,9 @@ class Container {
     }
 
     static class ObjectContainer extends VarContainer {
+        @SuppressWarnings("rawtypes")
+        FastEncoder encoder;
+
         ObjectContainer(int start, int offset, Object value, int size, boolean external) {
             super(start, offset, value, size, external);
         }

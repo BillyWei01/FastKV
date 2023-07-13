@@ -31,7 +31,20 @@ class TestObject implements Packable {
 
     @Override
     public String toString() {
-        return "TestObject{" + "id=" + id + ", info='" + info + '\'' + '}';
+        return "TestObject{"
+                + "id=" + id
+                + ", info='" + truncateStr(info)
+                + '\'' + '}';
+    }
+
+    private String truncateStr(String str){
+        if(str == null){
+            return null;
+        }
+        if(str.length() > 50){
+            return str.substring(0, 50) + "...";
+        }
+        return str;
     }
 
     @Override

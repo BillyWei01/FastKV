@@ -8,18 +8,23 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import io.fastkv.fastkvdemo.fastkv.AESCipher;
 import io.fastkv.fastkvdemo.manager.PathManager;
+import io.fastkv.interfaces.FastCipher;
+import io.fastkv.interfaces.FastLogger;
 
 public class TestHelper {
     private static final String TAG = "TestHelper";
     public static final String DIR = PathManager.INSTANCE.getFilesDir() + "/test/";
     public static final String MP_DIR = PathManager.INSTANCE.getFilesDir() + "/mp_test/";
 
+    static final FastCipher cipher = new AESCipher("abc1234567890xyz".getBytes());
+
     static AtomicInteger gcCount = new AtomicInteger();
     static AtomicInteger truncateCount = new AtomicInteger();
     static AtomicInteger fileErrorCount = new AtomicInteger();
 
-    public static FastKV.Logger logger = new FastKV.Logger() {
+    public static FastLogger logger = new FastLogger() {
         @Override
         public void i(@NonNull String name, @NonNull String message) {
             if (FastKV.GC_FINISH.equals(message)) {

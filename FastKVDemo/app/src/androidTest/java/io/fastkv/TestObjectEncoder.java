@@ -2,10 +2,11 @@ package io.fastkv;
 
 import androidx.annotation.NonNull;
 
+import io.fastkv.interfaces.FastEncoder;
 import io.packable.PackDecoder;
 import io.packable.PackEncoder;
 
-class TestObjectEncoder implements FastKV.Encoder<TestObject> {
+class TestObjectEncoder implements FastEncoder<TestObject> {
     static TestObjectEncoder INSTANCE = new TestObjectEncoder();
 
     private TestObjectEncoder() {

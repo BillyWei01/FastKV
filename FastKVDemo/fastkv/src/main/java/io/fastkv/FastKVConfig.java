@@ -2,8 +2,10 @@ package io.fastkv;
 
 import java.util.concurrent.*;
 
+import io.fastkv.interfaces.FastLogger;
+
 public final class FastKVConfig {
-    static FastKV.Logger sLogger = new DefaultLogger();
+    static FastLogger sLogger = new DefaultLogger();
     static volatile Executor sExecutor;
     static int internalLimit = 8192;
 
@@ -16,7 +18,7 @@ public final class FastKVConfig {
         }
     }
 
-    public static void setLogger(FastKV.Logger logger) {
+    public static void setLogger(FastLogger logger) {
         sLogger = logger;
     }
 
@@ -35,10 +37,7 @@ public final class FastKVConfig {
         if (sExecutor == null) {
             synchronized (FastKVConfig.class) {
                 if (sExecutor == null) {
-                    ThreadPoolExecutor executor = new ThreadPoolExecutor(4, 4,
-                            10, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
-                    executor.allowCoreThreadTimeOut(true);
-                    sExecutor = executor;
+                    sExecutor = Executors.newCachedThreadPool();
                 }
             }
         }

@@ -1,6 +1,6 @@
 package io.fastkv.fastkvdemo.account
 
-import io.fastkv.FastKV.Encoder
+import io.fastkv.interfaces.FastEncoder
 import io.packable.PackCreator
 import io.packable.PackDecoder
 import io.packable.PackEncoder
@@ -32,7 +32,7 @@ data class AccountInfo(
             )
         }
 
-        val ENCODER = object : Encoder<AccountInfo> {
+        val ENCODER = object : FastEncoder<AccountInfo> {
             override fun tag(): String {
                 return "UserAccount"
             }

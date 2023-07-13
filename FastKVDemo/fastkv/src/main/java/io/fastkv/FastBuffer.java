@@ -1,6 +1,9 @@
 package io.fastkv;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
+import io.fastkv.interfaces.FastCipher;
 
 class FastBuffer {
     private static final int MAX_CHAR_LEN = 2048;
@@ -42,11 +45,23 @@ class FastBuffer {
         hb[position++] = (byte) (v >> 8);
     }
 
+    public int getInt(int i) {
+        return (((hb[i++] & 0xFF)) |
+                ((hb[i++] & 0xFF) << 8) |
+                ((hb[i++] & 0xFF) << 16) |
+                ((hb[i]) << 24));
+    }
+
     public int getInt() {
         return (((hb[position++] & 0xFF)) |
                 ((hb[position++] & 0xFF) << 8) |
                 ((hb[position++] & 0xFF) << 16) |
                 ((hb[position++]) << 24));
+    }
+
+    public int getInt(FastCipher cipher) {
+        int value = getInt();
+        return cipher != null ? cipher.decrypt(value) : value;
     }
 
     public void putInt(int v) {
@@ -135,12 +150,25 @@ class FastBuffer {
         return value;
     }
 
+    public long getLong(FastCipher cipher) {
+        long value = getLong();
+        return cipher != null ? cipher.decrypt(value) : value;
+    }
+
     public float getFloat() {
         return Float.intBitsToFloat(getInt());
     }
 
+    public float getFloat(FastCipher cipher) {
+        return Float.intBitsToFloat(getInt(cipher));
+    }
+
     public double getDouble() {
         return Double.longBitsToDouble(getLong());
+    }
+
+    public double getDouble(FastCipher cipher) {
+        return Double.longBitsToDouble(getLong(cipher));
     }
 
     public byte[] getBytes(int len) {
@@ -148,6 +176,11 @@ class FastBuffer {
         System.arraycopy(hb, position, bytes, 0, len);
         position += len;
         return bytes;
+    }
+
+    public byte[] getBytes(FastCipher cipher, int len) {
+        byte[] bytes = getBytes(len);
+        return cipher != null ? cipher.decrypt(bytes) : bytes;
     }
 
     public void putBytes(byte[] src) {
@@ -158,13 +191,31 @@ class FastBuffer {
         }
     }
 
+    public String getString(FastCipher cipher, int len) {
+        if (cipher == null || len <= 0) {
+            return getString(len);
+        }
+        byte[] src = Arrays.copyOfRange(hb, position, position + len);
+        byte[] dst = cipher.decrypt(src);
+        String str;
+        if (dst == null) {
+            str = null;
+        } else {
+            str = dst.length > MAX_CHAR_LEN ?
+                    new String(dst, StandardCharsets.UTF_8) : decodeStr(dst, 0, dst.length);
+        }
+        position += len;
+        return str;
+    }
+
     public String getString(int len) {
         if (len < 0) {
             return null;
         } else if (len == 0) {
             return "";
         } else {
-            String str = len > MAX_CHAR_LEN ? new String(hb, position, len, StandardCharsets.UTF_8) : decodeStr(len);
+            String str = len > MAX_CHAR_LEN ?
+                    new String(hb, position, len, StandardCharsets.UTF_8) : decodeStr(hb, position, len);
             position += len;
             return str;
         }
@@ -218,12 +269,12 @@ class FastBuffer {
         return buf;
     }
 
-    private synchronized String decodeStr(int len) {
+    synchronized String decodeStr(byte[] src, int offset, int len) {
         char[] buf = getCharBuf(len);
-        byte[] src = hb;
-        int i = position;
+        // byte[] src = hb;
+        int i = offset;
         int j = 0;
-        int limit = position + len;
+        int limit = offset + len;
         while (i < limit) {
             byte b1 = src[i++];
             if (b1 > 0) {

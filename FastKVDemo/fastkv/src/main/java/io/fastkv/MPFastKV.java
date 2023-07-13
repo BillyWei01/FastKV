@@ -16,23 +16,24 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
-import io.fastkv.FastKV.*;
 import io.fastkv.Container.*;
+import io.fastkv.interfaces.FastCipher;
+import io.fastkv.interfaces.FastEncoder;
 
 /**
- * Multiprocess FastKV <br>
+ * Multi-process FastKV <br>
  * <p>
  * This class support cross process storage and update notify.
  * It implements API of SharePreferences, so it could be used as SharePreferences.<br>
+ * As it's usage like SharePreferences, remember to call 'commit' or 'apply' after editing.
  * <p>
  * Note:
  * To support cross process storage, MPFastKV needs to do many state checks, it's slower than {@link FastKV}.
- * So if you don't need to access the data in multiprocess, just use FastKV.
+ * So if you don't need to access the data in multi-process, just use FastKV.
  */
 @SuppressWarnings("rawtypes")
 public final class MPFastKV extends AbsFastKV implements SharedPreferences, SharedPreferences.Editor {
@@ -56,9 +57,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
     private int[] updateStartAndSize = new int[16];
     private int updateCount = 0;
-    private int updateStart;
-    private int updateSize;
-    private final List<String> deletedFiles = new ArrayList<>();
 
     private long updateHash;
     private boolean needFullWrite = false;
@@ -71,8 +69,12 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     private final Set<String> changedKey = new HashSet<>();
     private final ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners = new ArrayList<>();
 
-    MPFastKV(final String path, final String name, Encoder[] encoders, boolean needWatchFileChange) {
-        super(path, name, encoders);
+    MPFastKV(final String path,
+             final String name,
+             FastEncoder[] encoders,
+             FastCipher cipher,
+             boolean needWatchFileChange) {
+        super(path, name, encoders, cipher);
         aFile = new File(path, name + A_SUFFIX);
         bFile = new File(path, name + B_SUFFIX);
         this.needWatchFileChange = needWatchFileChange;
@@ -87,8 +89,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 }
             }
         }
-
-        trySettingObserver();
     }
 
     private synchronized void loadData() {
@@ -107,11 +107,19 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         if (dataEnd == 0) {
             dataEnd = DATA_START;
         }
+        if (needRewrite) {
+            rewrite();
+            info("rewrite data");
+        }
         if (logger != null) {
             long t = (System.nanoTime() - start) / 1000000;
             info("loading finish, data len:" + dataEnd + ", get keys:" + data.size() + ", use time:" + t + " ms");
         }
         trySettingObserver();
+    }
+
+    protected void copyToMainFile(FastKV tempKV) {
+        writeToABFile(tempKV.fastBuffer);
     }
 
     private void trySettingObserver() {
@@ -177,14 +185,16 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                         if (fastBuffer == null || fastBuffer.hb.length != aBuffer.capacity()) {
                             fastBuffer = new FastBuffer(aBuffer.capacity());
                         }
-                        int aDataSize = aBuffer.getInt();
+                        int aSize = aBuffer.getInt();
+                        int aDataSize = unpackSize(aSize);
+                        boolean aHadEncrypted = isCipher(aSize);
                         boolean isAValid = false;
                         if (aDataSize >= 0 && (aDataSize <= aFileLen - DATA_START)) {
                             dataEnd = DATA_START + aDataSize;
                             long aCheckSum = aBuffer.getLong(4);
                             aBuffer.rewind();
                             aBuffer.get(fastBuffer.hb, 0, dataEnd);
-                            if (aCheckSum == fastBuffer.getChecksum(DATA_START, aDataSize) && parseData() == 0) {
+                            if (aCheckSum == fastBuffer.getChecksum(DATA_START, aDataSize) && parseData(aHadEncrypted)) {
                                 checksum = aCheckSum;
                                 isAValid = true;
                             }
@@ -219,7 +229,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             if (!Util.makeFileIfNotExist(bFile)) {
                 return;
             }
-            trySettingObserver();
             setBFileSize(aBuffer.capacity());
             syncAToB(0, dataEnd);
         } catch (Exception e) {
@@ -302,7 +311,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             if (!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) {
                 throw new Exception(OPEN_FILE_FAILED);
             }
-            trySettingObserver();
             if (bAccessFile == null) {
                 bAccessFile = new RandomAccessFile(bFile, "rw");
             }
@@ -325,6 +333,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                     lock.release();
                 }
             }
+            trySettingObserver();
             return true;
         } catch (Exception e) {
             error(e);
@@ -387,139 +396,41 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
     @Override
     public synchronized Editor putBoolean(String key, boolean value) {
-        checkKey(key);
-        lockAndCheckUpdate();
-        BooleanContainer c = (BooleanContainer) data.get(key);
-        if (c == null) {
-            wrapHeader(key, DataType.BOOLEAN);
-            int offset = fastBuffer.position;
-            fastBuffer.put((byte) (value ? 1 : 0));
-            updateChange();
-            data.put(key, new BooleanContainer(offset, value));
-            markChanged(key);
-        } else if (c.value != value) {
-            c.value = value;
-            updateBoolean((byte) (value ? 1 : 0), c.offset);
-            markChanged(key);
-        }
+        putBooleanValue(key, value);
         return this;
     }
 
     @Override
     public synchronized Editor putInt(String key, int value) {
-        checkKey(key);
-        lockAndCheckUpdate();
-        IntContainer c = (IntContainer) data.get(key);
-        if (c == null) {
-            wrapHeader(key, DataType.INT);
-            int offset = fastBuffer.position;
-            fastBuffer.putInt(value);
-            updateChange();
-            data.put(key, new IntContainer(offset, value));
-            markChanged(key);
-        } else if (c.value != value) {
-            long sum = (value ^ c.value) & 0xFFFFFFFFL;
-            c.value = value;
-            updateInt32(value, sum, c.offset);
-            markChanged(key);
-        }
+        putIntValue(key, value);
         return this;
     }
 
     @Override
     public synchronized Editor putFloat(String key, float value) {
-        checkKey(key);
-        lockAndCheckUpdate();
-        FloatContainer c = (FloatContainer) data.get(key);
-        if (c == null) {
-            wrapHeader(key, DataType.FLOAT);
-            int offset = fastBuffer.position;
-            fastBuffer.putInt(Float.floatToRawIntBits(value));
-            updateChange();
-            data.put(key, new FloatContainer(offset, value));
-            markChanged(key);
-        } else if (c.value != value) {
-            int newValue = Float.floatToRawIntBits(value);
-            long sum = (Float.floatToRawIntBits(c.value) ^ newValue) & 0xFFFFFFFFL;
-            c.value = value;
-            updateInt32(newValue, sum, c.offset);
-            markChanged(key);
-        }
+        putFloatValue(key, value);
         return this;
     }
 
     @Override
     public synchronized Editor putLong(String key, long value) {
-        checkKey(key);
-        lockAndCheckUpdate();
-        LongContainer c = (LongContainer) data.get(key);
-        if (c == null) {
-            wrapHeader(key, DataType.LONG);
-            int offset = fastBuffer.position;
-            fastBuffer.putLong(value);
-            updateChange();
-            data.put(key, new LongContainer(offset, value));
-            markChanged(key);
-        } else if (c.value != value) {
-            long sum = value ^ c.value;
-            c.value = value;
-            updateInt64(value, sum, c.offset);
-            markChanged(key);
-        }
+        putLongValue(key, value);
         return this;
     }
 
-    public synchronized void putDouble(String key, double value) {
-        checkKey(key);
-        lockAndCheckUpdate();
-        DoubleContainer c = (DoubleContainer) data.get(key);
-        if (c == null) {
-            wrapHeader(key, DataType.DOUBLE);
-            int offset = fastBuffer.position;
-            fastBuffer.putLong(Double.doubleToRawLongBits(value));
-            updateChange();
-            data.put(key, new DoubleContainer(offset, value));
-            markChanged(key);
-        } else if (c.value != value) {
-            long newValue = Double.doubleToRawLongBits(value);
-            long sum = Double.doubleToRawLongBits(c.value) ^ newValue;
-            c.value = value;
-            updateInt64(newValue, sum, c.offset);
-            markChanged(key);
-        }
+    public synchronized Editor putDouble(String key, double value) {
+        putDoubleValue(key, value);
+        return this;
     }
 
     @Override
     public synchronized Editor putString(String key, String value) {
-        checkKey(key);
-        if (value == null) {
-            remove(key);
-        } else {
-            lockAndCheckUpdate();
-            markChanged(key);
-            StringContainer c = (StringContainer) data.get(key);
-            if (value.length() * 3 < INTERNAL_LIMIT) {
-                // putString is a frequent operation,
-                // so we make some redundant code to speed up putString method.
-                fastPutString(key, value, c);
-            } else {
-                byte[] bytes = value.isEmpty() ? EMPTY_ARRAY : value.getBytes(StandardCharsets.UTF_8);
-                addOrUpdate(key, value, bytes, c, DataType.STRING);
-            }
-        }
+        putStringValue(key, value);
         return this;
     }
 
     public synchronized void putArray(String key, byte[] value) {
-        checkKey(key);
-        if (value == null) {
-            remove(key);
-        } else {
-            lockAndCheckUpdate();
-            markChanged(key);
-            ArrayContainer c = (ArrayContainer) data.get(key);
-            addOrUpdate(key, value, value, c, DataType.ARRAY);
-        }
+        putArrayValue(key, value);
     }
 
     /**
@@ -529,61 +440,23 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
      *                for decoding byte[] to object in next loading.
      * @param <T>     Type of value
      */
-    public synchronized <T> void putObject(String key, T value, Encoder<T> encoder) {
-        checkKey(key);
-        if (encoder == null) {
-            throw new IllegalArgumentException("Encoder is null");
-        }
-        String tag = encoder.tag();
-        if (tag == null || tag.isEmpty() || tag.length() > 50) {
-            throw new IllegalArgumentException("Invalid encoder tag:" + tag);
-        }
-        if (!encoderMap.containsKey(tag)) {
-            throw new IllegalArgumentException("Encoder hasn't been registered");
-        }
-
-        if (value == null) {
-            remove(key);
-            return;
-        }
-
-        byte[] obj = null;
-        try {
-            obj = encoder.encode(value);
-        } catch (Exception e) {
-            error(e);
-        }
-        if (obj == null) {
-            remove(key);
-            return;
-        }
-
-        // assemble object bytes
-        int tagSize = FastBuffer.getStringSize(tag);
-        FastBuffer buffer = new FastBuffer(1 + tagSize + obj.length);
-        buffer.put((byte) tagSize);
-        buffer.putString(tag);
-        buffer.putBytes(obj);
-        byte[] bytes = buffer.hb;
-
-        lockAndCheckUpdate();
-        markChanged(key);
-        ObjectContainer c = (ObjectContainer) data.get(key);
-        addOrUpdate(key, value, bytes, c, DataType.OBJECT);
+    public synchronized <T> void putObject(String key, T value, FastEncoder<T> encoder) {
+        putObjectValue(key, value, encoder);
     }
 
     public synchronized Editor putStringSet(String key, Set<String> set) {
-        if (set == null) {
-            remove(key);
-        } else {
-            putObject(key, set, StringSetEncoder.INSTANCE);
-        }
+        putStringSetValue(key, set);
         return this;
+    }
+
+    @Override
+    protected void removeKey(String key) {
+        remove(key);
     }
 
     public synchronized Editor remove(String key) {
         lockAndCheckUpdate();
-        markChanged(key);
+        handleChange(key);
         BaseContainer container = data.get(key);
         if (container != null) {
             String oldFileName = null;
@@ -608,61 +481,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
     public void putAll(Map<String, Object> values) {
         putAll(values, null);
-    }
-
-    /**
-     * Batch put objects.
-     * Only support type in [boolean, int, long, float, double, String, byte[], Set of String] and object with encoder.
-     *
-     * @param values   map of key to value
-     * @param encoders map of value Class to Encoder
-     */
-    public synchronized void putAll(Map<String, Object> values, Map<Class, Encoder> encoders) {
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            if (key != null && !key.isEmpty()) {
-                if (value instanceof String) {
-                    putString(key, (String) value);
-                } else if (value instanceof Boolean) {
-                    putBoolean(key, (Boolean) value);
-                } else if (value instanceof Integer) {
-                    putInt(key, (Integer) value);
-                } else if (value instanceof Long) {
-                    putLong(key, (Long) value);
-                } else if (value instanceof Float) {
-                    putFloat(key, (Float) value);
-                } else if (value instanceof Double) {
-                    putDouble(key, (Double) value);
-                } else if (value instanceof byte[]) {
-                    putArray(key, (byte[]) value);
-                } else {
-                    encodeObject(key, value, encoders);
-                }
-            }
-        }
-    }
-
-    private void encodeObject(String key, Object value, Map<Class, Encoder> encoders) {
-        if (value instanceof Set) {
-            Set set = (Set) value;
-            if (set.isEmpty() || set.iterator().next() instanceof String) {
-                //noinspection unchecked
-                putStringSet(key, set);
-                return;
-            }
-        }
-        if (encoders != null) {
-            Encoder encoder = encoders.get(value.getClass());
-            if (encoder != null) {
-                //noinspection unchecked
-                putObject(key, value, encoder);
-            } else {
-                warning(new Exception("missing encoder for type:" + value.getClass()));
-            }
-        } else {
-            warning(new Exception("missing encoders"));
-        }
     }
 
     public synchronized void force() {
@@ -690,7 +508,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
     private boolean fullWrite() {
         fastBuffer.position = 0;
-        int dataSize = fastBuffer.getInt();
+        int dataSize = unpackSize(fastBuffer.getInt());
         checksum = fastBuffer.getLong();
         dataEnd = DATA_START + dataSize;
         if (checksum == fastBuffer.getChecksum(DATA_START, dataSize)) {
@@ -712,7 +530,8 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
         try {
             int dataSize = dataEnd - DATA_START;
-            fastBuffer.putInt(0, dataSize);
+            int packedSize = packSize(dataSize);
+            fastBuffer.putInt(0, packedSize);
             fastBuffer.putLong(4, checksum);
 
             if (needFullWrite) {
@@ -736,8 +555,8 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             setBFileSize(aBuffer.capacity());
 
             // update A Aile
-            //syncBufferToA(0, DATA_START);
-            aBuffer.putInt(0, dataSize);
+            // syncBufferToA(0, DATA_START);
+            aBuffer.putInt(0, packedSize);
             aBuffer.putLong(4, checksum);
             for (int i = 0; i < updateCount; i += 2) {
                 int start = updateStartAndSize[i];
@@ -745,7 +564,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 syncBufferToA(start, size);
             }
             if (dataEnd + 8 < aBuffer.capacity()) {
-                updateHash = random.nextLong() ^ System.currentTimeMillis();
+                updateHash = random.nextLong() ^ System.nanoTime();
                 aBuffer.putLong(dataEnd, updateHash);
             }
 
@@ -782,12 +601,13 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         return false;
     }
 
-    private void lockAndCheckUpdate() {
+    protected void lockAndCheckUpdate() {
         if (bFileLock != null) {
             return;
         }
         if (bChannel == null) {
             loadFromABFile();
+            trySettingObserver();
         }
         if (bChannel != null) {
             try {
@@ -824,10 +644,12 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         reloadData();
         getUpdateHash();
         fastBuffer.position = 0;
-        int dataSize = fastBuffer.getInt();
+        int size = fastBuffer.getInt();
+        int dataSize = unpackSize(size);
+        boolean hadEncrypted = isCipher(size);
         checksum = fastBuffer.getLong();
         dataEnd = DATA_START + dataSize;
-        if (checksum != fastBuffer.getChecksum(DATA_START, dataSize) || parseData() != 0) {
+        if (checksum != fastBuffer.getChecksum(DATA_START, dataSize) || !parseData(hadEncrypted)) {
             clearData();
         }
     }
@@ -868,7 +690,9 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             bChannel.truncate(fileLen);
         }
         int capacity = buffer.capacity();
-        int dataSize = buffer.getInt(0);
+        int size = buffer.getInt(0);
+        int dataSize = unpackSize(size);
+        boolean hadEncrypted = isCipher(size);
         if (dataSize < 0 || dataSize > capacity) {
             throw new IllegalStateException("Invalid file, dataSize:" + dataSize + ", capacity:" + capacity);
         }
@@ -884,7 +708,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             updateHash = hash;
             HashMap<String, BaseContainer> oldData = listeners.isEmpty() ? null : new HashMap<>(data);
             reloadData();
-            if (sum == fastBuffer.getChecksum(DATA_START, dataSize) && parseData() == 0) {
+            if (sum == fastBuffer.getChecksum(DATA_START, dataSize) && parseData(hadEncrypted)) {
                 if (oldData != null) {
                     checkDiff(oldData);
                 }
@@ -915,7 +739,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         }
     }
 
-    private void markChanged(String key) {
+    protected void handleChange(String key) {
         if (!listeners.isEmpty()) {
             changedKey.add(key);
         }
@@ -935,7 +759,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         resetMemory();
         try {
             alignAToBuffer();
-            aBuffer.putInt(0, 0);
+            aBuffer.putInt(0, packSize(0));
             aBuffer.putLong(4, 0L);
             getUpdateHash();
             if (Util.makeFileIfNotExist(bFile)) {
@@ -969,19 +793,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         updateHash = 0;
     }
 
-    private void wrapHeader(String key, byte type) {
-        wrapHeader(key, type, TYPE_SIZE[type]);
-    }
-
-    private void wrapHeader(String key, byte type, int valueSize) {
-        int keySize = FastBuffer.getStringSize(key);
-        checkKeySize(keySize);
-        updateSize = 2 + keySize + valueSize;
-        preparePutBytes();
-        fastBuffer.put(type);
-        putKey(key, keySize);
-    }
-
     private void addUpdate(int start, int size) {
         int count = updateCount;
         int capacity = updateStartAndSize.length;
@@ -995,7 +806,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         updateCount = count + 2;
     }
 
-    private void updateChange() {
+    protected void updateChange() {
         checksum ^= fastBuffer.getChecksum(updateStart, updateSize);
         if (updateSize != 0) {
             addUpdate(updateStart, updateSize);
@@ -1003,7 +814,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         }
     }
 
-    private void ensureSize(int allocate) {
+    protected void ensureSize(int allocate) {
         int capacity = fastBuffer.hb.length;
         int expected = dataEnd + allocate + 8;
         if (expected >= capacity) {
@@ -1014,229 +825,39 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         }
     }
 
-    private void updateBoolean(byte value, int offset) {
+    protected void updateBoolean(byte value, int offset) {
         checksum ^= shiftCheckSum(1L, offset);
         fastBuffer.hb[offset] = value;
         addUpdate(offset, 1);
     }
 
-    private void updateInt32(int value, long sum, int offset) {
+    protected void updateInt32(int value, long sum, int offset) {
         checksum ^= shiftCheckSum(sum, offset);
         fastBuffer.putInt(offset, value);
         addUpdate(offset, 4);
     }
 
-    private void updateInt64(long value, long sum, int offset) {
+    protected void updateInt64(long value, long sum, int offset) {
         checksum ^= shiftCheckSum(sum, offset);
         fastBuffer.putLong(offset, value);
         addUpdate(offset, 8);
     }
 
-    private void updateBytes(int offset, byte[] bytes) {
-        int size = bytes.length;
-        checksum ^= fastBuffer.getChecksum(offset, size);
-        fastBuffer.position = offset;
-        fastBuffer.putBytes(bytes);
-        checksum ^= fastBuffer.getChecksum(offset, size);
-        addUpdate(offset, size);
+    protected void updateBytes(int offset, byte[] bytes) {
+        super.updateBytes(offset, bytes);
+        addUpdate(offset, bytes.length);
     }
 
-    private void preparePutBytes() {
-        ensureSize(updateSize);
-        updateStart = dataEnd;
-        dataEnd += updateSize;
-        fastBuffer.position = updateStart;
+    protected void removeOldFile(String oldFileName) {
+        deletedFiles.add(oldFileName);
     }
 
-    private void putKey(String key, int keySize) {
-        fastBuffer.put((byte) keySize);
-        if (keySize == key.length()) {
-            //noinspection deprecation
-            key.getBytes(0, keySize, fastBuffer.hb, fastBuffer.position);
-            fastBuffer.position += keySize;
-        } else {
-            fastBuffer.putString(key);
-        }
-    }
-
-    private void putStringValue(String value, int valueSize) {
-        fastBuffer.putShort((short) valueSize);
-        if (valueSize == value.length()) {
-            //noinspection deprecation
-            value.getBytes(0, valueSize, fastBuffer.hb, fastBuffer.position);
-        } else {
-            fastBuffer.putString(value);
-        }
-    }
-
-    private void fastPutString(String key, String value, StringContainer c) {
-        int stringLen = FastBuffer.getStringSize(value);
-        if (c == null) {
-            int keyLen = FastBuffer.getStringSize(key);
-            checkKeySize(keyLen);
-            // 4 bytes = type:1, keyLen: 1, stringLen:2
-            // preSize include size of [type|keyLen|key|stringLen], which is "4+lengthOf(key)"
-            int preSize = 4 + keyLen;
-            updateSize = preSize + stringLen;
-            preparePutBytes();
-            fastBuffer.put(DataType.STRING);
-            putKey(key, keyLen);
-            putStringValue(value, stringLen);
-            data.put(key, new StringContainer(updateStart, updateStart + preSize, value, stringLen, false));
-            updateChange();
-        } else {
-            String oldFileName = null;
-            boolean needCheckGC = false;
-            // preSize: bytes count from start to value offset
-            int preSize = c.offset - c.start;
-            if (c.valueSize == stringLen) {
-                checksum ^= fastBuffer.getChecksum(c.offset, c.valueSize);
-                if (stringLen == value.length()) {
-                    //noinspection deprecation
-                    value.getBytes(0, stringLen, fastBuffer.hb, c.offset);
-                } else {
-                    fastBuffer.position = c.offset;
-                    fastBuffer.putString(value);
-                }
-                updateStart = c.offset;
-                updateSize = stringLen;
-            } else {
-                updateSize = preSize + stringLen;
-                preparePutBytes();
-                fastBuffer.put(DataType.STRING);
-                int keyBytes = preSize - 3;
-                System.arraycopy(fastBuffer.hb, c.start + 1, fastBuffer.hb, fastBuffer.position, keyBytes);
-                fastBuffer.position += keyBytes;
-                putStringValue(value, stringLen);
-
-                remove(DataType.STRING, c.start, c.offset + c.valueSize);
-                needCheckGC = true;
-                if (c.external) {
-                    oldFileName = (String) c.value;
-                }
-                c.external = false;
-                c.start = updateStart;
-                c.offset = updateStart + preSize;
-                c.valueSize = stringLen;
-            }
-            c.value = value;
-            updateChange();
-            if (needCheckGC) {
-                checkGC();
-            }
-            if (oldFileName != null) {
-                deletedFiles.add(oldFileName);
-            }
-        }
-    }
-
-    private void addOrUpdate(String key, Object value, byte[] bytes, VarContainer c, byte type) {
-        if (c == null) {
-            addObject(key, value, bytes, type);
-        } else {
-            if (!c.external && c.valueSize == bytes.length) {
-                updateBytes(c.offset, bytes);
-                c.value = value;
-            } else {
-                updateObject(key, value, bytes, c);
-            }
-        }
-    }
-
-    private void addObject(String key, Object value, byte[] bytes, byte type) {
-        int offset = saveArray(key, bytes, type);
-        if (offset != 0) {
-            int size;
-            Object v;
-            boolean external = tempExternalName != null;
-            if (external) {
-                bigValueCache.put(key, value);
-                size = Util.NAME_SIZE;
-                v = tempExternalName;
-                tempExternalName = null;
-            } else {
-                size = bytes.length;
-                v = value;
-            }
-            BaseContainer c;
-            if (type == DataType.STRING) {
-                c = new StringContainer(updateStart, offset, (String) v, size, external);
-            } else if (type == DataType.ARRAY) {
-                c = new ArrayContainer(updateStart, offset, v, size, external);
-            } else {
-                c = new ObjectContainer(updateStart, offset, v, size, external);
-            }
-            data.put(key, c);
-            updateChange();
-        }
-    }
-
-    private void updateObject(String key, Object value, byte[] bytes, VarContainer c) {
-        int offset = saveArray(key, bytes, c.getType());
-        if (offset != 0) {
-            String oldFileName = c.external ? (String) c.value : null;
-            remove(c.getType(), c.start, c.offset + c.valueSize);
-            boolean external = tempExternalName != null;
-            c.start = updateStart;
-            c.offset = offset;
-            c.external = external;
-            if (external) {
-                bigValueCache.put(key, value);
-                c.value = tempExternalName;
-                c.valueSize = Util.NAME_SIZE;
-                tempExternalName = null;
-            } else {
-                c.value = value;
-                c.valueSize = bytes.length;
-            }
-            updateChange();
-            checkGC();
-            if (oldFileName != null) {
-                deletedFiles.add(oldFileName);
-            }
-        }
-    }
-
-    private int saveArray(String key, byte[] value, byte type) {
-        tempExternalName = null;
-        if (value.length < INTERNAL_LIMIT) {
-            return wrapArray(key, value, type);
-        } else {
-            info("large value, key: " + key + ", size: " + value.length);
-            String fileName = Util.randomName();
-            File file = new File(path + name, fileName);
-            if (Util.saveBytes(file, value)) {
-                tempExternalName = fileName;
-                byte[] fileNameBytes = new byte[Util.NAME_SIZE];
-                //noinspection deprecation
-                fileName.getBytes(0, Util.NAME_SIZE, fileNameBytes, 0);
-                return wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
-            } else {
-                error("save large value failed");
-                return 0;
-            }
-        }
-    }
-
-    private int wrapArray(String key, byte[] value, byte type) {
-        wrapHeader(key, type, 2 + value.length);
-        fastBuffer.putShort((short) value.length);
-        int offset = fastBuffer.position;
-        fastBuffer.putBytes(value);
-        return offset;
-    }
-
-    private void remove(byte type, int start, int end) {
-        countInvalid(start, end);
-        byte newByte = (byte) (type | DataType.DELETE_MASK);
-        byte oldByte = fastBuffer.hb[start];
-        int shift = (start & 7) << 3;
-        checksum ^= ((long) (newByte ^ oldByte) & 0xFF) << shift;
-        fastBuffer.hb[start] = newByte;
+    protected void remove(byte type, int start, int end) {
+        super.remove(type, start, end);
         addUpdate(start, 1);
     }
 
-    private void checkGC() {
+    protected void checkGC() {
         if (invalidBytes >= bytesThreshold() || invalids.size() >= BASE_GC_KEYS_THRESHOLD) {
             gc();
         }
@@ -1379,7 +1000,8 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         private static final Map<String, MPFastKV> INSTANCE_MAP = new ConcurrentHashMap<>();
         private final String path;
         private final String name;
-        private Encoder[] encoders;
+        private FastEncoder[] encoders;
+        private FastCipher cipher;
         private boolean needWatchFileChange = true;
 
         public Builder(String path, String name) {
@@ -1399,8 +1021,16 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
          * @param encoders The encoder array to decode the bytes to obj.
          * @return the builder
          */
-        public Builder encoder(Encoder[] encoders) {
+        public Builder encoder(FastEncoder[] encoders) {
             this.encoders = encoders;
+            return this;
+        }
+
+        /**
+         * Set encryption cipher.
+         */
+        public Builder cipher(FastCipher cipher) {
+            this.cipher = cipher;
             return this;
         }
 
@@ -1424,7 +1054,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                 synchronized (Builder.class) {
                     kv = INSTANCE_MAP.get(key);
                     if (kv == null) {
-                        kv = new MPFastKV(path, name, encoders, needWatchFileChange);
+                        kv = new MPFastKV(path, name, encoders, cipher, needWatchFileChange);
                         INSTANCE_MAP.put(key, kv);
                     }
                 }

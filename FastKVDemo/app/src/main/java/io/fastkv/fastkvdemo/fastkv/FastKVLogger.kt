@@ -1,9 +1,9 @@
 package io.fastkv.fastkvdemo.fastkv
 
 import android.util.Log
-import io.fastkv.FastKV
+import io.fastkv.interfaces.FastLogger
 
-object FastKVLogger : FastKV.Logger {
+object FastKVLogger : FastLogger {
     private const val tag = "FastKV"
 
     override fun i(name: String, message: String) {

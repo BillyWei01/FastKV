@@ -25,9 +25,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
-   companion object{
-       private val serialChannel = Channel<Any>(1)
-   }
+    companion object {
+        private val serialChannel = Channel<Any>(1)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -5,7 +5,6 @@ import android.util.Log
 import com.tencent.mmkv.MMKV
 import io.fastkv.FastKVConfig
 import io.fastkv.fastkvdemo.fastkv.FastKVLogger
-import io.fastkv.fastkvdemo.util.ChannelExecutor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 
@@ -23,7 +22,7 @@ class AppApplication : Application() {
         if(processName == null || processName == GlobalConfig.APPLICATION_ID) {
             initMMKV()
             // FastKV not support multiprocess (MPFastKV does)
-            // preload()
+             preload()
         }
     }
 
@@ -38,12 +37,12 @@ class AppApplication : Application() {
         Log.i("MMKV", "mmkv root: $rootDir")
     }
 
-/*    private fun preload() {
-        GlobalScope.launch(Dispatchers.IO) {
-            CommonStoreV2.kv
-            UserData.kv
-            FastKV.Builder(fastKVDir, "fastkv").build()
-        }
-    }*/
+    private fun preload() {
+//        Dispatchers.IO.asExecutor().execute {
+//            CommonStoreV2.kv
+//            UserData.kv
+//            FastKV.Builder(fastKVDir, "fastkv").build()
+//        }
+    }
 }
 

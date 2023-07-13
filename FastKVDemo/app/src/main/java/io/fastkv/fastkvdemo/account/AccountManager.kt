@@ -2,6 +2,7 @@ package io.fastkv.fastkvdemo.account
 
 import io.fastkv.fastkvdemo.util.Utils
 import java.lang.StringBuilder
+import kotlin.random.Random
 
 object AccountManager {
     fun isLogin(): Boolean {
@@ -9,7 +10,7 @@ object AccountManager {
     }
 
     fun logout() {
-        UserData.kv.clear()
+        UserData.clear()
     }
 
     fun login(uid: Long) {
@@ -21,15 +22,22 @@ object AccountManager {
     private fun fetchUserInfo() {
         UserData.run {
             isVip = true
-            fansCount = 99
+            fansCount = Random.nextInt(10000)
             score = 4.5f
             loginTime = System.currentTimeMillis()
             balance = 99999.99
             sign = "The journey of a thousand miles begins with a single step."
             lock = Utils.md5("12347".toByteArray())
-            tags = setOf("travel", "foods", "cats")
+            tags = setOf("travel", "foods", "cats", randomString())
             favoriteChannels = listOf(1234567, 1234568, 2134569)
         }
+    }
+
+    private fun randomString(): String{
+        val n = Random.nextInt(16)
+        val a = ByteArray(n)
+        a.fill('a'.code.toByte(),0, n);
+        return String(a)
     }
 
     fun formatUserInfo() : String {

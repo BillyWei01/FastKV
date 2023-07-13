@@ -4,7 +4,9 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-class DefaultLogger implements FastKV.Logger {
+import io.fastkv.interfaces.FastLogger;
+
+class DefaultLogger implements FastLogger {
     private static final String TAG = "FastKV";
 
     @Override

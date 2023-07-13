@@ -1,17 +1,34 @@
 package io.fastkv.fastkvdemo.fastkv
 
+import io.fastkv.interfaces.FastCipher
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.manager.PathManager
+import io.fastkv.interfaces.FastEncoder
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 open class KVData(name: String) {
-    val kv: FastKV by lazy {
-        FastKV.Builder(PathManager.fastKVDir, name).encoder(encoders()).build()
+    internal val kv: FastKV by lazy {
+        FastKV.Builder(PathManager.fastKVDir, name)
+            .encoder(encoders())
+            .cipher(cipher())
+            .build()
     }
 
-    protected open fun encoders(): Array<FastKV.Encoder<*>>? {
+    protected open fun encoders(): Array<FastEncoder<*>>? {
         return null
+    }
+
+    protected open fun cipher(): FastCipher? {
+        return null
+    }
+
+    fun contains(key: String): Boolean {
+        return kv.contains(key)
+    }
+
+    fun clear() {
+        kv.clear()
     }
 
     protected fun boolean(key: String, defValue: Boolean = false) = BooleanProperty(key, defValue)
@@ -20,9 +37,13 @@ open class KVData(name: String) {
     protected fun long(key: String, defValue: Long = 0L) = LongProperty(key, defValue)
     protected fun double(key: String, defValue: Double = 0.0) = DoubleProperty(key, defValue)
     protected fun string(key: String, defValue: String = "") = StringProperty(key, defValue)
-    protected fun array(key: String, defValue: ByteArray = EMPTY_ARRAY) = ArrayProperty(key, defValue)
-    protected fun stringSet(key: String, defValue: Set<String>? = null) = StringSetProperty(key, defValue)
-    protected fun <T> obj(key: String, encoder: FastKV.Encoder<T>) = ObjectProperty(key, encoder)
+    protected fun array(key: String, defValue: ByteArray = EMPTY_ARRAY) =
+        ArrayProperty(key, defValue)
+
+    protected fun stringSet(key: String, defValue: Set<String>? = null) =
+        StringSetProperty(key, defValue)
+
+    protected fun <T> obj(key: String, encoder: FastEncoder<T>) = ObjectProperty(key, encoder)
 
     companion object {
         val EMPTY_ARRAY = ByteArray(0)
@@ -117,7 +138,7 @@ class StringSetProperty(private val key: String, private val defValue: Set<Strin
     }
 }
 
-class ObjectProperty<T>(private val key: String, private val encoder: FastKV.Encoder<T>) :
+class ObjectProperty<T>(private val key: String, private val encoder: FastEncoder<T>) :
     ReadWriteProperty<KVData, T?> {
     override fun getValue(thisRef: KVData, property: KProperty<*>): T? {
         return thisRef.kv.getObject(key)

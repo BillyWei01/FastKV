@@ -71,6 +71,7 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
-        testKV();
+        //testKV();
+        HexViewer.printFile( "/Users/bill/Downloads/user_data.kva", 320);
     }
 }

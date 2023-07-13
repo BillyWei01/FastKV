@@ -1,11 +1,11 @@
 package io.fastkv.fastkvdemo.fastkv
 
-import io.fastkv.FastKV
+import io.fastkv.interfaces.FastEncoder
 import io.packable.PackDecoder
 import io.packable.PackEncoder
 
 
-object LongListEncoder : FastKV.Encoder<List<Long>> {
+object LongListEncoder : FastEncoder<List<Long>> {
     override fun tag(): String {
         return "LongList"
     }

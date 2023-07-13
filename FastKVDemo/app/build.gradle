@@ -5,12 +5,13 @@ plugins {
 }
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 31
 
     defaultConfig {
         applicationId "io.github.fastkvdemo"
-        minSdkVersion 19
-        targetSdkVersion 30
+        //minSdkVersion 19
+        minSdkVersion 21
+        targetSdkVersion 31
         versionCode 1
         versionName "1.0"
 

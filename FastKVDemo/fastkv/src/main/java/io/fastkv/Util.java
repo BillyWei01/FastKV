@@ -1,9 +1,13 @@
 package io.fastkv;
 
+import android.annotation.SuppressLint;
+
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.SecureRandom;
+
+import io.fastkv.interfaces.FastLogger;
 
 class Util {
     private static class Holder {
@@ -32,7 +36,8 @@ class Util {
         return new String(buf);
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({"rawtypes", "unchecked", "ConstantConditions"})
+    @SuppressLint("DiscouragedPrivateApi")
     static int getPageSize() {
         try {
             Class unsafeClass = Class.forName("sun.misc.Unsafe");
@@ -134,6 +139,30 @@ class Util {
         file.delete();
     }
 
+    static void moveDirFiles(File srcDir, String currentDir) {
+        if (srcDir.isDirectory()) {
+            File[] fs = srcDir.listFiles();
+            if (fs != null) {
+                for (File file : fs) {
+                    try {
+                        Util.moveFile(file, new File(currentDir, file.getName()));
+                    } catch (Exception e) {
+                        logError(e);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void moveFile(File srcFile, File dstFile) throws IOException {
+        if (!srcFile.exists() || dstFile.exists()) {
+            return;
+        }
+        if (!srcFile.renameTo(dstFile)) {
+            saveBytes(dstFile, getBytes(srcFile));
+        }
+    }
+
     static int binarySearch(int[] a, int value) {
         int lo = 0;
         int hi = (a.length >> 1) - 1;
@@ -150,4 +179,12 @@ class Util {
         }
         return hi;
     }
+
+    static void logError(Exception e) {
+        FastLogger logger = FastKVConfig.sLogger;
+        if (logger != null) {
+            logger.e("FastKV", e);
+        }
+    }
+
 }

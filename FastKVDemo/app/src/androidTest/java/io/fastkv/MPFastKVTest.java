@@ -23,6 +23,7 @@ import java.util.Set;
 
 import io.fastkv.fastkvdemo.application.GlobalConfig;
 import io.fastkv.fastkvdemo.fastkv.LongListEncoder;
+import io.fastkv.interfaces.FastEncoder;
 
 public class MPFastKVTest {
     @Before
@@ -32,7 +33,7 @@ public class MPFastKVTest {
 
     @Test
     public void testPutAndGet() {
-        FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
+        FastEncoder<?>[] encoders = new FastEncoder[]{LongListEncoder.INSTANCE};
 
         String name = "test_put_and_get";
         MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name).encoder(encoders).disableWatchFileChange().build();
@@ -50,9 +51,6 @@ public class MPFastKVTest {
         String longKey = "long_key";
         kv1.putLong(longKey, Long.MAX_VALUE);
 
-        String doubleKey = "double_key";
-        kv1.putDouble(doubleKey, 99.9);
-
         String stringKey = "string_key";
         kv1.putString(stringKey, "hello, 你好");
 
@@ -67,14 +65,16 @@ public class MPFastKVTest {
         list.add(1L);
         list.add(Long.MAX_VALUE);
         kv1.putObject(objectKey, list, LongListEncoder.INSTANCE);
-        kv1.commit();
 
-        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders, false);
+        String doubleKey = "double_key";
+        kv1.putDouble(doubleKey, 99.9).commit();
+
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders,  null,false);
         Assert.assertEquals(kv1.getBoolean(boolKey), kv2.getBoolean(boolKey));
         Assert.assertEquals(kv1.getInt(intKey), kv2.getInt(intKey));
-        Assert.assertTrue(kv1.getFloat(floatKey) == kv2.getFloat(floatKey));
+        Assert.assertEquals(kv1.getFloat(floatKey), kv2.getFloat(floatKey), 0.0);
         Assert.assertEquals(kv1.getLong(longKey), kv2.getLong(longKey));
-        Assert.assertTrue(kv1.getDouble(doubleKey) == kv2.getDouble(doubleKey));
+        Assert.assertEquals(kv1.getDouble(doubleKey), kv2.getDouble(doubleKey), 0.0);
         Assert.assertEquals(kv1.getString(stringKey), kv1.getString(stringKey));
         Assert.assertEquals(kv1.getStringSet(stringSetKey), kv2.getStringSet(stringSetKey));
         Assert.assertTrue(kv1.getObject(objectKey).equals(kv2.getObject(objectKey)));
@@ -87,16 +87,16 @@ public class MPFastKVTest {
 
         String name_2 = "put_all";
         //noinspection rawtypes
-        Map<Class, FastKV.Encoder> encoderMap = new HashMap<>();
+        Map<Class, FastEncoder> encoderMap = new HashMap<>();
         encoderMap.put(ArrayList.class, LongListEncoder.INSTANCE);
         Map<String, Object> all_1 = kv1.getAll();
-        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name_2, encoders, false);
+        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name_2, encoders,  null,false);
         kv3.clear();
 
         kv3.putAll(all_1, encoderMap);
         kv3.commit();
 
-        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name_2, encoders, false);
+        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name_2, encoders,  null,false);
         Assert.assertEquals(all_1, kv4.getAll());
 
         Map<String, Object> m = new HashMap<>();
@@ -104,14 +104,14 @@ public class MPFastKVTest {
         m.put("b", "b");
         kv3.putAll(m);
         kv3.commit();
-        MPFastKV kv5 = new MPFastKV(TestHelper.MP_DIR, name_2, encoders, false);
+        MPFastKV kv5 = new MPFastKV(TestHelper.MP_DIR, name_2, encoders,  null,false);
         Assert.assertEquals("a", kv5.getString("a"));
         Assert.assertEquals("b", kv5.getString("b"));
 
         subTest(kv1, name, encoders);
     }
 
-    private void subTest(MPFastKV kv1, String name, FastKV.Encoder<?>[] encoders) {
+    private void subTest(MPFastKV kv1, String name, FastEncoder<?>[] encoders) {
         kv1.putBoolean("b", false);
         kv1.putBoolean("b", true);
         kv1.putInt("i", 100);
@@ -131,7 +131,7 @@ public class MPFastKVTest {
         kv1.putArray(arrayKey, "Hello".getBytes(StandardCharsets.UTF_8));
         kv1.commit();
 
-        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders, false);
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders,  null,false);
         Assert.assertEquals(true, kv2.getBoolean("b"));
         Assert.assertEquals(200, kv2.getInt("i"));
         Assert.assertEquals(Long.MIN_VALUE, kv2.getLong("L"));
@@ -175,7 +175,7 @@ public class MPFastKVTest {
         Assert.assertEquals(1, gc3 - gc2);
         kv1.commit();
 
-        MPFastKV kvt3 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kvt3 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals(100, kvt3.getInt("int_1"));
 
         for (int i = 0; i < 10; i++) {
@@ -188,7 +188,7 @@ public class MPFastKVTest {
         kv1.commit();
         int gc4 = TestHelper.gcCount.get();
         Assert.assertEquals(2, gc4 - gc3);
-        MPFastKV kvt4 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kvt4 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals(100, kvt4.getInt("int_1"));
 
         kv1.remove("int_2");
@@ -205,7 +205,7 @@ public class MPFastKVTest {
         int truncate2 = TestHelper.truncateCount.get();
         Assert.assertEquals(1, truncate2 - truncate1);
 
-        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals(100, kv3.getInt("int_1"));
         Assert.assertEquals(0, kv3.getInt("int_2"));
         Assert.assertEquals(kv1.getBoolean("bool_1"), kv3.getBoolean("bool_1"));
@@ -230,18 +230,18 @@ public class MPFastKVTest {
         kv1.putInt("int", 100);
         kv1.commit();
 
-        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals(longStr, kv2.getString("str"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
         kv1.putString("str", "hello");
         kv1.commit();
-        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals("hello", kv3.getString("str"));
 
         kv1.putString("str", longStr);
         kv1.commit();
-        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals(longStr, kv4.getString("str"));
     }
 
@@ -253,25 +253,25 @@ public class MPFastKVTest {
         kv1.putInt("int", 100);
         kv1.commit();
 
-        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertArrayEquals(longArray, kv2.getArray("array"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
         byte[] shortArray = "hello".getBytes(StandardCharsets.UTF_8);
         kv1.putArray("array", shortArray);
         kv1.commit();
-        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertArrayEquals(shortArray, kv3.getArray("array"));
 
         kv1.putArray("array", longArray);
         kv1.commit();
-        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertArrayEquals(longArray, kv4.getArray("array"));
     }
 
     private void testBigObject(String name) {
-        FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{TestObjectEncoder.INSTANCE};
-        MPFastKV kv1 = new MPFastKV(TestHelper.MP_DIR, name, encoders, false);
+        FastEncoder<?>[] encoders = new FastEncoder[]{TestObjectEncoder.INSTANCE};
+        MPFastKV kv1 = new MPFastKV(TestHelper.MP_DIR, name, encoders,  null,false);
         kv1.clear();
         String longStr = TestHelper.makeString(6000);
         TestObject obj = new TestObject(12345, longStr);
@@ -280,7 +280,7 @@ public class MPFastKVTest {
         kv1.putInt("int", 100);
         kv1.commit();
 
-        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders, false);
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders,  null,false);
         Assert.assertEquals(obj, kv2.getObject("obj"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
@@ -288,14 +288,14 @@ public class MPFastKVTest {
         obj.info = "hello";
         kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
         kv1.commit();
-        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, encoders, false);
+        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, encoders,  null,false);
         Assert.assertEquals(obj, kv3.getObject("obj"));
 
         obj.id = 123457;
         obj.info = longStr;
         kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
         kv1.commit();
-        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, encoders, false);
+        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, encoders,  null,false);
         Assert.assertEquals(obj, kv4.getObject("obj"));
     }
 
@@ -346,7 +346,7 @@ public class MPFastKVTest {
             long t2 = System.nanoTime();
             int gc2 = TestHelper.gcCount.get();
             System.out.println("use time:" + ((t2 - t1) / 1000000) + ", gc times:" + (gc2 - gc1));
-            MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+            MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
             Assert.assertEquals("flag1", kv2.getString(flag1));
             Assert.assertEquals(100, kv2.getInt(flag2));
         }
@@ -364,7 +364,7 @@ public class MPFastKVTest {
             i++;
         }
         kv1.commit();
-        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         i = 1000;
         for (String str : notAscii) {
             Assert.assertEquals(str + i, kv2.getString(str));
@@ -419,7 +419,7 @@ public class MPFastKVTest {
         }
         System.out.println("update, use time: " + (time / 1000000) + " ms");
 
-        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals("hello", kv2.getString("flag"));
     }
 
@@ -618,27 +618,27 @@ public class MPFastKVTest {
         }
         kv1.commit();
         Thread.sleep(50L);
-        MPFastKV kvt1 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kvt1 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals("hello", kvt1.getString("flag"));
 
         int e1 = TestHelper.fileErrorCount.get();
 
         damageFastKVFile(name + ".kva");
 
-        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals("hello", kv2.getString("flag"));
         int e2 = TestHelper.fileErrorCount.get();
         Assert.assertEquals(1, e2 - e1);
 
         damageFastKVFile(name + ".kvb");
 
-        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv3 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals("hello", kv3.getString("flag"));
         int e3 = TestHelper.fileErrorCount.get();
         Assert.assertEquals(1, e3 - e2);
 
 
-        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals("hello", kv4.getString("flag"));
         int e4 = TestHelper.fileErrorCount.get();
         Assert.assertEquals(0, e4 - e3);
@@ -646,7 +646,7 @@ public class MPFastKVTest {
         damageFastKVFile(name + ".kva");
         damageFastKVFile(name + ".kvb");
 
-        MPFastKV kv5 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv5 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals(0, kv5.getAll().size());
 
         kv5.putString("key1", "a");
@@ -654,7 +654,114 @@ public class MPFastKVTest {
         kv5.putString("key1", "A");
         kv5.commit();
         Thread.sleep(50L);
-        MPFastKV kv6 = new MPFastKV(TestHelper.MP_DIR, name, null, false);
+        MPFastKV kv6 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals("A", kv6.getString("key1"));
+    }
+
+    @Test
+    public void testEncrypt() {
+        testEncryptExternal();
+        testPlainToCipher();
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    private void clearFile(String name) {
+        new File(TestHelper.MP_DIR, name + ".kva").delete();
+        new File(TestHelper.MP_DIR, name + ".kvb").delete();
+        new File(TestHelper.MP_DIR, name + ".kvc").delete();
+        new File(TestHelper.MP_DIR, name + ".tmp").delete();
+        new File(TestHelper.MP_DIR, name).delete();
+    }
+
+    private void testEncryptExternal() {
+        String name = "encrypt_external";
+
+        clearFile(name);
+
+        FastEncoder<?>[] encoders = new FastEncoder[]{TestObjectEncoder.INSTANCE};
+
+        MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name)
+                .cipher(TestHelper.cipher)
+                .encoder(encoders)
+                .build();
+
+        String longStr = TestHelper.makeString(10000);
+
+        byte[] longArray = new byte[10000];
+        longArray[100] = 100;
+
+        TestObject obj = new TestObject(12345, longStr);
+        kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
+
+        Assert.assertEquals(obj, kv1.getObject("obj"));
+
+        kv1.putString("string", longStr);
+        kv1.putString("a", "a");
+        kv1.putInt("int", 100);
+        kv1.putArray("array", longArray);
+        kv1.commit();
+
+        try {
+            Thread.sleep(600L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders, TestHelper.cipher, false);
+        Assert.assertEquals(100, kv2.getInt("int"));
+        Assert.assertEquals(longStr, kv2.getString("string"));
+        Assert.assertArrayEquals(longArray, kv2.getArray("array"));
+        Assert.assertEquals(obj, kv2.getObject("obj"));
+    }
+
+    private void testPlainToCipher() {
+        String name = "plain_to_cipher";
+
+        clearFile(name);
+
+        FastEncoder<?>[] encoders = new FastEncoder[]{TestObjectEncoder.INSTANCE};
+
+        // not encrypted
+        MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name)
+                .encoder(encoders)
+                .build();
+
+        String longStr = TestHelper.makeString(10000);
+
+        byte[] longArray = new byte[10000];
+        longArray[100] = 100;
+
+        TestObject obj = new TestObject(12345, longStr);
+        kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
+        Assert.assertEquals(obj, kv1.getObject("obj"));
+
+        double d1 = 3.14;
+
+        kv1.putString("string", longStr);
+        kv1.putString("s1", "hello");
+        kv1.putInt("int", 100);
+        kv1.putArray("array", longArray);
+        kv1.putDouble("double", d1);
+        kv1.commit();
+
+        try {
+            // Waiting kv1 to finish saving big value.
+            Thread.sleep(600L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        // encrypt
+//        FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name)
+//                .cipher(TestHelper.cipher)
+//                .encoder(encoders)
+//                .build();
+        MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders, TestHelper.cipher, false);
+        Assert.assertEquals(d1, kv1.getDouble("double"), 0);
+        Assert.assertEquals("hello", kv2.getString("s1"));
+        Assert.assertEquals(100, kv2.getInt("int"));
+        Assert.assertEquals(longStr, kv2.getString("string"));
+        Assert.assertArrayEquals(longArray, kv2.getArray("array"));
+        Assert.assertEquals(obj, kv2.getObject("obj"));
     }
 }
