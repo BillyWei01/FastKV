@@ -10,8 +10,8 @@ import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.account.AccountManager
 import io.fastkv.fastkvdemo.account.UserData
 import io.fastkv.fastkvdemo.manager.PathManager
-import io.fastkv.fastkvdemo.storage.CommonStoreV1
-import io.fastkv.fastkvdemo.storage.CommonStoreV2
+import io.fastkv.fastkvdemo.storage.SpCase
+import io.fastkv.fastkvdemo.storage.KotlinCase
 import io.fastkv.fastkvdemo.util.runBlock
 import kotlinx.android.synthetic.main.activity_main.account_info_tv
 import kotlinx.android.synthetic.main.activity_main.login_btn
@@ -94,10 +94,10 @@ class MainActivity : AppCompatActivity() {
      * with the same interface with SharedPreferences.
      */
     fun case1() {
-        val preferences = CommonStoreV1.preferences
-        val t = preferences.getInt(CommonStoreV1.LAUNCH_COUNT, 0) + 1
+        val preferences = SpCase.preferences
+        val t = preferences.getInt(SpCase.LAUNCH_COUNT, 0) + 1
         tips_tv.text = getString(R.string.main_tips, t)
-        preferences.edit().putInt(CommonStoreV1.LAUNCH_COUNT, t).apply()
+        preferences.edit().putInt(SpCase.LAUNCH_COUNT, t).apply()
     }
 
     /**
@@ -115,8 +115,8 @@ class MainActivity : AppCompatActivity() {
      * With kotlin's syntactic sugar, read/write key-value data just like accessing variable.
      */
     fun case3() {
-        val t = CommonStoreV2.launchCount + 1
+        val t = KotlinCase.launchCount + 1
         tips_tv.text = getString(R.string.main_tips, t)
-        CommonStoreV2.launchCount = t
+        KotlinCase.launchCount = t
     }
 }

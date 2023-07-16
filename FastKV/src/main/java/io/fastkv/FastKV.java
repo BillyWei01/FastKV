@@ -1,5 +1,7 @@
 package io.fastkv;
 
+import android.content.Context;
+
 import androidx.annotation.NonNull;
 
 import java.io.File;
@@ -456,7 +458,7 @@ public final class FastKV extends AbsFastKV {
         return commitToCFile();
     }
 
-    protected void handleChange(String key){
+    protected void handleChange(String key) {
         checkIfCommit();
     }
 
@@ -814,6 +816,17 @@ public final class FastKV extends AbsFastKV {
         private FastEncoder[] encoders;
         private FastCipher cipher;
         private int writingMode = NON_BLOCKING;
+
+        public Builder(Context context, String name) {
+            if (context == null) {
+                throw new IllegalArgumentException("context is null");
+            }
+            if (name == null || name.isEmpty()) {
+                throw new IllegalArgumentException("name is empty");
+            }
+            this.path = context.getFilesDir().getAbsolutePath() + "/fastkv/";
+            this.name = name;
+        }
 
         public Builder(String path, String name) {
             if (path == null || path.isEmpty()) {

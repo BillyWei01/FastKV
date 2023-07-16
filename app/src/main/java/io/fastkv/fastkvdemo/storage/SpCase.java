@@ -6,7 +6,7 @@ import android.util.Log;
 import io.fastkv.fastkvdemo.application.GlobalConfig;
 import io.fastkv.FastPreferences;
 
-public class CommonStoreV1 {
+public class SpCase {
     public static final String NAME = "common_store";
     // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
     public static final SharedPreferences preferences = FastPreferences.adapt(GlobalConfig.appContext, NAME);

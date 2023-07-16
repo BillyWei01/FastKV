@@ -1,83 +1,64 @@
-# FastKV 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.billywei01/fastkv)](https://search.maven.org/artifact/io.github.billywei01/fastkv)｜[中文文档](README_CN.md)
+# FastKV
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.billywei01/fastkv)](https://search.maven.org/artifact/io.github.billywei01/fastkv)｜[English](README_EN.md)
 
+## 1. 概述
+FastKV是用Java编写的高效可靠的key-value存储库。<br>
 
-FastKV is an efficient key-value storage library written with Java.<br/>
-It can be used on  platforms with JVM environment, such as Android.
-
-## 1. Features
-1. Efficient
-    - Binary coding: the size after coding is much smaller than text coding such as XML;
-    - Incremental update: FastKV records the offset of each key-value relative to the file head,
-      updating can be written directly at the right location.
-    - By default, data is recorded with mmap . When updating data, it can be written directly to memory without IO blocking.
-    - For a value which length is larger than the threshold, it will be written to another file separately,  
-      only it's file name will be cached. In that way, it will not slow down accessing of other key-value .
-
-2. Support different writing modes
-   - In addition to the non-blocking IO (with mmap), 
-   FastKV also supports synchronous blocking and asynchronous blocking IO (similar to commit and apply of SharePreferences).
-
-3. Support various types
-    - Support primitive types such as Boolean / int / float / long / double / string;
-    - Support ByteArray (byte []);
-    - Support storage objects.
-    - Built in StringSet encoder(for compatibility with SharePreferences).
-
-4. Support multi-process
-   - The project supply an implement to support multi-process (MPFastKV).
-   - Support listener for changed values, one process write, all processes known.
-
-5. Easy to use
-    - FastKV provides rich API interfaces, including getAll() and putAll() methods, it is convenient to migrate the data of frameworks such as SharePreferences to FastKV. 
-
-6. Stable and reliable
-    - When FastKV writes data in non-blocking way (mmap), it writes two files one by one,  to ensure that at least one file is integrate at any time;
-    - FastKV checks the integrity of the files when loading, if one file is not integrate, it will be restored with another file which is integrated.
-    - If mmap API fails, it will be degraded to the blocking I/O; 
-     and it will try to restore to mmap mode when reloading.
-
-7. Simple code
-    - FastKV is implemented in pure Java and size of jar is less then 100KB.
+FastKV有以下特点：
+1. 读写速度快
+    - 二进制编码，编码后的体积相对XML等文本编码要小很多；
+    - 增量编码：FastKV记录了各个key-value相对文件的偏移量，
+      从而在更新数据时可以直接在指定的位置写入数据。
+    - 默认用mmap的方式记录数据，更新数据时直接写入到内存即可，没有IO阻塞。
+    - 对超大字符串和大数组做特殊处理，另起文件写入，不影响主文件的加载和更新。
+2. 支持多种写入模式
+   - 除了mmap这种非阻塞的写入方式，FastKV也支持常规的阻塞式写入方式，
+     并且支持同步阻塞和异步阻塞（分别类似于SharePreferences的commit和apply)。
+3. 支持多种类型
+   - 支持常用的boolean/int/float/long/double/String等基础类型。
+   - 支持ByteArray (byte[])。
+   - 支持存储自定义对象。
+   - 内置Set<String>的编码器 (兼容SharePreferences)。
+4. 支持数据加密
+   - 支持注入加密解密的实现，在数据写入磁盘之前执行加密。
+   - 解密处理在数据加载阶段，后续读取时可直接访问到解析好的数据，加解密处理几乎不影响读取效率。
+5. 支持多进程
+   - 项目提供了支持多进程的存储类（MPFastKV)。
+   - 支持监听文件内容变化，其中一个进程修改文件，所有进程皆可感知。
+6. 方便易用
+   - FastKV提供了了丰富的API接口，开箱即用。
+   - 提供的接口其中包括getAll()和putAll()方法，
+     所以很方便迁移SharePreferences等框架的数据到FastKV, 当然，迁移FastKV的数据到其他框架也很简单。
+7. 稳定可靠
+   - 通过double-write等方法确保数据的完整性。
+   - 在API抛IO异常时自动降级处理。
+8. 代码精简
+   - FastKV由纯Java实现，编译成jar包后体积只有数十K。
    
-## 2. Getting Start
+## 2. 使用方法
 
-### 2.1 Import
-FastKV had been published to Maven Central:
-
-For Android (include SharePreferences API, support multi-process):
+### 2.1 导入
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:1.2.1'
+    implementation 'io.github.billywei01:fastkv:2.0.1'
 }
 ```
 
-For Java (Pure Java API, not support multi-process):
-
-```gradle
-dependencies {
-    implementation 'io.github.billywei01:fastkv-java:1.2.0'
-}
-```
-
-
-### 2.2 Initialization
+### 2.2 初始化
 ```kotlin
     FastKVConfig.setLogger(FastKVLogger)
     FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
 ```
-
-Initialization is optional.<br/>
-You could set log callback and executor.<br/>
-It is recommended to set your own thread pool to reuse threads.
+初始化可以按需设置日志接口和Executor。
 
 
-### 2.3 Read/Write
-- Basic case
+### 2.3 基本用法
+
 ```java
-    FastKV kv = new FastKV.Builder(path, name).build();
-   
+    // FastKV kv = new FastKV.Builder(path, name).build();
+    FastKV kv = new FastKV.Builder(context, name).build();
+    
     if(!kv.getBoolean("flag")){
         kv.putBoolean("flag" , true);
     }
@@ -88,81 +69,112 @@ It is recommended to set your own thread pool to reuse threads.
     }
 ```
 
-- Sava custom object
+Builder的构造可传Context或者path。<br>
+如果传Context的话，会在内部目录的'files'目录下创建'fastkv'目录来作为文件的保存路径。
+
+### 2.4 存储自定义对象
+
 ```java
     FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
-    FastKV kv = new FastKV.Builder(path, name).encoder(encoders).build();
+    FastKV kv = new FastKV.Builder(context, name).encoder(encoders).build();
         
     List<Long> list = new ArrayList<>();
     list.add(100L);
     list.add(200L);
     list.add(300L);
     kv.putObject("long_list", list, LongListEncoder.INSTANCE);
-   
+    
     List<Long> list2 = kv.getObject("long_list");
 ```
 
+除了支持基本类型外，FastKV还支持写入对象，只需在构建FastKV实例时传入对象的编码器即可。<br>
+编码器为实现FastEncoder接口的对象。<br>
+上面LongListEncoder就实现了FastEncoder接，代码实现可参考：
+[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt) <br>
 
-In addition to supporting basic types, FastKV also supports writing objects. You only need to pass in the encoder of the object when building FastKV instances.<br/>
-The encoder is an object that implements FastKV.Encoder.<br/>
-For example, the implementation of LongListEncoder like this:
+编码对象涉及序列化/反序列化。<br>
+这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
+
+### 2.5 数据加密
+如需对数据进行加密，在创建FastKV实例时传入
+[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java) 的实现即可。
+
+```
+FastKV kv = FastKV.Builder(path, name)
+         .cipher(yourCihper)
+         .build()
+```
+
+项目中有举例Cipher的实现，可参考：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkvdemo/fastkv/AESCipher.java)
+
+### 2.6 迁移 SharePreferences 到FastKV
+
+SP支持getAll接口，而FastKV支持putAll接口，所以导入SP数据到FastKV很简单。
 
 ```java
-public class LongListEncoder implements FastKV.Encoder<List<Long>> {
-    public static final LongListEncoder INSTANCE = new LongListEncoder();
+public class CommonStore {
+    public static final String NAME = "common_store";
+    // 原本的获取SP的方法
+    // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
 
-    @Override
-    public String tag() {
-        return "LongList";
-    }
-
-    @Override
-    public byte[] encode(List<Long> obj) {
-        return new PackEncoder().putLongList(0, obj).getBytes();
-    }
-
-    @Override
-    public List<Long> decode(byte[] bytes, int offset, int length) {
-        return PackDecoder.newInstance(bytes, offset, length).getLongList(0); 
-    }
+    // 导入原SP数据
+    public static final SharedPreferences preferences = FastPreferences.adapt(GlobalConfig.appContext, NAME);
 }
 ```
 
-Encoding objects needs serialization/deserialization. <br/>
-Here recommend my serialization project: https://github.com/BillyWei01/Packable
+FastPreferences的代码实现：[FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/FastPreferences.java) <br>
+FastPreferences是SharedPreferences的实现类，由于接口不变，用FastPreferences替换之后，不需要改动其他代码。<br>
 
-### 2.4 For Android 
-Comparing with common usage, Android platform has SharePreferences API and support Kotlin.<br/>
-See: [Android Case](android_case.md)
+### 2.7 迁移 MMKV 到 FastKV
+由于MMKV没有实现 'getAll' 接口，所以无法像SharePreferences一样一次性迁移。<br>
+但是可以封装一个KV类，创建 'getInt'，'getString' ... 等方法，并在其中做适配处理。
+可参考：[FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkvdemo/storage/FooKV.java)
 
+### 2.8 多进程
+项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java)。<br>
+MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接口，包括支持注册OnSharedPreferenceChangeListener;<br>
+其中一个进程修改了数据，所有的进程都会感知（通过OnSharedPreferenceChangeListener回调）。<br>
+可参考 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt) 
+和 [TestService](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/TestService.kt)
 
-## 3. Benchmark
-- Data source: Collecting part of the key-value data of SharePreferences in the app (with  confusion) , hundreds of key-values. <br/>
-Because some key values are accessed more and others accessed less in normally, 
-I make a normally distributed sequence to test the accessing.
+需要提醒的是，由于支持多进程需要维护更多的状态，MPFastKV 的写入要比FastKV慢不少，
+所以在不需要多进程访问的情况下，尽量用 FastKV 或 FastPreferences。
 
-- Test Code：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/FastKVDemo/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
-- Comparison component: SharePreferences/DataStore/MMKV
-- Device: Huawei Honor 20s
+### 2.9 Kotlin 委托
+Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。
+此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。
+可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/KVData.kt)
 
-Result:
+## 3. 性能测试
+- 测试数据：搜集APP中的SharePreferences汇总的部份key-value数据（经过随机混淆）得到总共四百多个key-value。<br>
+          由于日常使用过程中部分key-value访问多，部分访问少，所以构造了一个正态分布的访问序列。<br>
+          此过程循环多遍，分别求其总耗时。
+- 比较对象： SharePreferences/DataStore/MMKV。
+- 测试机型：荣耀20S。
 
-| | Write(ms) | Read(ms) 
+测试代码：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
+
+测试结果：
+
+| | 写入(ms) |读取(ms) 
 ---|---|---
 SharePreferences | 1182 | 2
 DataStore | 33277 | 2
 MMKV | 29 | 10
 FastKV  | 19 | 1 
 
-- SharePreferences use the apply mode. When use commit mode, it will be much slower.
-- DataStore writes data very slow.
-- MMKV read slower than SharePreferences/DataStore，but much faster in writing.
-- FastKV is the fastest both in writing or reading.
+- SharePreferences提交用的是apply, 耗时依然不少。
+- DataStore写入很慢。
+- MMKV的读取比SharePreferences/DataStore要慢，写入则比之快不少。
+- FastKV无论读取还是写入都比其他方式要快。
 
-The test above writes hundreds of key-values on one file, so the results have a big difference.
-Normally one file may only save several or tens of key-values, the result may be close.
+现实中通常情况下不会有此差距，因为一般而言不会几百个key-value写到同一个文件，此处仅为显示极端情况下的对比，读者可自行调整参数看对比数据。
+
+## 4. 参考链接
+https://juejin.cn/post/7018522454171582500
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.
+
 
 

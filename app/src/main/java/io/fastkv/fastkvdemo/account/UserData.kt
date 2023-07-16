@@ -6,7 +6,6 @@ import io.fastkv.fastkvdemo.fastkv.AESCipher
 import io.fastkv.fastkvdemo.fastkv.KVData
 import io.fastkv.fastkvdemo.fastkv.KeyStoreHelper
 import io.fastkv.fastkvdemo.fastkv.LongListEncoder
-import io.fastkv.fastkvdemo.storage.CommonStoreV2
 import io.fastkv.interfaces.FastEncoder
 
 object UserData : KVData("user_data") {
@@ -23,10 +22,10 @@ object UserData : KVData("user_data") {
         // In case of the devices upgrade from version lower M to upper M,
         // saving the option of first time to keep app use the same cipher key.
         val overAndroidM = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-        if (!CommonStoreV2.contains(CommonStoreV2.USE_KEY_STORE)) {
-            CommonStoreV2.useKeyStore = overAndroidM
+        if (!Setting.contains(Setting.USE_KEY_STORE)) {
+            Setting.useKeyStore = overAndroidM
         }
-        return if (overAndroidM && CommonStoreV2.useKeyStore) {
+        return if (overAndroidM && Setting.useKeyStore) {
             // Log.i("FastKV", "cipher key: " + Utils.bytes2Hex(KeyStoreHelper.getKey()))
             AESCipher(KeyStoreHelper.getKey(secretKey))
         } else {

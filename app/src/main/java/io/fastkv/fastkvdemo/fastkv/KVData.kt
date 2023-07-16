@@ -2,14 +2,14 @@ package io.fastkv.fastkvdemo.fastkv
 
 import io.fastkv.interfaces.FastCipher
 import io.fastkv.FastKV
-import io.fastkv.fastkvdemo.manager.PathManager
+import io.fastkv.fastkvdemo.application.GlobalConfig
 import io.fastkv.interfaces.FastEncoder
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 open class KVData(name: String) {
     internal val kv: FastKV by lazy {
-        FastKV.Builder(PathManager.fastKVDir, name)
+        FastKV.Builder(GlobalConfig.appContext, name)
             .encoder(encoders())
             .cipher(cipher())
             .build()

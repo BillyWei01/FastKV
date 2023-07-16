@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">FastKVDemo</string>
+    <string name="app_name">FastKV</string>
     <string name="main_tips">Launch %d times.</string>
     <string name="logout">logout</string>
     <string name="login">login</string>
