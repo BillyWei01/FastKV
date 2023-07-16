@@ -1,5 +1,1 @@
-.gradle
-.idea
-build
-.DS_Store
-out
+/build
