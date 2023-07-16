@@ -97,20 +97,19 @@ the 'fastkv' directory will be created under the 'files' directory of the intern
  List<Long> list2 = kv.getObject("long_list");
 ```
 
-
 In addition to supporting basic types, FastKV also supports writing objects. <br/>
 You only need to pass in the encoder of the object when building FastKV instances.<br/>
 The encoder is an object that implements
-[FastEncoder](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastEncoder.java).<br/>
+[FastEncoder](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastEncoder.java).<br/>
 For example, the code of 'LongListEncoder' like:
-[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt) <br>
+[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt)<br>
 
 Encoding objects needs serialization/deserialization. <br/>
 Here recommend my serialization project: https://github.com/BillyWei01/Packable
 
 ### 2.5 Data encryption
 If you need to encrypt data, just pass in the implementation of
-[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java)  when creating a FastKV instance
+[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastCipher.java)  when creating a FastKV instance
 
 ```
 FastKV kv = FastKV.Builder(path, name)
@@ -119,7 +118,7 @@ FastKV kv = FastKV.Builder(path, name)
 ```
 
 There are examples of Cipher implementations in the project, 
-refer to：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkvdemo/fastkv/AESCipher.java)
+refer to：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/AESCipher.java)
 
 ### 2.6 Migrate SharePreferences to FastKV
 
@@ -136,19 +135,19 @@ public class CommonStore {
 }
 ```
 
-[FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/FastPreferences.java)
+[FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/FastPreferences.java)
 is the implementation class of SharedPreferences, which uses FastKV to store key-values.
 
 ### 2.7 Migrate MMKV to FastKV
 Since MMKV does not implement the 'getAll' interface, it cannot be migrated at once like SharePreferences. <br>
 But you can create a KV class, create methods such as 'getInt', 'getString', etc., and do adaptation processing in it.<br>
-Refer to [FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkvdemo/storage/FooKV.java)
+Refer to [FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/FooKV.kt)
 
 ### 2.8 Multi-Process
-Multi-Process implement：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java).<br>
+Multi-Process implement: [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/MPFastKV.java).<br>
 
 Example:
-[MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt) 
+[MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt)
 and [TestService](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/TestService.kt)
 
 ### 2.9 Kotlin delegation

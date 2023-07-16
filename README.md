@@ -21,7 +21,8 @@ FastKV有以下特点：
    - 内置Set<String>的编码器 (兼容SharePreferences)。
 4. 支持数据加密
    - 支持注入加密解密的实现，在数据写入磁盘之前执行加密。
-   - 解密处理在数据加载阶段，后续读取时可直接访问到解析好的数据，加解密处理几乎不影响读取效率。
+   - 解密处理发生在数据解析阶段，解析完成后，数据是缓存的（用HashMap缓存)，<br>
+     所以加解密会稍微增加写入和解析的时间，不会增加索引数据的时间。
 5. 支持多进程
    - 项目提供了支持多进程的存储类（MPFastKV)。
    - 支持监听文件内容变化，其中一个进程修改文件，所有进程皆可感知。
@@ -90,14 +91,14 @@ Builder的构造可传Context或者path。<br>
 除了支持基本类型外，FastKV还支持写入对象，只需在构建FastKV实例时传入对象的编码器即可。<br>
 编码器为实现FastEncoder接口的对象。<br>
 上面LongListEncoder就实现了FastEncoder接，代码实现可参考：
-[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt) <br>
+[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt)<br>
 
 编码对象涉及序列化/反序列化。<br>
 这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
 
 ### 2.5 数据加密
 如需对数据进行加密，在创建FastKV实例时传入
-[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java) 的实现即可。
+[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastCipher.java) 的实现即可。
 
 ```
 FastKV kv = FastKV.Builder(path, name)
@@ -105,9 +106,9 @@ FastKV kv = FastKV.Builder(path, name)
          .build()
 ```
 
-项目中有举例Cipher的实现，可参考：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkvdemo/fastkv/AESCipher.java)
+项目中有举例Cipher的实现，可参考：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/AESCipher.java)
 
-### 2.6 迁移 SharePreferences 到FastKV
+### 2.6 迁移 SharePreferences 到 FastKV
 
 SP支持getAll接口，而FastKV支持putAll接口，所以导入SP数据到FastKV很简单。
 
@@ -122,16 +123,16 @@ public class CommonStore {
 }
 ```
 
-FastPreferences的代码实现：[FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/FastPreferences.java) <br>
+FastPreferences的代码实现：[FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/FastPreferences.java) <br>
 FastPreferences是SharedPreferences的实现类，由于接口不变，用FastPreferences替换之后，不需要改动其他代码。<br>
 
 ### 2.7 迁移 MMKV 到 FastKV
 由于MMKV没有实现 'getAll' 接口，所以无法像SharePreferences一样一次性迁移。<br>
 但是可以封装一个KV类，创建 'getInt'，'getString' ... 等方法，并在其中做适配处理。
-可参考：[FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkvdemo/storage/FooKV.java)
+可参考：[FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/FooKV.kt)
 
 ### 2.8 多进程
-项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java)。<br>
+项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/MPFastKV.java)。<br>
 MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接口，包括支持注册OnSharedPreferenceChangeListener;<br>
 其中一个进程修改了数据，所有的进程都会感知（通过OnSharedPreferenceChangeListener回调）。<br>
 可参考 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt) 
@@ -141,8 +142,8 @@ MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接�
 所以在不需要多进程访问的情况下，尽量用 FastKV 或 FastPreferences。
 
 ### 2.9 Kotlin 委托
-Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。
-此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。
+Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。 <br>
+此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。 <br>
 可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/KVData.kt)
 
 ## 3. 性能测试
