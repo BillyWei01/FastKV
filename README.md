@@ -174,6 +174,10 @@ FastKV  | 19 | 1
 ## 4. 参考链接
 https://juejin.cn/post/7018522454171582500
 
+## 5. 讨论
+创建了一个QQ群：436359235 <br>
+对FastKV感兴趣的朋友可以加群讨论，提建议，提BUG，都可以。
+
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.
 
