@@ -76,7 +76,7 @@ Builder的构造可传Context或者path。<br>
 ### 2.4 存储自定义对象
 
 ```java
-    FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
+    FastEncoder<?>[] encoders = new FastEncoder[]{LongListEncoder.INSTANCE};
     FastKV kv = new FastKV.Builder(context, name).encoder(encoders).build();
         
     List<Long> list = new ArrayList<>();
@@ -90,7 +90,7 @@ Builder的构造可传Context或者path。<br>
 
 除了支持基本类型外，FastKV还支持写入对象，只需在构建FastKV实例时传入对象的编码器即可。<br>
 编码器为实现FastEncoder接口的对象。<br>
-上面LongListEncoder就实现了FastEncoder接，代码实现可参考：
+上面LongListEncoder就实现了FastEncoder接口，代码实现可参考：
 [LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt)<br>
 
 编码对象涉及序列化/反序列化。<br>
