@@ -18,9 +18,9 @@ public class KeyStoreHelper {
     private static final String ALIAS = "KeyStoreHelper";
 
     /**
-     * Get the random bytes as symmetric key with length of 128.
+     * Get the random bytes as symmetric key with length of 128 bits.
      * The first time it's generating by random,
-     * and in later time it will return the bytes which be the same as first time.
+     * and in later time it will return the bytes which be the same as the first time.
      * So it's suitable to use as symmetric key.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
@@ -32,20 +32,19 @@ public class KeyStoreHelper {
     /**
      * HMAC = H(KEY XOR opad, H(KEY XOR ipad, text))
      * <br>
-     * The 'KEY' is generated and store by KeyStore.
+     * The 'KEY' is generated and stored by KeyStore.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
     private synchronized static byte[] hash(@NonNull byte[] text) {
         try {
             String algorithm = KeyProperties.KEY_ALGORITHM_HMAC_SHA256;
-            Key key;
             KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
             keyStore.load(null);
-
+            Key key;
             if (keyStore.containsAlias(ALIAS)) {
                 key = keyStore.getKey(ALIAS, null);
             } else {
-                // Generate the key and save to KeyStore, next time we could get it from KeyStore.
+                // Generate the key and save to KeyStore, next time we can get it from KeyStore.
                 KeyGenerator keyGenerator = KeyGenerator.getInstance(algorithm, "AndroidKeyStore");
                 keyGenerator.init(new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN).build());
                 key = keyGenerator.generateKey();

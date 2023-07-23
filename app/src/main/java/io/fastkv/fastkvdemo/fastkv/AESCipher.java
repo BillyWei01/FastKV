@@ -6,7 +6,6 @@ import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;
-import java.util.Random;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -22,13 +21,7 @@ public class AESCipher implements FastCipher {
     private final Cipher aesCipher;
     private final int ivMask;
 
-    // Option 1, use encryption operator of AES.
     private final NumberCipher numberCipher;
-
-    // Option 2, use simple linear operation (like xor and cyclic shift).
-//    private final int shift;
-//    private final int mask32;
-//    private final long mask64;
 
     public AESCipher(byte[] keyBytes) {
         if (keyBytes == null || keyBytes.length != 16) {
@@ -37,19 +30,43 @@ public class AESCipher implements FastCipher {
         secretKey = new SecretKeySpec(keyBytes, "AES");
         aesCipher = getAesCipher();
 
-        // Use 'Random' with seed to make key expansion.
+        // Use 'pseudo-random' to make key expansion.
         long seed = ByteBuffer.wrap(keyBytes).getLong();
-        Random r = new Random(seed);
+        CustomRandom r = new CustomRandom(seed);
 
         ivMask = r.nextInt();
 
         byte[] intKey = new byte[24];
-        r.nextBytes(intKey);
+        ByteBuffer buffer = ByteBuffer.wrap(intKey);
+        for (int i = 0; i < 6; i++) {
+            buffer.putInt(r.nextInt());
+        }
         numberCipher = new NumberCipher(intKey);
+    }
 
-//        shift = r.nextInt(23) + 10;
-//        mask32 = r.nextInt();
-//        mask64 = r.nextLong();
+    // Use custom random instead of 'Random' of JDK,
+    // in case of different JDKs having different implementations.
+    private static class CustomRandom {
+        private static final long multiplier = 0x5DEECE66DL;
+        private static final long addend = 0xBL;
+        private static final long mask = (1L << 48) - 1;
+        private long seed;
+
+        CustomRandom(long seed) {
+            this.seed = seed;
+        }
+
+        protected int nextInt() {
+            long oldSeed = seed;
+            do {
+                seed = (oldSeed * multiplier + addend) & mask;
+                if (oldSeed != seed) {
+                    break;
+                }
+                oldSeed++;
+            } while (true);
+            return (int) (seed >>> 12);
+        }
     }
 
     /**
@@ -61,8 +78,8 @@ public class AESCipher implements FastCipher {
             byte[] x = new byte[]{1, 2, 3, 4};
             byte[] y = aesEncrypt(cipher, x);
             byte[] z = aesDecrypt(cipher, y);
-            if(Arrays.equals(x, z)){
-               return cipher;
+            if (Arrays.equals(x, z)) {
+                return cipher;
             }
         } catch (Exception e) {
             logError(e);
@@ -122,25 +139,21 @@ public class AESCipher implements FastCipher {
 
     @Override
     public int encrypt(int src) {
-        // return ~Integer.rotateLeft(src ^ mask32, shift);
         return numberCipher.encryptInt(src);
     }
 
     @Override
     public int decrypt(int dst) {
-        // return Integer.rotateRight(~dst, shift) ^ mask32;
         return numberCipher.decryptInt(dst);
     }
 
     @Override
     public long encrypt(long src) {
-        // return ~Long.rotateLeft(src ^ mask64, shift);
         return numberCipher.encryptLong(src);
     }
 
     @Override
     public long decrypt(long dst) {
-        // return Long.rotateRight(~dst, shift) ^ mask64;
         return numberCipher.decryptLong(dst);
     }
 

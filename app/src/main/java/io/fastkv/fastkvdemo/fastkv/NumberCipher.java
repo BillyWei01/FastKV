@@ -263,4 +263,3 @@ public class NumberCipher {
                 ((long) (state[0] & 0xFF));
     }
 }
-
