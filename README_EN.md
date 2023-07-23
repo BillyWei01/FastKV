@@ -48,7 +48,7 @@ FastKV had been published to Maven Central:
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.0.1'
+    implementation 'io.github.billywei01:fastkv:2.0.2'
 }
 ```
 
@@ -85,7 +85,7 @@ the 'fastkv' directory will be created under the 'files' directory of the intern
 
 ### 2.4 Sava custom object
 ```java
- FastKV.Encoder<?>[] encoders = new FastKV.Encoder[]{LongListEncoder.INSTANCE};
+ FastEncoder] encoders = new FastEncoder[]{LongListEncoder.INSTANCE};
  FastKV kv = new FastKV.Builder(path, name).encoder(encoders).build();
      
  List<Long> list = new ArrayList<>();
@@ -157,7 +157,7 @@ Refer to [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/ja
 
 ## 3. Benchmark
 - Data source: Collecting part of the key-value data of SharePreferences in the app (with  confusion) , hundreds of key-values. <br/>
-Because some key values are accessed more and others accessed less in normally, 
+Because some key values are accessed more and others accessed less in normally, <br>
 I make a normally distributed sequence to test the accessing.
 
 - Test Code：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
@@ -178,8 +178,12 @@ FastKV  | 19 | 1
 - MMKV read slower than SharePreferences/DataStore，but much faster in writing.
 - FastKV is the fastest both in writing or reading.
 
-The test above writes hundreds of key-values on one file, so the results have a big difference.
+The test above writes hundreds of key-values on one file, so the results have a big difference.<br>
 Normally one file may only save several or tens of key-values, the result may be close.
+
+# Java-Version
+There is a project write with only API of JDK, no Android SDK. <br>
+link: https://github.com/BillyWei01/FastKV-Java
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.

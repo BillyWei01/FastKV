@@ -149,7 +149,10 @@ abstract class AbsFastKV {
                 StringContainer c = (StringContainer) value;
                 if (c.external) {
                     oldExternalFiles.add((String) c.value);
-                    tempKV.putString(key, getStringFromFile(c, null));
+                    String bigStr = getStringFromFile(c, null);
+                    if(bigStr != null){
+                        tempKV.putString(key, bigStr);
+                    }
                 } else {
                     tempKV.putString(key, (String) c.value);
                 }
@@ -167,7 +170,10 @@ abstract class AbsFastKV {
                 ArrayContainer c = (ArrayContainer) value;
                 if (c.external) {
                     oldExternalFiles.add((String) c.value);
-                    tempKV.putArray(key, getArrayFromFile(c, null));
+                    byte[] bigArray = getArrayFromFile(c, null);
+                    if (bigArray != null) {
+                        tempKV.putArray(key, bigArray);
+                    }
                 } else {
                     tempKV.putArray(key, (byte[]) c.value);
                 }
@@ -595,7 +601,9 @@ abstract class AbsFastKV {
                     return (String) value;
                 }
                 String str = getStringFromFile(c, cipher);
-                if (!str.isEmpty()) {
+                if (str == null) {
+                    removeKey(key);
+                } else if (!str.isEmpty()) {
                     bigValueCache.put(key, str);
                 }
                 return str;
@@ -612,12 +620,12 @@ abstract class AbsFastKV {
             byte[] bytes = (cache != null) ? cache : Util.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 bytes = fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
-                return new String(bytes, StandardCharsets.UTF_8);
+                return bytes != null ? new String(bytes, StandardCharsets.UTF_8) : null;
             }
         } catch (Exception e) {
             error(e);
         }
-        return "";
+        return null;
     }
 
     public byte[] getArray(String key) {
@@ -633,7 +641,9 @@ abstract class AbsFastKV {
                     return (byte[]) value;
                 }
                 byte[] bytes = getArrayFromFile(c, cipher);
-                if (bytes != null && bytes.length != 0) {
+                if (bytes == null) {
+                    removeKey(key);
+                } else if (bytes.length != 0) {
                     bigValueCache.put(key, bytes);
                 }
                 return bytes;
@@ -654,7 +664,7 @@ abstract class AbsFastKV {
         } catch (Exception e) {
             error(e);
         }
-        return EMPTY_ARRAY;
+        return null;
     }
 
     @SuppressWarnings("unchecked")
@@ -667,7 +677,9 @@ abstract class AbsFastKV {
                     return (T) value;
                 }
                 Object obj = getObjectFromFile(c, cipher);
-                if (obj != null) {
+                if (obj == null) {
+                    removeKey(key);
+                } else {
                     bigValueCache.put(key, obj);
                 }
                 return (T) obj;
@@ -747,7 +759,9 @@ abstract class AbsFastKV {
                     value = oc.external ? getObjectFromFile(oc, cipher) : ((ObjectContainer) c).value;
                     break;
             }
-            result.put(key, value);
+            if (value != null) {
+                result.put(key, value);
+            }
         }
         return result;
     }

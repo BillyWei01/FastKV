@@ -42,7 +42,7 @@ FastKV有以下特点：
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.0.1'
+    implementation 'io.github.billywei01:fastkv:2.0.2'
 }
 ```
 
@@ -172,7 +172,12 @@ FastKV  | 19 | 1
 现实中通常情况下不会有此差距，因为一般而言不会几百个key-value写到同一个文件，此处仅为显示极端情况下的对比，读者可自行调整参数看对比数据。
 
 ## 4. 参考链接
+相关博客： <br>
 https://juejin.cn/post/7018522454171582500
+
+由于提供给Android平台的版本和纯JDK的版本的差异越来越多，所以分开仓库来维护。<br>
+纯JDK版本的链接为：<br>
+https://github.com/BillyWei01/FastKV-Java
 
 ## 5. 讨论
 创建了一个QQ群：436359235 <br>

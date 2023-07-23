@@ -370,6 +370,7 @@ public final class FastKV extends AbsFastKV {
             final String oldFileName;
             data.remove(key);
             bigValueCache.remove(key);
+            externalCache.remove(key);
             byte type = container.getType();
             if (type <= DataType.DOUBLE) {
                 int keySize = FastBuffer.getStringSize(key);
