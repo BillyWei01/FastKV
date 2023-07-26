@@ -212,7 +212,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             } finally {
                 lock.release();
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             error(e);
             resetMemory();
         }

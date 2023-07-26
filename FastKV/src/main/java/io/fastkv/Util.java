@@ -186,5 +186,4 @@ class Util {
             logger.e("FastKV", e);
         }
     }
-
 }

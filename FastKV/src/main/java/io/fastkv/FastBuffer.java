@@ -270,8 +270,8 @@ class FastBuffer {
     }
 
     synchronized String decodeStr(byte[] src, int offset, int len) {
+        // Use common buffer to reduce gc.
         char[] buf = getCharBuf(len);
-        // byte[] src = hb;
         int i = offset;
         int j = 0;
         int limit = offset + len;

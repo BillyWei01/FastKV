@@ -601,14 +601,15 @@ abstract class AbsFastKV {
                     return (String) value;
                 }
                 String str = getStringFromFile(c, cipher);
-                if (str == null) {
+                if (str == null || str.isEmpty()) {
                     removeKey(key);
-                } else if (!str.isEmpty()) {
+                } else {
                     bigValueCache.put(key, str);
+                    return str;
                 }
-                return str;
+            } else {
+                return (String) c.value;
             }
-            return (String) c.value;
         }
         return defValue;
     }
@@ -622,7 +623,7 @@ abstract class AbsFastKV {
                 bytes = fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
                 return bytes != null ? new String(bytes, StandardCharsets.UTF_8) : null;
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             error(e);
         }
         return null;
@@ -641,14 +642,15 @@ abstract class AbsFastKV {
                     return (byte[]) value;
                 }
                 byte[] bytes = getArrayFromFile(c, cipher);
-                if (bytes == null) {
+                if (bytes == null || bytes.length == 0) {
                     removeKey(key);
-                } else if (bytes.length != 0) {
+                } else {
                     bigValueCache.put(key, bytes);
+                    return bytes;
                 }
-                return bytes;
+            } else {
+                return (byte[]) c.value;
             }
-            return (byte[]) c.value;
         }
         return defValue;
     }
@@ -661,7 +663,7 @@ abstract class AbsFastKV {
             if (bytes != null) {
                 return fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             error(e);
         }
         return null;
@@ -681,10 +683,11 @@ abstract class AbsFastKV {
                     removeKey(key);
                 } else {
                     bigValueCache.put(key, obj);
+                    return (T) obj;
                 }
-                return (T) obj;
+            } else {
+                return (T) c.value;
             }
-            return (T) c.value;
         }
         return null;
     }
@@ -697,7 +700,6 @@ abstract class AbsFastKV {
             if (bytes != null) {
                 bytes = fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
                 int tagSize = bytes[0] & 0xFF;
-                //String tag = new String(bytes, 1, tagSize, StandardCharsets.UTF_8);
                 String tag = fastBuffer.decodeStr(bytes, 1, tagSize);
                 FastEncoder encoder = encoderMap.get(tag);
                 if (encoder != null) {
@@ -710,7 +712,7 @@ abstract class AbsFastKV {
             } else {
                 warning(new Exception("Read object data failed"));
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             error(e);
         }
         return null;
@@ -1257,8 +1259,13 @@ abstract class AbsFastKV {
             // by saving bytes asynchronously,
             // But we have to save it asynchronously for efficiency.
             externalExecutor.execute(key, () -> {
+                long startTime = System.nanoTime();
                 if (!Util.saveBytes(new File(path + name, fileName), value)) {
-                    info("Write big data with key:" + key + " failed");
+                    info("Write large value with key:" + key + " failed");
+                } else {
+                    long t = System.nanoTime() - startTime;
+                    String formatTime = (t / 1000000) + "." + ((t % 1000000) / 10000);
+                    info("Write large value with key:" + key + ", use time:" + formatTime + " ms");
                 }
             });
 

@@ -885,7 +885,7 @@ public class FastKVTest {
         kv1.close();
 
         try {
-            Thread.sleep(600L);
+            Thread.sleep(300L);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -933,7 +933,7 @@ public class FastKVTest {
 
         try {
             // Waiting kv1 to finish saving big value.
-            Thread.sleep(600L);
+            Thread.sleep(200L);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

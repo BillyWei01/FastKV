@@ -199,7 +199,7 @@ public final class FastKV extends AbsFastKV {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             error(e);
             resetMemory();
             toBlockingMode();

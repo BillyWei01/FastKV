@@ -3,8 +3,8 @@ package io.fastkv;
 import java.util.*;
 
 public class TagExecutor {
-    private static final Set<String> scheduledTags = new HashSet<>();
-    private static final Map<String, Runnable> waitingTasks = new HashMap<>();
+    private final Set<String> scheduledTags = new HashSet<>();
+    private final Map<String, Runnable> waitingTasks = new HashMap<>();
 
     public synchronized void execute(String tag, Runnable r) {
         if (r == null) {

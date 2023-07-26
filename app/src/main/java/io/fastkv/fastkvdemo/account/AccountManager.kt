@@ -19,6 +19,7 @@ object AccountManager {
         fetchUserInfo()
     }
 
+    // mock values
     private fun fetchUserInfo() {
         UserData.run {
             isVip = true
@@ -29,7 +30,7 @@ object AccountManager {
             sign = "The journey of a thousand miles begins with a single step."
             lock = Utils.md5("12347".toByteArray())
             tags = setOf("travel", "foods", "cats", randomString())
-            favoriteChannels = listOf(1234567, 1234568, 2134569)
+            favoriteChannels = null//listOf(1234567, 1234568, 2134569)
         }
     }
 
