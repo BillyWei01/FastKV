@@ -1,4 +1,4 @@
-package io.fastkv.fastkvdemo.fastkv;
+package io.fastkv.fastkvdemo.fastkv.cipher;
 
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
@@ -13,6 +13,8 @@ import java.util.Arrays;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
+
+import io.fastkv.fastkvdemo.fastkv.FastKVLogger;
 
 public class KeyStoreHelper {
     private static final String ALIAS = "KeyStoreHelper";

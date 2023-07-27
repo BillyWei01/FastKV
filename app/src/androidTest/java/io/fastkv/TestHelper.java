@@ -8,7 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import io.fastkv.fastkvdemo.fastkv.AESCipher;
+import io.fastkv.fastkvdemo.fastkv.cipher.AESCipher;
 import io.fastkv.fastkvdemo.manager.PathManager;
 import io.fastkv.interfaces.FastCipher;
 import io.fastkv.interfaces.FastLogger;

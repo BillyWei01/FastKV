@@ -1,4 +1,4 @@
-package io.fastkv.fastkvdemo.fastkv;
+package io.fastkv.fastkvdemo.fastkv.cipher;
 
 import androidx.annotation.NonNull;
 
@@ -12,6 +12,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import io.fastkv.fastkvdemo.fastkv.FastKVLogger;
 import io.fastkv.interfaces.FastCipher;
 
 public class AESCipher implements FastCipher {

@@ -118,7 +118,7 @@ FastKV kv = FastKV.Builder(path, name)
 ```
 
 There are examples of Cipher implementations in the project, 
-refer to：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/AESCipher.java)
+refer to：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/cipher/AESCipher.java)
 
 ### 2.6 Migrate SharePreferences to FastKV
 
@@ -130,7 +130,7 @@ public class CommonStore {
     // original case
     // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
 
-    // import SharedPreferences's data
+    // import data of SharedPreferences
     public static final SharedPreferences preferences = FastPreferences.adapt(GlobalConfig.appContext, NAME);
 }
 ```

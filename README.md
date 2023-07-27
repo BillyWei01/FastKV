@@ -106,7 +106,7 @@ FastKV kv = FastKV.Builder(path, name)
          .build()
 ```
 
-项目中有举例Cipher的实现，可参考：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/AESCipher.java)
+项目中有举例Cipher的实现，可参考：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/cipher/AESCipher.java)
 
 ### 2.6 迁移 SharePreferences 到 FastKV
 

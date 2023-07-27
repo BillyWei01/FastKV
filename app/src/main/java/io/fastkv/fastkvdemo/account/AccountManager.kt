@@ -1,20 +1,23 @@
 package io.fastkv.fastkvdemo.account
 
+import io.fastkv.fastkvdemo.storage.CommonStorage
 import io.fastkv.fastkvdemo.util.Utils
 import java.lang.StringBuilder
 import kotlin.random.Random
 
 object AccountManager {
     fun isLogin(): Boolean {
-        return UserData.userAccount != null
+        return CommonStorage.uid.isNotEmpty()
     }
 
     fun logout() {
+        CommonStorage.uid = ""
         UserData.clear()
     }
 
     fun login(uid: Long) {
-        val account = AccountInfo(uid, "mock token", "hello", "12312345678", "foo@gmail.com")
+        CommonStorage.uid = uid.toString()
+        val account = AccountInfo("mock token", "hello", "12312345678", "foo@gmail.com")
         UserData.userAccount = account
         fetchUserInfo()
     }
@@ -28,9 +31,9 @@ object AccountManager {
             loginTime = System.currentTimeMillis()
             balance = 99999.99
             sign = "The journey of a thousand miles begins with a single step."
-            lock = Utils.md5("12347".toByteArray())
+            lock = Utils.getMD5Array("12347".toByteArray())
             tags = setOf("travel", "foods", "cats", randomString())
-            favoriteChannels = null//listOf(1234567, 1234568, 2134569)
+            favoriteChannels = listOf(1234567, 1234568, 2134569)
         }
     }
 

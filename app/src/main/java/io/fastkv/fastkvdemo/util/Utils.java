@@ -1,8 +1,6 @@
 package io.fastkv.fastkvdemo.util;
 
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
@@ -15,7 +13,7 @@ public class Utils {
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
             'a', 'b', 'c', 'd', 'e', 'f'};
 
-    public static byte[] md5(byte[] msg) throws NoSuchAlgorithmException {
+    public static byte[] getMD5Array(byte[] msg) throws NoSuchAlgorithmException {
         return MessageDigest.getInstance("MD5").digest(msg);
     }
 
@@ -39,22 +37,6 @@ public class Utils {
         SimpleDateFormat sd = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
         return sd.format(date);
     }
-
-    @SuppressWarnings({"rawtypes", "unchecked", "ConstantConditions"})
-    public static int getPageSize() {
-        try {
-            Class unsafeClass = Class.forName("sun.misc.Unsafe");
-            Field theUnsafe = unsafeClass.getDeclaredField("theUnsafe");
-            theUnsafe.setAccessible(true);
-            Method method = unsafeClass.getDeclaredMethod("pageSize");
-            method.setAccessible(true);
-            return (int) (Integer) method.invoke(theUnsafe.get(null));
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
 
     /**
      * Get array with normal distribution.

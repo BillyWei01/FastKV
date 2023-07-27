@@ -1,4 +1,4 @@
-package io.fastkv.fastkvdemo.fastkv;
+package io.fastkv.fastkvdemo.fastkv.cipher;
 
 /**
  * Use encryption operator of AES to encrypt/decrypt number.

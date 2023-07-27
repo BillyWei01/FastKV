@@ -11,7 +11,7 @@ import io.fastkv.fastkvdemo.account.AccountManager
 import io.fastkv.fastkvdemo.account.UserData
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.storage.SpCase
-import io.fastkv.fastkvdemo.storage.KotlinCase
+import io.fastkv.fastkvdemo.storage.CommonStorage
 import io.fastkv.fastkvdemo.util.runBlock
 import kotlinx.android.synthetic.main.activity_main.account_info_tv
 import kotlinx.android.synthetic.main.activity_main.login_btn
@@ -73,6 +73,7 @@ class MainActivity : AppCompatActivity() {
             account_info_tv.visibility = View.VISIBLE
             user_info_tv.visibility = View.VISIBLE
             UserData.userAccount?.run {
+                val uid = CommonStorage.uid
                 account_info_tv.text =
                     "uid: $uid\nnickname: $nickname\nphone: $phoneNo\nemail: $email"
             }
@@ -115,8 +116,8 @@ class MainActivity : AppCompatActivity() {
      * With kotlin's syntactic sugar, read/write key-value data just like accessing variable.
      */
     fun case3() {
-        val t = KotlinCase.launchCount + 1
+        val t = CommonStorage.launchCount + 1
         tips_tv.text = getString(R.string.main_tips, t)
-        KotlinCase.launchCount = t
+        CommonStorage.launchCount = t
     }
 }
