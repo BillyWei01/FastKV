@@ -37,8 +37,8 @@ object AccountManager {
             lock = Utils.getMD5Array("12347".toByteArray())
             tags = setOf("travel", "foods", "cats", randomString())
             favoriteChannels = listOf(1234567, 1234568, 2134569)
-            config["theme"] = "dark"
-            config["notification"] = "close"
+            config.putString("theme", "dark")
+            config.putBoolean("notification", true)
         }
     }
 
@@ -63,8 +63,8 @@ object AccountManager {
                     .append("lock: ").append(Utils.bytes2Hex(lock)).append('\n')
                     .append("tags: ").append(tags).append('\n')
                     .append("favoriteChannels: ").append(favoriteChannels).append('\n')
-                    .append("theme: ").append(config["theme"]).append('\n')
-                    .append("notification: ").append(config["notification"])
+                    .append("theme: ").append(config.getString("theme")).append('\n')
+                    .append("notification: ").append(config.getBoolean("notification"))
             }
         }
         return builder.toString()

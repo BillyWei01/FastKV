@@ -13,5 +13,5 @@ object CommonStorage : GlobalStorage("common_storage") {
     var deviceId by string("device_id")
     var installId by string("install_id")
     var uid by string("user_id")
-    val setting by map("setting")
+    val setting by combineKey("setting")
 }

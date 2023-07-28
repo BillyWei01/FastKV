@@ -4,13 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.account.AccountManager
 import io.fastkv.fastkvdemo.account.UserData
-import io.fastkv.fastkvdemo.fastkv.UserStorage
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.storage.SpCase
 import io.fastkv.fastkvdemo.storage.CommonStorage
@@ -23,10 +21,8 @@ import kotlinx.android.synthetic.main.activity_main.tips_tv
 import kotlinx.android.synthetic.main.activity_main.user_info_tv
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlin.coroutines.Continuation
 
 class MainActivity : AppCompatActivity() {
     companion object {

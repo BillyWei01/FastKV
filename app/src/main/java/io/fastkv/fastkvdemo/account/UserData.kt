@@ -1,14 +1,14 @@
 package io.fastkv.fastkvdemo.account
 
 import io.fastkv.fastkvdemo.fastkv.LongListEncoder
-import io.fastkv.fastkvdemo.fastkv.UserStorage
+import io.fastkv.fastkvdemo.fastkv.GroupStorage
 import io.fastkv.fastkvdemo.fastkv.cipher.CipherManager
 import io.fastkv.fastkvdemo.storage.CommonStorage
 import io.fastkv.interfaces.FastCipher
 import io.fastkv.interfaces.FastEncoder
 
-object UserData : UserStorage("user_data") {
-    override fun getUid(): String {
+object UserData : GroupStorage("user_data") {
+    override fun groupId(): String {
        return CommonStorage.uid
     }
 
@@ -30,5 +30,5 @@ object UserData : UserStorage("user_data") {
     var lock by array("lock")
     var tags by stringSet("tags")
     var favoriteChannels by obj("favorite_channels", LongListEncoder)
-    val config by map("config")
+    val config by combineKey("config")
 }

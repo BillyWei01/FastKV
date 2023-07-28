@@ -8,7 +8,6 @@ import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 abstract class KVData {
-    // Make kv to be protected or public/internal ?
     protected abstract val kv: FastKV
 
     protected open fun encoders(): Array<FastEncoder<*>>? {
@@ -40,16 +39,15 @@ abstract class KVData {
     protected fun long(key: String, defValue: Long = 0L) = LongProperty(key, defValue)
     protected fun double(key: String, defValue: Double = 0.0) = DoubleProperty(key, defValue)
     protected fun string(key: String, defValue: String = "") = StringProperty(key, defValue)
-    protected fun array(key: String, defValue: ByteArray = EMPTY_ARRAY) = ArrayProperty(key, defValue)
-    protected fun stringSet(key: String, defValue: Set<String>? = null) = StringSetProperty(key, defValue)
+    protected fun array(key: String, defValue: ByteArray = EMPTY_ARRAY) =
+        ArrayProperty(key, defValue)
+
+    protected fun stringSet(key: String, defValue: Set<String>? = null) =
+        StringSetProperty(key, defValue)
+
     protected fun <T> obj(key: String, encoder: FastEncoder<T>) = ObjectProperty(key, encoder)
 
-    /**
-     * Note:
-     * This property only supports 'put', 'get', 'containsKey', and 'remove'.
-     * Calling other method will throw UnsupportedOperationException.
-     */
-    protected fun map(key: String) = MapProperty(key)
+    protected fun combineKey(key: String) = CombineKeyProperty(key)
 
     class BooleanProperty(private val key: String, private val defValue: Boolean) :
         ReadWriteProperty<KVData, Boolean> {
@@ -150,57 +148,93 @@ abstract class KVData {
         }
     }
 
-    class MapProperty(private val key: String) : ReadOnlyProperty<KVData, MutableMap<String, String>> {
-        @Volatile
-        private var proxyMap: ProxyMap? = null
-        private fun getMap(kvData: KVData): ProxyMap {
-            if (proxyMap == null) {
-                synchronized(this) {
-                    if (proxyMap == null) {
-                        proxyMap = ProxyMap(kvData, key)
-                    }
-                }
-            }
-            return proxyMap!!
+    inner class CombineKeyProperty(preKey: String) : ReadOnlyProperty<KVData, CombineKV> {
+        private var combineKV = CombineKV(preKey)
+        override fun getValue(thisRef: KVData, property: KProperty<*>): CombineKV {
+            return combineKV
+        }
+    }
+
+    inner class CombineKV(private val preKey: String) {
+        private fun combineKey(key: String): String {
+            return "$preKey&$key"
         }
 
-        override fun getValue(thisRef: KVData, property: KProperty<*>): MutableMap<String, String> {
-            return getMap(thisRef)
+        fun containsKey(key: String): Boolean {
+            return kv.contains(combineKey(key))
+        }
+
+        fun remove(key: String) {
+            kv.remove(combineKey(key))
+        }
+
+        fun putBoolean(key: String, value: Boolean) {
+            kv.putBoolean(combineKey(key), value)
+        }
+
+        fun getBoolean(key: String, defValue: Boolean = false): Boolean {
+            return kv.getBoolean(combineKey(key), defValue)
+        }
+
+        fun putInt(key: String, value: Int) {
+            kv.putInt(key, value)
+        }
+
+        fun getInt(key: String, defValue: Int = 0): Int {
+            return kv.getInt(key, defValue)
+        }
+
+        fun putFloat(key: String, value: Float) {
+            kv.putFloat(key, value)
+        }
+
+        fun getFloat(key: String, defValue: Float = 0f): Float {
+            return kv.getFloat(key, defValue)
+        }
+
+        fun putLong(key: String, value: Long) {
+            kv.putLong(key, value)
+        }
+
+        fun getLong(key: String, defValue: Long = 0L): Long {
+            return kv.getLong(key, defValue)
+        }
+
+        fun putDouble(key: String, value: Double) {
+            kv.putDouble(key, value)
+        }
+
+        fun getDouble(key: String, defValue: Double = 0.0): Double {
+            return kv.getDouble(key, defValue)
+        }
+
+        fun putString(key: String, value: String) {
+            kv.putString(combineKey(key), value)
+        }
+
+        fun getString(key: String, defValue: String = ""): String {
+            return kv.getString(combineKey(key), defValue)
+        }
+
+        fun putArray(key: String, value: ByteArray) {
+            kv.putArray(key, value)
+        }
+
+        fun getArray(key: String, defValue: ByteArray = EMPTY_ARRAY): ByteArray {
+            return kv.getArray(key, defValue)
+        }
+
+        fun <T> putObject(key: String, value: T, encoder: FastEncoder<T>) {
+            kv.putObject(key, value, encoder)
+        }
+
+        fun <T> getObject(key: String): T? {
+            return kv.getObject(key)
         }
     }
 
     companion object {
         val EMPTY_ARRAY = ByteArray(0)
-
-        class ProxyMap(private val kvData: KVData, private val preKey: String) :
-            java.util.AbstractMap<String, String>() {
-            override val entries: MutableSet<MutableMap.MutableEntry<String, String>>
-                get() = throw UnsupportedOperationException()
-
-            private fun combineKey(key: String): String {
-                return "$preKey&$key"
-            }
-
-            override fun get(key: String?): String? {
-                return if (key == null) null else kvData.kv.getString(combineKey(key), null)
-            }
-
-            override fun put(key: String?, value: String?): String? {
-                if (key == null) return null
-                kvData.kv.putString(combineKey(key), value)
-                return null
-            }
-
-            override fun containsKey(key: String?): Boolean {
-                return if (key == null) false else kvData.kv.contains(combineKey(key))
-            }
-
-            override fun remove(key: String?): String? {
-                if (key == null) return null
-                kvData.kv.remove(combineKey(key))
-                return null
-            }
-        }
     }
 }
 
