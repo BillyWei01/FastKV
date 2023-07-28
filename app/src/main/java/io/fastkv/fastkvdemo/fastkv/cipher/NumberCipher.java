@@ -6,7 +6,7 @@ package io.fastkv.fastkvdemo.fastkv.cipher;
  * Link to <a href="https://github.com/BillyWei01/LongEncrypt/tree/master">LongEncrypt</a>
  * and <a href="https://github.com/openluopworld/aes_128/blob/master/aes.c">aes.c</a>
  */
-public class NumberCipher {
+class NumberCipher {
     private static final int ROUND = 2;
     private static final int KEY_LEN = (ROUND + 1) * 8; // 24
 

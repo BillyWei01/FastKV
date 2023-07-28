@@ -30,4 +30,5 @@ object UserData : UserStorage("user_data") {
     var lock by array("lock")
     var tags by stringSet("tags")
     var favoriteChannels by obj("favorite_channels", LongListEncoder)
+    val config by map("config")
 }

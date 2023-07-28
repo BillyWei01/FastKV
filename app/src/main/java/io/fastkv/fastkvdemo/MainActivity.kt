@@ -4,11 +4,13 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.account.AccountManager
 import io.fastkv.fastkvdemo.account.UserData
+import io.fastkv.fastkvdemo.fastkv.UserStorage
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.storage.SpCase
 import io.fastkv.fastkvdemo.storage.CommonStorage
@@ -19,10 +21,12 @@ import kotlinx.android.synthetic.main.activity_main.test_multi_process_btn
 import kotlinx.android.synthetic.main.activity_main.test_performance_btn
 import kotlinx.android.synthetic.main.activity_main.tips_tv
 import kotlinx.android.synthetic.main.activity_main.user_info_tv
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlin.coroutines.Continuation
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -39,10 +43,13 @@ class MainActivity : AppCompatActivity() {
             if (AccountManager.isLogin()) {
                 AccountManager.logout()
             } else {
-                AccountManager.login(10000)
+                AccountManager.login("10001")
             }
             updateAccountInfo()
         }
+
+        // Test 'remove'
+        // UserData.config.remove("notification")
 
         test_multi_process_btn.setOnClickListener {
             val intent = Intent(this, MultiProcessTestActivity::class.java)
@@ -55,15 +62,13 @@ class MainActivity : AppCompatActivity() {
             test_performance_btn.isEnabled = false
             serialChannel.runBlock {
                 Benchmark.start()
-                GlobalScope.launch(Dispatchers.Main) {
+                CoroutineScope(Dispatchers.Main).launch {
                     tips_tv.text = getString(R.string.test_tips)
                     tips_tv.setTextColor(Color.parseColor("#FF009900"))
                     test_performance_btn.isEnabled = true
                 }
             }
         }
-
-        // Log.i("MyTag", "pageSize:" + Utils.getPageSize())
     }
 
     @SuppressLint("SetTextI18n")

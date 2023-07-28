@@ -5,7 +5,7 @@ import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.util.Digest
 
-abstract class UserStorage(val name: String) : KVData() {
+abstract class UserStorage(private val name: String) : KVData() {
     companion object {
         val kvMap = ArrayMap<String, HashMap<String, FastKV>>()
     }
@@ -20,22 +20,11 @@ abstract class UserStorage(val name: String) : KVData() {
                     HashMap()
                 }
                 val kv = group.getOrPut(name) {
-                    buildFastKV(uid)
+                    // Make data save in different folder (group by uid).
+                    val path = PathManager.fastKVDir + "/user/" + uid
+                    buildKV(path, name)
                 }
                 return kv
             }
         }
-
-    private fun buildFastKV(uid: String): FastKV {
-        // Hide uid to digest
-        val uidDigest = Digest.md5(uid.toByteArray())
-
-        // Make data of users saving in different folder.
-        val path = PathManager.fastKVDir + "/" + uidDigest
-
-        return FastKV.Builder(path, name)
-            .encoder(encoders())
-            .cipher(cipher())
-            .build()
-    }
 }

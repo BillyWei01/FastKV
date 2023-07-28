@@ -2,8 +2,8 @@ package io.fastkv.fastkvdemo.fastkv
 
 import io.fastkv.interfaces.FastCipher
 import io.fastkv.FastKV
-import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.interfaces.FastEncoder
+import kotlin.properties.ReadOnlyProperty
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
@@ -17,6 +17,13 @@ abstract class KVData {
 
     protected open fun cipher(): FastCipher? {
         return null
+    }
+
+    protected fun buildKV(path: String, name: String): FastKV {
+        return FastKV.Builder(path, name)
+            .encoder(encoders())
+            .cipher(cipher())
+            .build()
     }
 
     fun contains(key: String): Boolean {
@@ -33,13 +40,16 @@ abstract class KVData {
     protected fun long(key: String, defValue: Long = 0L) = LongProperty(key, defValue)
     protected fun double(key: String, defValue: Double = 0.0) = DoubleProperty(key, defValue)
     protected fun string(key: String, defValue: String = "") = StringProperty(key, defValue)
-    protected fun array(key: String, defValue: ByteArray = EMPTY_ARRAY) =
-        ArrayProperty(key, defValue)
-
-    protected fun stringSet(key: String, defValue: Set<String>? = null) =
-        StringSetProperty(key, defValue)
-
+    protected fun array(key: String, defValue: ByteArray = EMPTY_ARRAY) = ArrayProperty(key, defValue)
+    protected fun stringSet(key: String, defValue: Set<String>? = null) = StringSetProperty(key, defValue)
     protected fun <T> obj(key: String, encoder: FastEncoder<T>) = ObjectProperty(key, encoder)
+
+    /**
+     * Note:
+     * This property only supports 'put', 'get', 'containsKey', and 'remove'.
+     * Calling other method will throw UnsupportedOperationException.
+     */
+    protected fun map(key: String) = MapProperty(key)
 
     class BooleanProperty(private val key: String, private val defValue: Boolean) :
         ReadWriteProperty<KVData, Boolean> {
@@ -140,8 +150,57 @@ abstract class KVData {
         }
     }
 
+    class MapProperty(private val key: String) : ReadOnlyProperty<KVData, MutableMap<String, String>> {
+        @Volatile
+        private var proxyMap: ProxyMap? = null
+        private fun getMap(kvData: KVData): ProxyMap {
+            if (proxyMap == null) {
+                synchronized(this) {
+                    if (proxyMap == null) {
+                        proxyMap = ProxyMap(kvData, key)
+                    }
+                }
+            }
+            return proxyMap!!
+        }
+
+        override fun getValue(thisRef: KVData, property: KProperty<*>): MutableMap<String, String> {
+            return getMap(thisRef)
+        }
+    }
+
     companion object {
         val EMPTY_ARRAY = ByteArray(0)
+
+        class ProxyMap(private val kvData: KVData, private val preKey: String) :
+            java.util.AbstractMap<String, String>() {
+            override val entries: MutableSet<MutableMap.MutableEntry<String, String>>
+                get() = throw UnsupportedOperationException()
+
+            private fun combineKey(key: String): String {
+                return "$preKey&$key"
+            }
+
+            override fun get(key: String?): String? {
+                return if (key == null) null else kvData.kv.getString(combineKey(key), null)
+            }
+
+            override fun put(key: String?, value: String?): String? {
+                if (key == null) return null
+                kvData.kv.putString(combineKey(key), value)
+                return null
+            }
+
+            override fun containsKey(key: String?): Boolean {
+                return if (key == null) false else kvData.kv.contains(combineKey(key))
+            }
+
+            override fun remove(key: String?): String? {
+                if (key == null) return null
+                kvData.kv.remove(combineKey(key))
+                return null
+            }
+        }
     }
 }
 

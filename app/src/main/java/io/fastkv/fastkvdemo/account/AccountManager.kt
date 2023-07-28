@@ -11,12 +11,15 @@ object AccountManager {
     }
 
     fun logout() {
-        CommonStorage.uid = ""
+        // In fact, it's unnecessary to clear data.
+        // Here we just make a usage.
         UserData.clear()
+
+        CommonStorage.uid = ""
     }
 
-    fun login(uid: Long) {
-        CommonStorage.uid = uid.toString()
+    fun login(uid: String) {
+        CommonStorage.uid = uid
         val account = AccountInfo("mock token", "hello", "12312345678", "foo@gmail.com")
         UserData.userAccount = account
         fetchUserInfo()
@@ -34,6 +37,8 @@ object AccountManager {
             lock = Utils.getMD5Array("12347".toByteArray())
             tags = setOf("travel", "foods", "cats", randomString())
             favoriteChannels = listOf(1234567, 1234568, 2134569)
+            config["theme"] = "dark"
+            config["notification"] = "close"
         }
     }
 
@@ -57,7 +62,9 @@ object AccountManager {
                     .append("sign: ").append(sign).append('\n')
                     .append("lock: ").append(Utils.bytes2Hex(lock)).append('\n')
                     .append("tags: ").append(tags).append('\n')
-                    .append("favoriteChannels: ").append(favoriteChannels)
+                    .append("favoriteChannels: ").append(favoriteChannels).append('\n')
+                    .append("theme: ").append(config["theme"]).append('\n')
+                    .append("notification: ").append(config["notification"])
             }
         }
         return builder.toString()
