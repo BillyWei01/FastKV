@@ -9,7 +9,7 @@ import io.fastkv.interfaces.FastEncoder
 
 object UserData : GroupStorage("user_data") {
     override fun groupId(): String {
-       return CommonStorage.uid
+       return CipherManager.numberCipher.encryptLong(CommonStorage.uid).toString()
     }
 
     override fun encoders(): Array<FastEncoder<*>> {
@@ -17,10 +17,11 @@ object UserData : GroupStorage("user_data") {
     }
 
     override fun cipher(): FastCipher {
-        return CipherManager.getKVCipher()
+        return CipherManager.defaultCipher
     }
 
     var userAccount by obj("user_account", AccountInfo.ENCODER)
+    var gender by intEnum("gender", Gender.CONVERTER)
     var isVip by boolean("is_vip")
     var fansCount by int("fans_count")
     var score by float("score")

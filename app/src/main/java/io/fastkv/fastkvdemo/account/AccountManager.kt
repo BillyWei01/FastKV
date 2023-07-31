@@ -7,20 +7,20 @@ import kotlin.random.Random
 
 object AccountManager {
     fun isLogin(): Boolean {
-        return CommonStorage.uid.isNotEmpty()
+        return CommonStorage.uid != 0L
     }
 
     fun logout() {
         // In fact, it's unnecessary to clear data.
         // Here we just make a usage.
-        UserData.clear()
+        // UserData.clear()
 
-        CommonStorage.uid = ""
+        CommonStorage.uid = 0L
     }
 
-    fun login(uid: String) {
+    fun login(uid: Long) {
         CommonStorage.uid = uid
-        val account = AccountInfo("mock token", "hello", "12312345678", "foo@gmail.com")
+        val account = AccountInfo(uid,"mock token", "hello", "12312345678", "foo@gmail.com")
         UserData.userAccount = account
         fetchUserInfo()
     }
@@ -29,6 +29,7 @@ object AccountManager {
     private fun fetchUserInfo() {
         UserData.run {
             isVip = true
+            gender = Gender.CONVERTER.intToType(Random.nextInt(3))
             fansCount = Random.nextInt(10000)
             score = 4.5f
             loginTime = System.currentTimeMillis()
@@ -54,6 +55,7 @@ object AccountManager {
         if (isLogin()) {
             UserData.run {
                 builder
+                    .append("gender: ").append(gender).append('\n')
                     .append("isVip: ").append(isVip).append('\n')
                     .append("fansCount: ").append(fansCount).append('\n')
                     .append("score: ").append(score).append('\n')

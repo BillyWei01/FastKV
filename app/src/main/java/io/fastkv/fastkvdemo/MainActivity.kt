@@ -39,7 +39,7 @@ class MainActivity : AppCompatActivity() {
             if (AccountManager.isLogin()) {
                 AccountManager.logout()
             } else {
-                AccountManager.login("10001")
+                AccountManager.login(10001L)
             }
             updateAccountInfo()
         }
@@ -74,7 +74,7 @@ class MainActivity : AppCompatActivity() {
             account_info_tv.visibility = View.VISIBLE
             user_info_tv.visibility = View.VISIBLE
             UserData.userAccount?.run {
-                val uid = CommonStorage.uid
+                //val uid = CommonStorage.uid
                 account_info_tv.text =
                     "uid: $uid\nnickname: $nickname\nphone: $phoneNo\nemail: $email"
             }

@@ -7,7 +7,7 @@ import io.packable.PackEncoder
 import io.packable.Packable
 
 data class AccountInfo(
-    // var uid: Long, // move uid to CommonStorage
+    var uid: Long,
     var token: String,
     var nickname: String,
     var phoneNo: String,
@@ -15,7 +15,7 @@ data class AccountInfo(
 ) : Packable {
     override fun encode(encoder: PackEncoder) {
         encoder
-            //.putLong(0, uid)
+            .putLong(0, uid)
             .putString(1, token)
             .putString(2, nickname)
             .putString(3, phoneNo)
@@ -25,7 +25,7 @@ data class AccountInfo(
     companion object {
         val CREATOR: PackCreator<AccountInfo> = PackCreator {
             AccountInfo(
-                // it.getLong(0),
+                it.getLong(0),
                 it.getString(1),
                 it.getString(2),
                 it.getString(3),

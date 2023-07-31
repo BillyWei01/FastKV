@@ -6,9 +6,9 @@ package io.fastkv.fastkvdemo.fastkv.cipher;
  * Link to <a href="https://github.com/BillyWei01/LongEncrypt/tree/master">LongEncrypt</a>
  * and <a href="https://github.com/openluopworld/aes_128/blob/master/aes.c">aes.c</a>
  */
-class NumberCipher {
-    private static final int ROUND = 2;
-    private static final int KEY_LEN = (ROUND + 1) * 8; // 24
+public class NumberCipher {
+    private static final int ROUND = 3;
+    static final int KEY_LEN = (ROUND + 1) * 8;
 
     private static final byte[] S_BOX = {
             99, 124, 119, 123, -14, 107, 111, -59, 48, 1, 103, 43, -2, -41, -85, 118,
@@ -66,7 +66,7 @@ class NumberCipher {
     private final byte[] key;
 
     /**
-     * @param key require a key with length of 24.
+     * @param key require a key with length of 32.
      */
     public NumberCipher(byte[] key) {
         if (key == null || key.length != KEY_LEN) {

@@ -22,27 +22,35 @@ public class AESCipher implements FastCipher {
     private final Cipher aesCipher;
     private final int ivMask;
 
-    private final NumberCipher numberCipher;
+    final NumberCipher numberCipher;
 
-    public AESCipher(byte[] keyBytes) {
-        if (keyBytes == null || keyBytes.length != 16) {
+    public AESCipher(byte[] aesKey) {
+        if (aesKey == null || aesKey.length != 16) {
             throw new IllegalArgumentException("Require a key with length of 16");
         }
-        secretKey = new SecretKeySpec(keyBytes, "AES");
-        aesCipher = getAesCipher();
-
         // Use 'pseudo-random' to make key expansion.
-        long seed = ByteBuffer.wrap(keyBytes).getLong();
-        CustomRandom r = new CustomRandom(seed);
+        long seed = ByteBuffer.wrap(aesKey).getLong();
+        CustomRandom r1 = new CustomRandom(seed & 0xFFFFFFFFL);
+        CustomRandom r2 = new CustomRandom(seed >>> 32);
 
-        ivMask = r.nextInt();
-
-        byte[] intKey = new byte[24];
+        byte[] intKey = new byte[NumberCipher.KEY_LEN];
         ByteBuffer buffer = ByteBuffer.wrap(intKey);
-        for (int i = 0; i < 6; i++) {
-            buffer.putInt(r.nextInt());
+        int n = NumberCipher.KEY_LEN / 8;
+        for (int i = 0; i < n; i++) {
+            buffer.putInt(r1.nextInt());
+            buffer.putInt(r2.nextInt());
         }
         numberCipher = new NumberCipher(intKey);
+
+        ivMask = r1.nextInt();
+        ByteBuffer ivBuffer = ByteBuffer.wrap(iv);
+        ivBuffer.position(4);
+        ivBuffer.putInt(r2.nextInt());
+        ivBuffer.putInt(r1.nextInt());
+        ivBuffer.putInt(r2.nextInt());
+
+        secretKey = new SecretKeySpec(aesKey, "AES");
+        aesCipher = getAesCipher();
     }
 
     // Use custom random instead of 'Random' of JDK,
@@ -75,7 +83,7 @@ public class AESCipher implements FastCipher {
      */
     private Cipher getAesCipher() {
         try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
             byte[] x = new byte[]{1, 2, 3, 4};
             byte[] y = aesEncrypt(cipher, x);
             byte[] z = aesDecrypt(cipher, y);

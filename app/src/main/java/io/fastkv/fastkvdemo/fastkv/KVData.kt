@@ -47,6 +47,12 @@ abstract class KVData {
 
     protected fun <T> obj(key: String, encoder: FastEncoder<T>) = ObjectProperty(key, encoder)
 
+    protected fun <T> stringEnum(key: String, converter: StringEnumConverter<T>) =
+        StringEnumProperty(key, converter)
+
+    protected fun <T> intEnum(key: String, converter: IntEnumConverter<T>) =
+        IntEnumProperty(key, converter)
+
     protected fun combineKey(key: String) = CombineKeyProperty(key)
 
     class BooleanProperty(private val key: String, private val defValue: Boolean) :
@@ -148,6 +154,34 @@ abstract class KVData {
         }
     }
 
+    class StringEnumProperty<T>(
+        private val key: String,
+        private val converter: StringEnumConverter<T>
+    ) :
+        ReadWriteProperty<KVData, T> {
+        override fun getValue(thisRef: KVData, property: KProperty<*>): T {
+            return converter.stringToType(thisRef.kv.getString(key))
+        }
+
+        override fun setValue(thisRef: KVData, property: KProperty<*>, value: T) {
+            thisRef.kv.putString(key, converter.typeToString(value))
+        }
+    }
+
+    class IntEnumProperty<T>(
+        private val key: String,
+        private val converter: IntEnumConverter<T>
+    ) :
+        ReadWriteProperty<KVData, T> {
+        override fun getValue(thisRef: KVData, property: KProperty<*>): T {
+            return converter.intToType(thisRef.kv.getInt(key))
+        }
+
+        override fun setValue(thisRef: KVData, property: KProperty<*>, value: T) {
+            thisRef.kv.putInt(key, converter.typeToInt(value))
+        }
+    }
+
     inner class CombineKeyProperty(preKey: String) : ReadOnlyProperty<KVData, CombineKV> {
         private var combineKV = CombineKV(preKey)
         override fun getValue(thisRef: KVData, property: KProperty<*>): CombineKV {
@@ -177,35 +211,35 @@ abstract class KVData {
         }
 
         fun putInt(key: String, value: Int) {
-            kv.putInt(key, value)
+            kv.putInt(combineKey(key), value)
         }
 
         fun getInt(key: String, defValue: Int = 0): Int {
-            return kv.getInt(key, defValue)
+            return kv.getInt(combineKey(key), defValue)
         }
 
         fun putFloat(key: String, value: Float) {
-            kv.putFloat(key, value)
+            kv.putFloat(combineKey(key), value)
         }
 
         fun getFloat(key: String, defValue: Float = 0f): Float {
-            return kv.getFloat(key, defValue)
+            return kv.getFloat(combineKey(key), defValue)
         }
 
         fun putLong(key: String, value: Long) {
-            kv.putLong(key, value)
+            kv.putLong(combineKey(key), value)
         }
 
         fun getLong(key: String, defValue: Long = 0L): Long {
-            return kv.getLong(key, defValue)
+            return kv.getLong(combineKey(key), defValue)
         }
 
         fun putDouble(key: String, value: Double) {
-            kv.putDouble(key, value)
+            kv.putDouble(combineKey(key), value)
         }
 
         fun getDouble(key: String, defValue: Double = 0.0): Double {
-            return kv.getDouble(key, defValue)
+            return kv.getDouble(combineKey(key), defValue)
         }
 
         fun putString(key: String, value: String) {
@@ -217,19 +251,19 @@ abstract class KVData {
         }
 
         fun putArray(key: String, value: ByteArray) {
-            kv.putArray(key, value)
+            kv.putArray(combineKey(key), value)
         }
 
         fun getArray(key: String, defValue: ByteArray = EMPTY_ARRAY): ByteArray {
-            return kv.getArray(key, defValue)
+            return kv.getArray(combineKey(key), defValue)
         }
 
         fun <T> putObject(key: String, value: T, encoder: FastEncoder<T>) {
-            kv.putObject(key, value, encoder)
+            kv.putObject(combineKey(key), value, encoder)
         }
 
         fun <T> getObject(key: String): T? {
-            return kv.getObject(key)
+            return kv.getObject(combineKey(key))
         }
     }
 
@@ -237,5 +271,17 @@ abstract class KVData {
         val EMPTY_ARRAY = ByteArray(0)
     }
 }
+
+interface StringEnumConverter<T> {
+    fun stringToType(str: String?): T
+    fun typeToString(type: T): String
+}
+
+interface IntEnumConverter<T> {
+    fun intToType(value: Int): T
+    fun typeToInt(type: T): Int
+}
+
+
 
 

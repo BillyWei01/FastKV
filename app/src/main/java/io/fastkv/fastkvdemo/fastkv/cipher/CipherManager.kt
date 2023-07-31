@@ -3,29 +3,34 @@ package io.fastkv.fastkvdemo.fastkv.cipher
 import android.os.Build
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.manager.PathManager
-import io.fastkv.interfaces.FastCipher
 
 object CipherManager {
-    // It's suggest to load from somewhere else instead of hard-coding
-    private val secretKey = "KeyStore!@#^%123".toByteArray()
+    val defaultCipher: AESCipher = getKVCipher()
+    val numberCipher: NumberCipher = defaultCipher.numberCipher
 
-    private val cipherSetting = FastKV.Builder(PathManager.fastKVDir, "cipher_setting")
-        .blocking()
-        .build()
 
-    private const val USE_KEY_STORE = "use_key_store"
 
-    fun getKVCipher(): FastCipher {
+    private fun getKVCipher(): AESCipher {
+       val cipherSetting = FastKV.Builder(PathManager.fastKVDir, "cipher_setting")
+            .blocking()
+            .build()
+
         // In case of the devices upgrade from version lower M to upper M,
-        // saving the option of first time to keep app use the same cipher key.
+        // saving the option of first time to make app keep using the same cipher key.
         val overAndroidM = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-        if (!cipherSetting.contains(USE_KEY_STORE)) {
-            cipherSetting.putBoolean(USE_KEY_STORE, overAndroidM)
-        }
-        return if (overAndroidM && cipherSetting.getBoolean(USE_KEY_STORE)) {
-            AESCipher(KeyStoreHelper.getKey(secretKey))
+        val key = "used_key_store"
+        val usedKeyStore = if (cipherSetting.contains(key)) {
+            cipherSetting.getBoolean(key)
         } else {
-            AESCipher(secretKey)
+            cipherSetting.putBoolean(key, overAndroidM)
+            overAndroidM
+        }
+
+        val seed = "seed1234567890ab".toByteArray()
+        return if (usedKeyStore && overAndroidM) {
+            AESCipher(KeyStoreHelper.getKey(seed))
+        } else {
+            AESCipher(seed)
         }
     }
 }
