@@ -8,13 +8,16 @@ import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.account.AccountManager
-import io.fastkv.fastkvdemo.account.UserData
+import io.fastkv.fastkvdemo.account.UserInfo
+import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.manager.PathManager
-import io.fastkv.fastkvdemo.storage.SpCase
-import io.fastkv.fastkvdemo.storage.CommonStorage
+import io.fastkv.fastkvdemo.data.SpCase
+import io.fastkv.fastkvdemo.data.UsageData
+import io.fastkv.fastkvdemo.util.onClick
 import io.fastkv.fastkvdemo.util.runBlock
 import kotlinx.android.synthetic.main.activity_main.account_info_tv
 import kotlinx.android.synthetic.main.activity_main.login_btn
+import kotlinx.android.synthetic.main.activity_main.switch_account_btn
 import kotlinx.android.synthetic.main.activity_main.test_multi_process_btn
 import kotlinx.android.synthetic.main.activity_main.test_performance_btn
 import kotlinx.android.synthetic.main.activity_main.tips_tv
@@ -29,30 +32,52 @@ class MainActivity : AppCompatActivity() {
         private val serialChannel = Channel<Any>(1)
     }
 
+    var lastUid = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         printLaunchTime()
-        updateAccountInfo()
+        refreshAccountInfoViews()
 
-        login_btn.setOnClickListener {
+        login_btn.onClick {
             if (AccountManager.isLogin()) {
+                lastUid = AppContext.uid
                 AccountManager.logout()
+                switch_account_btn.isEnabled = false
             } else {
-                AccountManager.login(10001L)
+                if (lastUid == 0L) {
+                    AccountManager.login(10001L)
+                } else {
+                    AccountManager.login(lastUid)
+                }
+                switch_account_btn.isEnabled = true
             }
-            updateAccountInfo()
+            refreshAccountInfoViews()
+        }
+
+        switch_account_btn.onClick {
+            if (AppContext.isLogin()) {
+                if (AppContext.uid == 10001L) {
+                    AccountManager.switchAccount(10002L)
+                } else {
+                    AccountManager.switchAccount(10001L)
+                }
+            } else {
+                tips_tv.text = getString(R.string.login_first_tips)
+            }
+            refreshAccountInfoViews()
         }
 
         // Test 'remove'
         // UserData.config.remove("notification")
 
-        test_multi_process_btn.setOnClickListener {
+        test_multi_process_btn.onClick {
             val intent = Intent(this, MultiProcessTestActivity::class.java)
             startActivity(intent)
         }
 
-        test_performance_btn.setOnClickListener {
+        test_performance_btn.onClick {
             tips_tv.text = getString(R.string.running_tips)
             tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
             test_performance_btn.isEnabled = false
@@ -68,12 +93,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     @SuppressLint("SetTextI18n")
-    private fun updateAccountInfo() {
+    private fun refreshAccountInfoViews() {
         if (AccountManager.isLogin()) {
             login_btn.text = getString(R.string.logout)
             account_info_tv.visibility = View.VISIBLE
             user_info_tv.visibility = View.VISIBLE
-            UserData.userAccount?.run {
+            UserInfo.userAccount?.run {
                 //val uid = CommonStorage.uid
                 account_info_tv.text =
                     "uid: $uid\nnickname: $nickname\nphone: $phoneNo\nemail: $email"
@@ -117,8 +142,8 @@ class MainActivity : AppCompatActivity() {
      * With kotlin's syntactic sugar, read/write key-value data just like accessing variable.
      */
     fun case3() {
-        val t = CommonStorage.launchCount + 1
+        val t = UsageData.launchCount + 1
         tips_tv.text = getString(R.string.main_tips, t)
-        CommonStorage.launchCount = t
+        UsageData.launchCount = t
     }
 }

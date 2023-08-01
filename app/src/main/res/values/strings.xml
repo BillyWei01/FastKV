@@ -9,4 +9,6 @@
     <string name="server_input">server_input</string>
     <string name="client_input">client_input</string>
     <string name="test_multi_process">test_multi_process</string>
+    <string name="switch_account">switch_account</string>
+    <string name="login_first_tips">Please login first</string>
 </resources>

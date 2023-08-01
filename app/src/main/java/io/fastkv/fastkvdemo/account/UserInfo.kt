@@ -1,23 +1,15 @@
 package io.fastkv.fastkvdemo.account
 
 import io.fastkv.fastkvdemo.fastkv.LongListEncoder
-import io.fastkv.fastkvdemo.fastkv.GroupStorage
-import io.fastkv.fastkvdemo.fastkv.cipher.CipherManager
-import io.fastkv.fastkvdemo.storage.CommonStorage
-import io.fastkv.interfaces.FastCipher
+import io.fastkv.fastkvdemo.fastkv.UserStorage
 import io.fastkv.interfaces.FastEncoder
 
-object UserData : GroupStorage("user_data") {
-    override fun groupId(): String {
-       return CipherManager.numberCipher.encryptLong(CommonStorage.uid).toString()
-    }
-
+/**
+ * 用户信息
+ */
+object UserInfo : UserStorage("user_data") {
     override fun encoders(): Array<FastEncoder<*>> {
         return arrayOf(AccountInfo.ENCODER, LongListEncoder)
-    }
-
-    override fun cipher(): FastCipher {
-        return CipherManager.defaultCipher
     }
 
     var userAccount by obj("user_account", AccountInfo.ENCODER)

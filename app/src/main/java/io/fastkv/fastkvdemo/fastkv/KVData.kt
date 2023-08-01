@@ -2,6 +2,7 @@ package io.fastkv.fastkvdemo.fastkv
 
 import io.fastkv.interfaces.FastCipher
 import io.fastkv.FastKV
+import io.fastkv.fastkvdemo.fastkv.cipher.CipherManager
 import io.fastkv.interfaces.FastEncoder
 import kotlin.properties.ReadOnlyProperty
 import kotlin.properties.ReadWriteProperty
@@ -15,7 +16,7 @@ abstract class KVData {
     }
 
     protected open fun cipher(): FastCipher? {
-        return null
+        return CipherManager.defaultCipher
     }
 
     protected fun buildKV(path: String, name: String): FastKV {
@@ -113,7 +114,7 @@ abstract class KVData {
     class StringProperty(private val key: String, private val defValue: String) :
         ReadWriteProperty<KVData, String> {
         override fun getValue(thisRef: KVData, property: KProperty<*>): String {
-            return thisRef.kv.getString(key, defValue)
+            return thisRef.kv.getString(key, null) ?: defValue
         }
 
         override fun setValue(thisRef: KVData, property: KProperty<*>, value: String) {
@@ -247,7 +248,7 @@ abstract class KVData {
         }
 
         fun getString(key: String, defValue: String = ""): String {
-            return kv.getString(combineKey(key), defValue)
+            return kv.getString(combineKey(key), null) ?: defValue
         }
 
         fun putArray(key: String, value: ByteArray) {

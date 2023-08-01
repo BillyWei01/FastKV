@@ -13,7 +13,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.tencent.mmkv.MMKV
 import io.fastkv.FastKV
-import io.fastkv.fastkvdemo.application.GlobalConfig
+import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.manager.PathManager.fastKVDir
 import io.fastkv.fastkvdemo.util.IOUtil
@@ -27,7 +27,7 @@ import java.util.*
 
 object Benchmark {
     private const val TAG = "Benchmark"
-    private val sp = GlobalConfig.appContext.getSharedPreferences("sp", Context.MODE_PRIVATE)
+    private val sp = AppContext.context.getSharedPreferences("sp", Context.MODE_PRIVATE)
     private val dataStore = PreferenceDataStoreFactory.create { File(PathManager.filesDir, "data_store.preferences_pb") }
     private val mmkv = MMKV.defaultMMKV()
     private val fastkv = FastKV.Builder(fastKVDir, "fastkv").build()
@@ -36,7 +36,7 @@ object Benchmark {
     private var hadWarmingUp = false
     suspend fun start() {
         try {
-            runTest(GlobalConfig.appContext)
+            runTest(AppContext.context)
         } catch (e: Throwable) {
             Log.e(TAG, e.message, e)
         }

@@ -9,7 +9,7 @@ import java.security.SecureRandom;
 
 import io.fastkv.interfaces.FastLogger;
 
-class Util {
+class Utils {
     private static class Holder {
         static final SecureRandom random = new SecureRandom();
         static final char[] digits = {
@@ -145,7 +145,7 @@ class Util {
             if (fs != null) {
                 for (File file : fs) {
                     try {
-                        Util.moveFile(file, new File(currentDir, file.getName()));
+                        Utils.moveFile(file, new File(currentDir, file.getName()));
                     } catch (Exception e) {
                         logError(e);
                     }

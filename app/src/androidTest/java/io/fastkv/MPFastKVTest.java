@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import io.fastkv.fastkvdemo.application.GlobalConfig;
+import io.fastkv.fastkvdemo.base.AppContext;
 import io.fastkv.fastkvdemo.fastkv.LongListEncoder;
 import io.fastkv.interfaces.FastEncoder;
 
@@ -214,16 +214,17 @@ public class MPFastKVTest {
 
     @Test
     public void testBigValue() {
-        String name = "test_big_value";
-        MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name).disableWatchFileChange().build();
-
-        testBigString(kv1, name);
-        testBigArray(kv1, name);
-        testBigObject(name);
+        testBigString();
+        testBigArray();
+        testBigObject();
     }
 
-    private void testBigString(MPFastKV kv1, String name) {
-        kv1.clear();
+    private void testBigString() {
+        String name = "testBigString";
+        clearFile(name);
+        MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name)
+                .disableWatchFileChange()
+                .build();
         String longStr = TestHelper.makeString(6000);
         kv1.putString("str", longStr);
         kv1.putString("a", "a");
@@ -245,8 +246,12 @@ public class MPFastKVTest {
         Assert.assertEquals(longStr, kv4.getString("str"));
     }
 
-    private void testBigArray(MPFastKV kv1, String name) {
-        kv1.clear();
+    private void testBigArray() {
+        String name = "testBigArray";
+        clearFile(name);
+        MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name)
+                .disableWatchFileChange()
+                .build();
         byte[] longArray = new byte[6000];
         kv1.putArray("array", longArray);
         kv1.putString("a", "a");
@@ -269,7 +274,9 @@ public class MPFastKVTest {
         Assert.assertArrayEquals(longArray, kv4.getArray("array"));
     }
 
-    private void testBigObject(String name) {
+    private void testBigObject() {
+        String name = "testBigObject";
+
         FastEncoder<?>[] encoders = new FastEncoder[]{TestObjectEncoder.INSTANCE};
         MPFastKV kv1 = new MPFastKV(TestHelper.MP_DIR, name, encoders,  null,false);
         kv1.clear();
@@ -310,8 +317,8 @@ public class MPFastKVTest {
     @Test
     public void testRewrite() {
         String name = "test_rewrite";
+        clearFile(name);
         MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name).disableWatchFileChange().build();
-        kv1.clear();
 
         //System.currentTimeMillis();
         long seed = 1;
@@ -480,7 +487,7 @@ public class MPFastKVTest {
         File srcFile = new File(TestHelper.MP_DIR, "src.kva");
         if (!srcFile.exists()) {
 
-            InputStream inputStream = GlobalConfig.appContext.getAssets().open("src.kva");
+            InputStream inputStream = AppContext.INSTANCE.getContext().getAssets().open("src.kva");
             //this.getClass().getClassLoader().getResourceAsStream("src.kva");
             if (inputStream == null) {
                 throw new IOException("Could not load src.kva");
@@ -598,7 +605,7 @@ public class MPFastKVTest {
         if (file.exists()) {
             RandomAccessFile accessFile = new RandomAccessFile(file, "rw");
             FileChannel channel = accessFile.getChannel();
-            MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, Util.getPageSize());
+            MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, Utils.getPageSize());
             int index = (int) (System.currentTimeMillis() % 30);
             String name = fileName.endsWith(".kva") ? "A" : "B";
             System.out.println("Damage " + name + " file's byte at index:" + index);
@@ -702,7 +709,7 @@ public class MPFastKVTest {
         kv1.commit();
 
         try {
-            Thread.sleep(300L);
+            Thread.sleep(100L);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -746,16 +753,12 @@ public class MPFastKVTest {
 
         try {
             // Waiting kv1 to finish saving big value.
-            Thread.sleep(300L);
+            Thread.sleep(100L);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
 
-        // encrypt
-//        FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name)
-//                .cipher(TestHelper.cipher)
-//                .encoder(encoders)
-//                .build();
+        // test encrypt
         MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders, TestHelper.cipher, false);
         Assert.assertEquals(d1, kv1.getDouble("double"), 0);
         Assert.assertEquals("hello", kv2.getString("s1"));

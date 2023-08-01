@@ -8,8 +8,6 @@ object CipherManager {
     val defaultCipher: AESCipher = getKVCipher()
     val numberCipher: NumberCipher = defaultCipher.numberCipher
 
-
-
     private fun getKVCipher(): AESCipher {
        val cipherSetting = FastKV.Builder(PathManager.fastKVDir, "cipher_setting")
             .blocking()
@@ -25,6 +23,7 @@ object CipherManager {
             cipherSetting.putBoolean(key, overAndroidM)
             overAndroidM
         }
+        cipherSetting.close()
 
         val seed = "seed1234567890ab".toByteArray()
         return if (usedKeyStore && overAndroidM) {

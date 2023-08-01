@@ -1,28 +1,41 @@
 package io.fastkv.fastkvdemo.application
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import com.tencent.mmkv.MMKV
 import io.fastkv.FastKVConfig
+import io.fastkv.fastkvdemo.BuildConfig
+import io.fastkv.fastkvdemo.base.AppContext
+import io.fastkv.fastkvdemo.base.IAppContext
 import io.fastkv.fastkvdemo.fastkv.FastKVLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 
-class AppApplication : Application() {
+class AppApplication : Application(), IAppContext {
+    override val context: Context
+        get() = this
+
+    override val debug: Boolean
+        get() = BuildConfig.DEBUG
+
+    override val isMainProcess: Boolean
+        get() = appId == null || appId == BuildConfig.APPLICATION_ID
+
+    private var appId: String? = null
+
     override fun onCreate() {
         super.onCreate()
-        GlobalConfig.appContext = this
+        AppContext.init(this)
 
         FastKVConfig.setLogger(FastKVLogger)
         FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
 
-        // filter other processes,
-        // in case files damaged in multiprocess mode
-        val processName = ProcessUtil.getProcessName(this)
-        if(processName == null || processName == GlobalConfig.APPLICATION_ID) {
+        appId = ProcessUtil.getProcessName(this)
+
+        // Avoid files corruption in multi-process environment
+        if(isMainProcess) {
             initMMKV()
-            // FastKV not support multiprocess (MPFastKV does)
-             preload()
         }
     }
 
@@ -35,14 +48,6 @@ class AppApplication : Application() {
         )*/
         val rootDir = MMKV.initialize(this)
         Log.i("MMKV", "mmkv root: $rootDir")
-    }
-
-    private fun preload() {
-//        Dispatchers.IO.asExecutor().execute {
-//            CommonStoreV2.kv
-//            UserData.kv
-//            FastKV.Builder(fastKVDir, "fastkv").build()
-//        }
     }
 }
 

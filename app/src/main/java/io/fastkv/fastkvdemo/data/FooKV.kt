@@ -1,11 +1,11 @@
-package io.fastkv.fastkvdemo.storage
+package io.fastkv.fastkvdemo.data
 
 import com.tencent.mmkv.MMKV
 import io.fastkv.FastKV
-import io.fastkv.fastkvdemo.application.GlobalConfig
+import io.fastkv.fastkvdemo.base.AppContext
 
 /**
- * Example codes for migrating MMKV to FastKV
+ * MMKV 迁移 FastKV 的样例
  */
 class FooKV(val name: String) {
     // Using lazy initialization.
@@ -14,7 +14,7 @@ class FooKV(val name: String) {
         MMKV.mmkvWithID(name)
     }
 
-    private val fastkv = FastKV.Builder(GlobalConfig.appContext, name).build()
+    private val fastkv = FastKV.Builder(AppContext.context, name).build()
 
     fun putString(key: String, value: String) {
         // Unnecessary to considering old value when putting new value.

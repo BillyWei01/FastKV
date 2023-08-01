@@ -1,35 +1,72 @@
 package io.fastkv.fastkvdemo.account
 
-import io.fastkv.fastkvdemo.storage.CommonStorage
+import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.util.Utils
+import io.fastkv.fastkvdemo.data.AppState
 import java.lang.StringBuilder
 import kotlin.random.Random
 
 object AccountManager {
     fun isLogin(): Boolean {
-        return CommonStorage.uid != 0L
+        return AppContext.uid != 0L
     }
 
-    fun logout() {
-        // In fact, it's unnecessary to clear data.
-        // Here we just make a usage.
-        // UserData.clear()
+    /**
+     * 切换到注销状态前，最好发送一下"注销“事件给存在“写入用户数据”的异步任务，
+     * 如果这些任务正在执行，则取消之。
+     * 具体原因可参考：[io.fastkv.fastkvdemo.fastkv.UserStorage]
+     */
+    fun logout(): Boolean {
+        // Post“注销”的消息（这里就不演示了）
 
-        CommonStorage.uid = 0L
+        AppContext.uid = 0L
+        AppState.user_id = 0L
+        return true
     }
 
     fun login(uid: Long) {
-        CommonStorage.uid = uid
-        val account = AccountInfo(uid,"mock token", "hello", "12312345678", "foo@gmail.com")
-        UserData.userAccount = account
-        fetchUserInfo()
+        if (!AppContext.isLogin() || logout()) {
+            doLogin(uid)
+        }
+    }
+
+    fun switchAccount(uid: Long) {
+        if (AppContext.uid != uid && logout()) {
+            doLogin(uid)
+        }
+    }
+
+    private fun doLogin(uid: Long) {
+        // Do some thing about login
+
+        // mock data
+        val accountInfo = AccountInfo(
+            uid,
+            "mock token",
+            "hello",
+            "12312345678",
+            "u$uid@gmail.com"
+        )
+        onSuccess(accountInfo)
+    }
+
+    private fun onSuccess(accountInfo: AccountInfo) {
+        // 首先第一件事情就是切换上下AppContext中的uid,
+        // 因为后面的存储可能与uid相关
+        AppContext.uid = accountInfo.uid
+
+        // 记录当前登陆的用户ID
+        AppState.user_id = accountInfo.uid
+
+        UserInfo.userAccount = accountInfo
+        fetchUserInfo(accountInfo.uid)
     }
 
     // mock values
-    private fun fetchUserInfo() {
-        UserData.run {
+    private fun fetchUserInfo(uid: Long) {
+        UserInfo.run {
             isVip = true
-            gender = Gender.CONVERTER.intToType(Random.nextInt(3))
+            gender = Gender.CONVERTER.intToType((uid % 10000 % 3).toInt())
             fansCount = Random.nextInt(10000)
             score = 4.5f
             loginTime = System.currentTimeMillis()
@@ -43,17 +80,17 @@ object AccountManager {
         }
     }
 
-    private fun randomString(): String{
+    private fun randomString(): String {
         val n = Random.nextInt(16)
         val a = ByteArray(n)
-        a.fill('a'.code.toByte(),0, n);
+        a.fill('a'.code.toByte(), 0, n);
         return String(a)
     }
 
-    fun formatUserInfo() : String {
+    fun formatUserInfo(): String {
         val builder = StringBuilder()
         if (isLogin()) {
-            UserData.run {
+            UserInfo.run {
                 builder
                     .append("gender: ").append(gender).append('\n')
                     .append("isVip: ").append(isVip).append('\n')

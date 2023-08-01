@@ -1,8 +1,8 @@
 package io.fastkv.fastkvdemo.manager
 
-import io.fastkv.fastkvdemo.application.GlobalConfig
+import io.fastkv.fastkvdemo.base.AppContext
 
 object PathManager {
-    val filesDir: String = GlobalConfig.appContext.filesDir.absolutePath
+    val filesDir: String = AppContext.context.filesDir.absolutePath
     val fastKVDir: String = "$filesDir/fastkv"
 }

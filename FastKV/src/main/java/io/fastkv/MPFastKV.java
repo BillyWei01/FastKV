@@ -1,13 +1,11 @@
 package io.fastkv;
 
-import android.content.SharedPreferences;
 import android.os.FileObserver;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,11 +14,17 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
-import io.fastkv.Container.*;
+import io.fastkv.Container.BaseContainer;
+import io.fastkv.Container.VarContainer;
 import io.fastkv.interfaces.FastCipher;
 import io.fastkv.interfaces.FastEncoder;
 
@@ -36,7 +40,7 @@ import io.fastkv.interfaces.FastEncoder;
  * So if you don't need to access the data in multi-process, just use FastKV.
  */
 @SuppressWarnings("rawtypes")
-public final class MPFastKV extends AbsFastKV implements SharedPreferences, SharedPreferences.Editor {
+public final class MPFastKV extends AbsFastKV /*implements SharedPreferences, SharedPreferences.Editor*/ {
     private static final int MSG_REFRESH = 1;
     private static final int MSG_APPLY = 2;
     private static final int MSG_DATA_CHANGE = 3;
@@ -66,8 +70,8 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
     // We need to keep reference to the observer in case of gc recycle it.
     private volatile KVFileObserver fileObserver;
+
     private final Set<String> changedKey = new HashSet<>();
-    private final ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners = new ArrayList<>();
 
     MPFastKV(final String path,
              final String name,
@@ -132,7 +136,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     private void loadFromABFile() {
         try {
             int count = 0;
-            while ((!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) && count < 3) {
+            while ((!Utils.makeFileIfNotExist(aFile) || !Utils.makeFileIfNotExist(bFile)) && count < 3) {
                 //noinspection BusyWait
                 Thread.sleep(20L);
                 count++;
@@ -226,7 +230,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
     private void fullWriteAToB() {
         try {
-            if (!Util.makeFileIfNotExist(bFile)) {
+            if (!Utils.makeFileIfNotExist(bFile)) {
                 return;
             }
             setBFileSize(aBuffer.capacity());
@@ -251,7 +255,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         int bufferSize = fastBuffer.hb.length;
         try {
             if (aAccessFile == null) {
-                if (!Util.makeFileIfNotExist(aFile)) {
+                if (!Utils.makeFileIfNotExist(aFile)) {
                     return false;
                 }
                 aAccessFile = new RandomAccessFile(aFile, "rw");
@@ -308,7 +312,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
     private boolean writeToABFile(FastBuffer buffer) {
         int bufferLen = buffer.hb.length;
         try {
-            if (!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) {
+            if (!Utils.makeFileIfNotExist(aFile) || !Utils.makeFileIfNotExist(bFile)) {
                 throw new Exception(OPEN_FILE_FAILED);
             }
             if (bAccessFile == null) {
@@ -361,99 +365,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         aBuffer.put(bytes, offset, length);
     }
 
-    @Nullable
-    @Override
-    public Set<String> getStringSet(String key, @Nullable Set<String> defValues) {
-        Set<String> set = getStringSet(key);
-        return set != null ? set : defValues;
-    }
-
-    @Override
-    public Editor edit() {
-        return this;
-    }
-
-    private void notifyListeners(ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners, String key) {
-        for (SharedPreferences.OnSharedPreferenceChangeListener listener : listeners) {
-            listener.onSharedPreferenceChanged(this, key);
-        }
-    }
-
-    @Override
-    public synchronized void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
-        if (listener == null) {
-            return;
-        }
-        if (!listeners.contains(listener)) {
-            listeners.add(listener);
-        }
-    }
-
-    @Override
-    public synchronized void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
-        listeners.remove(listener);
-    }
-
-    @Override
-    public synchronized Editor putBoolean(String key, boolean value) {
-        putBooleanValue(key, value);
-        return this;
-    }
-
-    @Override
-    public synchronized Editor putInt(String key, int value) {
-        putIntValue(key, value);
-        return this;
-    }
-
-    @Override
-    public synchronized Editor putFloat(String key, float value) {
-        putFloatValue(key, value);
-        return this;
-    }
-
-    @Override
-    public synchronized Editor putLong(String key, long value) {
-        putLongValue(key, value);
-        return this;
-    }
-
-    public synchronized Editor putDouble(String key, double value) {
-        putDoubleValue(key, value);
-        return this;
-    }
-
-    @Override
-    public synchronized Editor putString(String key, String value) {
-        putStringValue(key, value);
-        return this;
-    }
-
-    public synchronized void putArray(String key, byte[] value) {
-        putArrayValue(key, value);
-    }
-
-    /**
-     * @param key     The name of the data to modify
-     * @param value   The new value
-     * @param encoder The encoder to encode value to byte[], encoder must register in  Builder.encoder(),
-     *                for decoding byte[] to object in next loading.
-     * @param <T>     Type of value
-     */
-    public synchronized <T> void putObject(String key, T value, FastEncoder<T> encoder) {
-        putObjectValue(key, value, encoder);
-    }
-
-    public synchronized Editor putStringSet(String key, Set<String> set) {
-        putStringSetValue(key, set);
-        return this;
-    }
-
-    @Override
-    protected void removeKey(String key) {
-        remove(key);
-    }
-
     public synchronized Editor remove(String key) {
         lockAndCheckUpdate();
         handleChange(key);
@@ -479,8 +390,20 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         return this;
     }
 
-    public void putAll(Map<String, Object> values) {
-        putAll(values, null);
+    @Override
+    protected void handleChange(String key) {
+        if (!listeners.isEmpty()) {
+            changedKey.add(key);
+        }
+    }
+
+    private synchronized void notifyChangedKeys() {
+        if (!changedKey.isEmpty()) {
+            for (String key : changedKey) {
+                notifyListeners(key);
+            }
+            changedKey.clear();
+        }
     }
 
     public synchronized void force() {
@@ -578,7 +501,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
             if (!deletedFiles.isEmpty()) {
                 for (String oldFileName : deletedFiles) {
-                    FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
+                    FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
                 }
             }
 
@@ -625,7 +548,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         }
     }
 
-    private void releaseLock() {
+    private synchronized void releaseLock() {
         if (bFileLock != null) {
             try {
                 bFileLock.release();
@@ -739,12 +662,6 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
         }
     }
 
-    protected void handleChange(String key) {
-        if (!listeners.isEmpty()) {
-            changedKey.add(key);
-        }
-    }
-
     /**
      * Clear all data, take effect immediately (no need to call commit/apply).
      */
@@ -762,7 +679,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             aBuffer.putInt(0, packSize(0));
             aBuffer.putLong(4, 0L);
             getUpdateHash();
-            if (Util.makeFileIfNotExist(bFile)) {
+            if (Utils.makeFileIfNotExist(bFile)) {
                 setBFileSize(PAGE_SIZE);
                 syncAToB(0, DATA_START);
                 trySettingObserver();
@@ -771,7 +688,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
             error(e);
             needFullWrite = true;
         }
-        Util.deleteFile(new File(path + name));
+        Utils.deleteFile(new File(path + name));
         kvHandler.sendEmptyMessage(MSG_CLEAR);
     }
 
@@ -965,22 +882,13 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
                     notifyChangedKeys();
                     break;
                 case MSG_CLEAR:
-                    synchronized (MPFastKV.this) {
-                        notifyListeners(listeners, null);
-                    }
+                    notifyListeners(null);
                     break;
                 default:
                     break;
             }
         }
     };
-
-    private synchronized void notifyChangedKeys() {
-        for (String key : changedKey) {
-            notifyListeners(listeners, key);
-        }
-        changedKey.clear();
-    }
 
     private class KVFileObserver extends FileObserver {
         public KVFileObserver(String path) {
@@ -989,7 +897,7 @@ public final class MPFastKV extends AbsFastKV implements SharedPreferences, Shar
 
         @Override
         public void onEvent(int event, String path) {
-            // Delay a few time to filter frequency callbacks.
+            // Delay a few time to avoid frequency refresh.
             if (!kvHandler.hasMessages(MSG_REFRESH)) {
                 kvHandler.sendEmptyMessageDelayed(MSG_REFRESH, 30L);
             }

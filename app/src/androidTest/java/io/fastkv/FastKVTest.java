@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import io.fastkv.fastkvdemo.application.GlobalConfig;
+import io.fastkv.fastkvdemo.base.AppContext;
 import io.fastkv.fastkvdemo.fastkv.LongListEncoder;
 import io.fastkv.interfaces.FastEncoder;
 
@@ -524,7 +524,7 @@ public class FastKVTest {
         File srcFile = new File(TestHelper.DIR, "src.kva");
         if (!srcFile.exists()) {
 
-            InputStream inputStream = GlobalConfig.appContext.getAssets().open("src.kva");
+            InputStream inputStream = AppContext.INSTANCE.getContext().getAssets().open("src.kva");
             //this.getClass().getClassLoader().getResourceAsStream("src.kva");
             if (inputStream == null) {
                 throw new IOException("Could not load src.kva");
@@ -641,7 +641,7 @@ public class FastKVTest {
         if (file.exists()) {
             RandomAccessFile accessFile = new RandomAccessFile(file, "rw");
             FileChannel channel = accessFile.getChannel();
-            MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, Util.getPageSize());
+            MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, Utils.getPageSize());
             int index = (int) (System.currentTimeMillis() % 30);
             String name = fileName.endsWith(".kva") ? "A" : "B";
             System.out.println("Damage " + name + " file's byte at index:" + index);

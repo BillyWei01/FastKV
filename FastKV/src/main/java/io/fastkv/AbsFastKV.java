@@ -1,5 +1,12 @@
 package io.fastkv;
 
+import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -19,7 +26,7 @@ import io.fastkv.interfaces.FastLogger;
  * Abstract class of FastKV and MPFastKV.
  */
 @SuppressWarnings("rawtypes")
-abstract class AbsFastKV {
+abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor {
     protected static final String BOTH_FILES_ERROR = "both files error";
     protected static final String PARSE_DATA_FAILED = "parse dara failed";
     protected static final String OPEN_FILE_FAILED = "open file failed";
@@ -47,7 +54,7 @@ abstract class AbsFastKV {
     protected static final int BASE_GC_BYTES_THRESHOLD = 4096;
     protected final int INTERNAL_LIMIT = FastKVConfig.internalLimit;
 
-    protected static final int PAGE_SIZE = Util.getPageSize();
+    protected static final int PAGE_SIZE = Utils.getPageSize();
     protected static final int DOUBLE_LIMIT = Math.max(PAGE_SIZE << 1, 1 << 14);
     protected static final int TRUNCATE_THRESHOLD = DOUBLE_LIMIT << 1;
 
@@ -72,6 +79,11 @@ abstract class AbsFastKV {
     // It has to rewrite the data.
     protected boolean needRewrite = false;
 
+    // Make a 'closed' flag in case of some async threads still trying to update files.
+    // This flag is make for 'FastKV' now.
+    // There is no sign that 'MPFastKV' needs to support 'close'.
+    protected boolean closed = false;
+
     protected String tempExternalName;
     protected final WeakCache externalCache = new WeakCache();
     protected final WeakCache bigValueCache = new WeakCache();
@@ -80,6 +92,9 @@ abstract class AbsFastKV {
 
     protected int invalidBytes;
     protected final ArrayList<Segment> invalids = new ArrayList<>();
+
+    protected final ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners = new ArrayList<>();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     protected AbsFastKV(final String path, final String name, FastEncoder[] encoders, FastCipher cipher) {
         this.path = path;
@@ -150,7 +165,7 @@ abstract class AbsFastKV {
                 if (c.external) {
                     oldExternalFiles.add((String) c.value);
                     String bigStr = getStringFromFile(c, null);
-                    if(bigStr != null){
+                    if (bigStr != null) {
                         tempKV.putString(key, bigStr);
                     }
                 } else {
@@ -211,10 +226,10 @@ abstract class AbsFastKV {
         // Move external files
         File tempDir = new File(path, tempName);
         String currentDir = path + name;
-        Util.moveDirFiles(tempDir, currentDir);
-        Util.deleteFile(tempDir);
+        Utils.moveDirFiles(tempDir, currentDir);
+        Utils.deleteFile(tempDir);
         for (String name : oldExternalFiles) {
-            Util.deleteFile(new File(currentDir, name));
+            Utils.deleteFile(new File(currentDir, name));
         }
 
         needRewrite = false;
@@ -222,7 +237,7 @@ abstract class AbsFastKV {
 
     protected abstract void copyToMainFile(FastKV tempKV);
 
-    protected final boolean loadWithBlockingIO(File srcFile) throws IOException {
+    protected final boolean loadWithBlockingIO(@NonNull File srcFile) throws IOException {
         long fileLen = srcFile.length();
         if (fileLen == 0 || fileLen >= DATA_SIZE_LIMIT) {
             return false;
@@ -237,7 +252,7 @@ abstract class AbsFastKV {
             buffer = new FastBuffer(new byte[capacity]);
             fastBuffer = buffer;
         }
-        Util.readBytes(srcFile, buffer.hb, fileSize);
+        Utils.readBytes(srcFile, buffer.hb, fileSize);
         int size = buffer.getInt();
         if (size < 0) {
             return false;
@@ -257,8 +272,8 @@ abstract class AbsFastKV {
 
     protected final void deleteCFiles() {
         try {
-            Util.deleteFile(new File(path, name + C_SUFFIX));
-            Util.deleteFile(new File(path, name + TEMP_SUFFIX));
+            Utils.deleteFile(new File(path, name + C_SUFFIX));
+            Utils.deleteFile(new File(path, name + TEMP_SUFFIX));
         } catch (Exception e) {
             error(e);
         }
@@ -314,7 +329,7 @@ abstract class AbsFastKV {
                 } else {
                     int size = buffer.getShort() & 0xFFFF;
                     boolean external = (info & DataType.EXTERNAL_MASK) != 0;
-                    if (external && size != Util.NAME_SIZE) {
+                    if (external && size != Utils.NAME_SIZE) {
                         throw new IllegalStateException("name size not match");
                     }
                     switch (type) {
@@ -431,7 +446,7 @@ abstract class AbsFastKV {
         Collection<BaseContainer> values = data.values();
         for (BaseContainer c : values) {
             if (c.offset > gcStart) {
-                int index = Util.binarySearch(srcToShift, c.offset);
+                int index = Utils.binarySearch(srcToShift, c.offset);
                 int shift = srcToShift[(index << 1) + 1];
                 c.offset -= shift;
                 if (c.getType() >= DataType.STRING) {
@@ -531,8 +546,6 @@ abstract class AbsFastKV {
         }
     }
 
-    protected abstract void checkGC();
-
     protected final long shiftCheckSum(long checkSum, int offset) {
         int shift = (offset & 7) << 3;
         return (checkSum << shift) | (checkSum >>> (64 - shift));
@@ -602,7 +615,7 @@ abstract class AbsFastKV {
                 }
                 String str = getStringFromFile(c, cipher);
                 if (str == null || str.isEmpty()) {
-                    removeKey(key);
+                    remove(key);
                 } else {
                     bigValueCache.put(key, str);
                     return str;
@@ -618,7 +631,7 @@ abstract class AbsFastKV {
         String fileName = (String) c.value;
         byte[] cache = (byte[]) externalCache.get(fileName);
         try {
-            byte[] bytes = (cache != null) ? cache : Util.getBytes(new File(path + name, fileName));
+            byte[] bytes = (cache != null) ? cache : Utils.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 bytes = fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
                 return bytes != null ? new String(bytes, StandardCharsets.UTF_8) : null;
@@ -643,7 +656,7 @@ abstract class AbsFastKV {
                 }
                 byte[] bytes = getArrayFromFile(c, cipher);
                 if (bytes == null || bytes.length == 0) {
-                    removeKey(key);
+                    remove(key);
                 } else {
                     bigValueCache.put(key, bytes);
                     return bytes;
@@ -659,7 +672,7 @@ abstract class AbsFastKV {
         String fileName = (String) c.value;
         byte[] cache = (byte[]) externalCache.get(fileName);
         try {
-            byte[] bytes = cache != null ? cache : Util.getBytes(new File(path + name, fileName));
+            byte[] bytes = cache != null ? cache : Utils.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 return fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
             }
@@ -680,7 +693,7 @@ abstract class AbsFastKV {
                 }
                 Object obj = getObjectFromFile(c, cipher);
                 if (obj == null) {
-                    removeKey(key);
+                    remove(key);
                 } else {
                     bigValueCache.put(key, obj);
                     return (T) obj;
@@ -696,7 +709,7 @@ abstract class AbsFastKV {
         String fileName = (String) c.value;
         byte[] cache = (byte[]) externalCache.get(fileName);
         try {
-            byte[] bytes = cache != null ? cache : Util.getBytes(new File(path + name, fileName));
+            byte[] bytes = cache != null ? cache : Utils.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 bytes = fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
                 int tagSize = bytes[0] & 0xFF;
@@ -722,187 +735,20 @@ abstract class AbsFastKV {
         return getObject(key);
     }
 
-    public synchronized Map<String, Object> getAll() {
-        int size = data.size();
-        if (size == 0) {
-            return new HashMap<>();
-        }
-        Map<String, Object> result = new HashMap<>(size * 4 / 3 + 1);
-        for (Map.Entry<String, BaseContainer> entry : data.entrySet()) {
-            String key = entry.getKey();
-            BaseContainer c = entry.getValue();
-            Object value = null;
-            switch (c.getType()) {
-                case DataType.BOOLEAN:
-                    value = ((BooleanContainer) c).value;
-                    break;
-                case DataType.INT:
-                    value = ((IntContainer) c).value;
-                    break;
-                case DataType.FLOAT:
-                    value = ((FloatContainer) c).value;
-                    break;
-                case DataType.LONG:
-                    value = ((LongContainer) c).value;
-                    break;
-                case DataType.DOUBLE:
-                    value = ((DoubleContainer) c).value;
-                    break;
-                case DataType.STRING:
-                    StringContainer sc = (StringContainer) c;
-                    value = sc.external ? getStringFromFile(sc, cipher) : sc.value;
-                    break;
-                case DataType.ARRAY:
-                    ArrayContainer ac = (ArrayContainer) c;
-                    value = ac.external ? getArrayFromFile(ac, cipher) : ac.value;
-                    break;
-                case DataType.OBJECT:
-                    ObjectContainer oc = (ObjectContainer) c;
-                    value = oc.external ? getObjectFromFile(oc, cipher) : ((ObjectContainer) c).value;
-                    break;
-            }
-            if (value != null) {
-                result.put(key, value);
-            }
-        }
-        return result;
+    @Nullable
+    @Override
+    public Set<String> getStringSet(String key, @Nullable Set<String> defValues) {
+        Set<String> set = getStringSet(key);
+        return set != null ? set : defValues;
     }
 
-    /**
-     * Batch put objects.
-     * Only support type in [boolean, int, long, float, double, String, byte[], Set of String] and object with encoder.
-     *
-     * @param values   map of key to value
-     * @param encoders map of value Class to Encoder
-     */
-    public synchronized void putAll(Map<String, Object> values, Map<Class, FastEncoder> encoders) {
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            if (key != null && !key.isEmpty()) {
-                if (value instanceof String) {
-                    putStringValue(key, (String) value);
-                } else if (value instanceof Boolean) {
-                    putBooleanValue(key, (Boolean) value);
-                } else if (value instanceof Integer) {
-                    putIntValue(key, (Integer) value);
-                } else if (value instanceof Long) {
-                    putLongValue(key, (Long) value);
-                } else if (value instanceof Float) {
-                    putFloatValue(key, (Float) value);
-                } else if (value instanceof Double) {
-                    putDoubleValue(key, (Double) value);
-                } else if (value instanceof byte[]) {
-                    putArrayValue(key, (byte[]) value);
-                } else {
-                    encodeObject(key, value, encoders);
-                }
-            }
-        }
+    @Override
+    public Editor edit() {
+        return this;
     }
 
-    private void encodeObject(String key, Object value, Map<Class, FastEncoder> encoders) {
-        if (value instanceof Set) {
-            Set set = (Set) value;
-            if (set.isEmpty() || set.iterator().next() instanceof String) {
-                //noinspection unchecked
-                putStringSetValue(key, set);
-                return;
-            }
-        }
-        if (encoders != null) {
-            FastEncoder encoder = encoders.get(value.getClass());
-            if (encoder != null) {
-                //noinspection unchecked
-                putObjectValue(key, value, encoder);
-            } else {
-                warning(new Exception("missing encoder for type:" + value.getClass()));
-            }
-        } else {
-            warning(new Exception("missing encoders"));
-        }
-    }
-
-    protected abstract void ensureSize(int allocate);
-
-    protected void preparePutBytes() {
-        ensureSize(updateSize);
-        updateStart = dataEnd;
-        dataEnd += updateSize;
-        fastBuffer.position = updateStart;
-    }
-
-    protected void wrapHeader(String key, byte type) {
-        wrapHeader(key, type, TYPE_SIZE[type]);
-    }
-
-    protected void wrapHeader(String key, byte type, int valueSize) {
-        if (cipher != null) {
-            byte[] keyBytes = cipher.encrypt(key.getBytes(StandardCharsets.UTF_8));
-            int keySize = keyBytes.length;
-            prepareHeaderInfo(keySize, valueSize, type);
-            fastBuffer.put((byte) keySize);
-            System.arraycopy(keyBytes, 0, fastBuffer.hb, fastBuffer.position, keySize);
-            fastBuffer.position += keySize;
-        } else {
-            int keySize = FastBuffer.getStringSize(key);
-            prepareHeaderInfo(keySize, valueSize, type);
-            wrapKey(key, keySize);
-        }
-    }
-
-    protected void prepareHeaderInfo(int keySize, int valueSize, byte type) {
-        checkKeySize(keySize);
-        updateSize = 2 + keySize + valueSize;
-        preparePutBytes();
-        fastBuffer.put(type);
-    }
-
-    private void wrapKey(String key, int keySize) {
-        fastBuffer.put((byte) keySize);
-        if (keySize == key.length()) {
-            //noinspection deprecation
-            key.getBytes(0, keySize, fastBuffer.hb, fastBuffer.position);
-            fastBuffer.position += keySize;
-        } else {
-            fastBuffer.putString(key);
-        }
-    }
-
-    protected void remove(byte type, int start, int end) {
-        countInvalid(start, end);
-        byte newByte = (byte) (type | DataType.DELETE_MASK);
-        byte oldByte = fastBuffer.hb[start];
-        int shift = (start & 7) << 3;
-        checksum ^= ((long) (newByte ^ oldByte) & 0xFF) << shift;
-        fastBuffer.hb[start] = newByte;
-    }
-
-    protected void lockAndCheckUpdate() {
-        // prepare for MPFastKV
-    }
-
-    protected abstract void updateChange();
-
-    protected abstract void handleChange(String key);
-
-    protected abstract void removeKey(String key);
-
-    protected abstract void updateBoolean(byte value, int offset);
-
-    protected abstract void updateInt32(int value, long sum, int offset);
-
-    protected abstract void updateInt64(long value, long sum, int offset);
-
-    protected void updateBytes(int offset, byte[] bytes) {
-        int size = bytes.length;
-        checksum ^= fastBuffer.getChecksum(offset, size);
-        fastBuffer.position = offset;
-        fastBuffer.putBytes(bytes);
-        checksum ^= fastBuffer.getChecksum(offset, size);
-    }
-
-    protected void putBooleanValue(String key, boolean value) {
+    public synchronized Editor putBoolean(String key, boolean value) {
+        if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
         BooleanContainer c = (BooleanContainer) data.get(key);
@@ -918,9 +764,12 @@ abstract class AbsFastKV {
             updateBoolean((byte) (value ? 1 : 0), c.offset);
             handleChange(key);
         }
+        return this;
     }
 
-    protected void putIntValue(String key, int value) {
+    @Override
+    public synchronized Editor putInt(String key, int value) {
+        if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
         IntContainer c = (IntContainer) data.get(key);
@@ -939,9 +788,12 @@ abstract class AbsFastKV {
             updateInt32(newValue, sum, c.offset);
             handleChange(key);
         }
+        return this;
     }
 
-    protected void putFloatValue(String key, float value) {
+    @Override
+    public synchronized Editor putFloat(String key, float value) {
+        if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
         FloatContainer c = (FloatContainer) data.get(key);
@@ -960,14 +812,12 @@ abstract class AbsFastKV {
             updateInt32(newValue, sum, c.offset);
             handleChange(key);
         }
+        return this;
     }
 
-    private int getNewFloatValue(float value) {
-        int intValue = Float.floatToRawIntBits(value);
-        return cipher != null ? cipher.encrypt(intValue) : intValue;
-    }
-
-    protected void putLongValue(String key, long value) {
+    @Override
+    public synchronized Editor putLong(String key, long value) {
+        if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
         LongContainer c = (LongContainer) data.get(key);
@@ -986,9 +836,11 @@ abstract class AbsFastKV {
             updateInt64(newValue, sum, c.offset);
             handleChange(key);
         }
+        return this;
     }
 
-    protected void putDoubleValue(String key, double value) {
+    public synchronized Editor putDouble(String key, double value) {
+        if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
         DoubleContainer c = (DoubleContainer) data.get(key);
@@ -1007,17 +859,15 @@ abstract class AbsFastKV {
             updateInt64(newValue, sum, c.offset);
             handleChange(key);
         }
+        return this;
     }
 
-    private long getNewDoubleValue(double value) {
-        long longValue = Double.doubleToRawLongBits(value);
-        return cipher != null ? cipher.encrypt(longValue) : longValue;
-    }
-
-    protected void putStringValue(String key, String value) {
+    @Override
+    public synchronized Editor putString(String key, String value) {
+        if (closed) return this;
         checkKey(key);
         if (value == null) {
-            removeKey(key);
+            remove(key);
         } else {
             lockAndCheckUpdate();
             StringContainer c = (StringContainer) data.get(key);
@@ -1032,6 +882,7 @@ abstract class AbsFastKV {
             }
             handleChange(key);
         }
+        return this;
     }
 
     /**
@@ -1100,10 +951,11 @@ abstract class AbsFastKV {
         }
     }
 
-    protected void putArrayValue(String key, byte[] value) {
+    public synchronized Editor putArray(String key, byte[] value) {
+        if (closed) return this;
         checkKey(key);
         if (value == null) {
-            removeKey(key);
+            remove(key);
         } else {
             lockAndCheckUpdate();
             ArrayContainer c = (ArrayContainer) data.get(key);
@@ -1111,9 +963,18 @@ abstract class AbsFastKV {
             addOrUpdate(key, value, newBytes, c, DataType.ARRAY);
             handleChange(key);
         }
+        return this;
     }
 
-    protected <T> void putObjectValue(String key, T value, FastEncoder<T> encoder) {
+    /**
+     * @param key     The name of the data to modify
+     * @param value   The new value
+     * @param encoder The encoder to encode value to byte[], encoder must register in  Builder.encoder(),
+     *                for decoding byte[] to object in next loading.
+     * @param <T>     Type of value
+     */
+    public synchronized <T> Editor putObject(String key, T value, FastEncoder<T> encoder) {
+        if (closed) return this;
         checkKey(key);
         if (encoder == null) {
             throw new IllegalArgumentException("Encoder is null");
@@ -1127,8 +988,8 @@ abstract class AbsFastKV {
         }
 
         if (value == null) {
-            removeKey(key);
-            return;
+            remove(key);
+            return this;
         }
         byte[] objBytes = null;
         try {
@@ -1137,8 +998,8 @@ abstract class AbsFastKV {
             error(e);
         }
         if (objBytes == null) {
-            removeKey(key);
-            return;
+            remove(key);
+            return this;
         }
 
         // assemble object bytes
@@ -1154,17 +1015,240 @@ abstract class AbsFastKV {
         byte[] newBytes = cipher != null ? cipher.encrypt(bytes) : bytes;
         addOrUpdate(key, value, newBytes, c, DataType.OBJECT);
         handleChange(key);
+
+        return this;
     }
 
-    protected void putStringSetValue(String key, Set<String> set) {
+    public synchronized Editor putStringSet(String key, Set<String> set) {
+        if (closed) return this;
         if (set == null) {
-            removeKey(key);
+            remove(key);
         } else {
-            putObjectValue(key, set, StringSetEncoder.INSTANCE);
+            putObject(key, set, StringSetEncoder.INSTANCE);
+        }
+        return this;
+    }
+
+    protected synchronized void notifyListeners(String key) {
+        for (SharedPreferences.OnSharedPreferenceChangeListener listener : listeners) {
+            mainHandler.post(() -> listener.onSharedPreferenceChanged(this, key));
         }
     }
 
+    @Override
+    public synchronized void registerOnSharedPreferenceChangeListener(
+            OnSharedPreferenceChangeListener listener) {
+        if (listener == null) {
+            return;
+        }
+        if (!listeners.contains(listener)) {
+            listeners.add(listener);
+        }
+    }
+
+    @Override
+    public synchronized void unregisterOnSharedPreferenceChangeListener(
+            OnSharedPreferenceChangeListener listener) {
+        listeners.remove(listener);
+    }
+
+    @Override
+    public synchronized Map<String, Object> getAll() {
+        int size = data.size();
+        if (size == 0) {
+            return new HashMap<>();
+        }
+        Map<String, Object> result = new HashMap<>(size * 4 / 3 + 1);
+        for (Map.Entry<String, BaseContainer> entry : data.entrySet()) {
+            String key = entry.getKey();
+            BaseContainer c = entry.getValue();
+            Object value = null;
+            switch (c.getType()) {
+                case DataType.BOOLEAN:
+                    value = ((BooleanContainer) c).value;
+                    break;
+                case DataType.INT:
+                    value = ((IntContainer) c).value;
+                    break;
+                case DataType.FLOAT:
+                    value = ((FloatContainer) c).value;
+                    break;
+                case DataType.LONG:
+                    value = ((LongContainer) c).value;
+                    break;
+                case DataType.DOUBLE:
+                    value = ((DoubleContainer) c).value;
+                    break;
+                case DataType.STRING:
+                    StringContainer sc = (StringContainer) c;
+                    value = sc.external ? getStringFromFile(sc, cipher) : sc.value;
+                    break;
+                case DataType.ARRAY:
+                    ArrayContainer ac = (ArrayContainer) c;
+                    value = ac.external ? getArrayFromFile(ac, cipher) : ac.value;
+                    break;
+                case DataType.OBJECT:
+                    ObjectContainer oc = (ObjectContainer) c;
+                    value = oc.external ? getObjectFromFile(oc, cipher) : ((ObjectContainer) c).value;
+                    break;
+            }
+            if (value != null) {
+                result.put(key, value);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Batch put objects.
+     * Only support type in [boolean, int, long, float, double, String, byte[], Set of String] and object with encoder.
+     *
+     * @param values   map of key to value
+     * @param encoders map of value Class to Encoder
+     */
+    public synchronized void putAll(Map<String, Object> values, Map<Class, FastEncoder> encoders) {
+        if (closed) return;
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (key != null && !key.isEmpty()) {
+                if (value instanceof String) {
+                    putString(key, (String) value);
+                } else if (value instanceof Boolean) {
+                    putBoolean(key, (Boolean) value);
+                } else if (value instanceof Integer) {
+                    putInt(key, (Integer) value);
+                } else if (value instanceof Long) {
+                    putLong(key, (Long) value);
+                } else if (value instanceof Float) {
+                    putFloat(key, (Float) value);
+                } else if (value instanceof Double) {
+                    putDouble(key, (Double) value);
+                } else if (value instanceof byte[]) {
+                    putArray(key, (byte[]) value);
+                } else {
+                    encodeObject(key, value, encoders);
+                }
+            }
+        }
+    }
+
+    public void putAll(Map<String, Object> values) {
+        putAll(values, null);
+    }
+
+    private void encodeObject(String key, Object value, Map<Class, FastEncoder> encoders) {
+        if (value instanceof Set) {
+            Set set = (Set) value;
+            if (set.isEmpty() || set.iterator().next() instanceof String) {
+                //noinspection unchecked
+                putStringSet(key, set);
+                return;
+            }
+        }
+        if (encoders != null) {
+            FastEncoder encoder = encoders.get(value.getClass());
+            if (encoder != null) {
+                //noinspection unchecked
+                putObject(key, value, encoder);
+            } else {
+                warning(new Exception("missing encoder for type:" + value.getClass()));
+            }
+        } else {
+            warning(new Exception("missing encoders"));
+        }
+    }
+
+    protected void preparePutBytes() {
+        ensureSize(updateSize);
+        updateStart = dataEnd;
+        dataEnd += updateSize;
+        fastBuffer.position = updateStart;
+    }
+
+    private void wrapHeader(String key, byte type) {
+        wrapHeader(key, type, TYPE_SIZE[type]);
+    }
+
+    private void wrapHeader(String key, byte type, int valueSize) {
+        if (cipher != null) {
+            byte[] keyBytes = cipher.encrypt(key.getBytes(StandardCharsets.UTF_8));
+            int keySize = keyBytes.length;
+            prepareHeaderInfo(keySize, valueSize, type);
+            fastBuffer.put((byte) keySize);
+            System.arraycopy(keyBytes, 0, fastBuffer.hb, fastBuffer.position, keySize);
+            fastBuffer.position += keySize;
+        } else {
+            int keySize = FastBuffer.getStringSize(key);
+            prepareHeaderInfo(keySize, valueSize, type);
+            wrapKey(key, keySize);
+        }
+    }
+
+    private void prepareHeaderInfo(int keySize, int valueSize, byte type) {
+        checkKeySize(keySize);
+        updateSize = 2 + keySize + valueSize;
+        preparePutBytes();
+        fastBuffer.put(type);
+    }
+
+    private void wrapKey(String key, int keySize) {
+        fastBuffer.put((byte) keySize);
+        if (keySize == key.length()) {
+            //noinspection deprecation
+            key.getBytes(0, keySize, fastBuffer.hb, fastBuffer.position);
+            fastBuffer.position += keySize;
+        } else {
+            fastBuffer.putString(key);
+        }
+    }
+
+    protected void remove(byte type, int start, int end) {
+        countInvalid(start, end);
+        byte newByte = (byte) (type | DataType.DELETE_MASK);
+        byte oldByte = fastBuffer.hb[start];
+        int shift = (start & 7) << 3;
+        checksum ^= ((long) (newByte ^ oldByte) & 0xFF) << shift;
+        fastBuffer.hb[start] = newByte;
+    }
+
+    protected void lockAndCheckUpdate() {
+        // prepare for MPFastKV
+    }
+
+    protected abstract void handleChange(String key);
+
+    protected abstract void ensureSize(int allocate);
+
+    protected abstract void checkGC();
+
+    protected abstract void updateChange();
+
+    protected abstract void updateBoolean(byte value, int offset);
+
+    protected abstract void updateInt32(int value, long sum, int offset);
+
+    protected abstract void updateInt64(long value, long sum, int offset);
+
     protected abstract void removeOldFile(String oldFileName);
+
+    protected void updateBytes(int offset, byte[] bytes) {
+        int size = bytes.length;
+        checksum ^= fastBuffer.getChecksum(offset, size);
+        fastBuffer.position = offset;
+        fastBuffer.putBytes(bytes);
+        checksum ^= fastBuffer.getChecksum(offset, size);
+    }
+
+    private int getNewFloatValue(float value) {
+        int intValue = Float.floatToRawIntBits(value);
+        return cipher != null ? cipher.encrypt(intValue) : intValue;
+    }
+
+    private long getNewDoubleValue(double value) {
+        long longValue = Double.doubleToRawLongBits(value);
+        return cipher != null ? cipher.encrypt(longValue) : longValue;
+    }
 
     private void wrapStringValue(String value, int valueSize) {
         fastBuffer.putShort((short) valueSize);
@@ -1197,7 +1281,7 @@ abstract class AbsFastKV {
             boolean external = tempExternalName != null;
             if (external) {
                 bigValueCache.put(key, value);
-                size = Util.NAME_SIZE;
+                size = Utils.NAME_SIZE;
                 v = tempExternalName;
                 tempExternalName = null;
             } else {
@@ -1229,7 +1313,7 @@ abstract class AbsFastKV {
             if (external) {
                 bigValueCache.put(key, value);
                 c.value = tempExternalName;
-                c.valueSize = Util.NAME_SIZE;
+                c.valueSize = Utils.NAME_SIZE;
                 tempExternalName = null;
             } else {
                 c.value = value;
@@ -1249,7 +1333,7 @@ abstract class AbsFastKV {
             return wrapArray(key, value, type);
         } else {
             info("Large value, key: " + key + ", size: " + value.length);
-            String fileName = Util.randomName();
+            String fileName = Utils.randomName();
 
             // The reference of 'value' will not be gc before 'saveBytes' finish,
             // So before the value saving to disk, it could be read with 'externalCache'.
@@ -1260,7 +1344,7 @@ abstract class AbsFastKV {
             // But we have to save it asynchronously for efficiency.
             externalExecutor.execute(key, () -> {
                 long startTime = System.nanoTime();
-                if (!Util.saveBytes(new File(path + name, fileName), value)) {
+                if (!Utils.saveBytes(new File(path + name, fileName), value)) {
                     info("Write large value with key:" + key + " failed");
                 } else {
                     long t = System.nanoTime() - startTime;
@@ -1270,9 +1354,9 @@ abstract class AbsFastKV {
             });
 
             tempExternalName = fileName;
-            byte[] fileNameBytes = new byte[Util.NAME_SIZE];
+            byte[] fileNameBytes = new byte[Utils.NAME_SIZE];
             //noinspection deprecation
-            fileName.getBytes(0, Util.NAME_SIZE, fileNameBytes, 0);
+            fileName.getBytes(0, Utils.NAME_SIZE, fileNameBytes, 0);
             return wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
         }
     }

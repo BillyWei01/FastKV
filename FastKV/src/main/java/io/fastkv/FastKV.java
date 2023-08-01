@@ -12,7 +12,6 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
@@ -27,6 +26,13 @@ import io.fastkv.interfaces.FastEncoder;
  * async-block: write all data to disk with blocking I/O asynchronously, likes 'apply' of  SharePreferences.<br>
  * sync-block: write all data too, but it likes 'commit' of  SharePreferences.<br>
  * FastKV is not support multi-process, use {@link MPFastKV} if you want to support multi-process.
+ * <br>
+ * Note: <br>
+ * 1. Do not change file name once create, or you will loss data. <br>
+ * 2. Do not change cipher , or you will loss data.
+ * But it's okay to transfer from no cipher to applying cipher.<br>
+ * 3. Do not change value type for one key, or your app might crash.<br>
+ * 4. Do not use one key to save two kind of value (same as note 3).
  */
 @SuppressWarnings("rawtypes")
 public final class FastKV extends AbsFastKV {
@@ -49,7 +55,6 @@ public final class FastKV extends AbsFastKV {
     boolean autoCommit = true;
 
     private final Executor applyExecutor = new LimitExecutor();
-
 
     FastKV(final String path,
            final String name,
@@ -123,7 +128,7 @@ public final class FastKV extends AbsFastKV {
         File aFile = new File(path, name + A_SUFFIX);
         File bFile = new File(path, name + B_SUFFIX);
         try {
-            if (!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) {
+            if (!Utils.makeFileIfNotExist(aFile) || !Utils.makeFileIfNotExist(bFile)) {
                 error(new Exception(OPEN_FILE_FAILED));
                 toBlockingMode();
                 return;
@@ -269,7 +274,7 @@ public final class FastKV extends AbsFastKV {
         File aFile = new File(path, name + A_SUFFIX);
         File bFile = new File(path, name + B_SUFFIX);
         try {
-            if (!Util.makeFileIfNotExist(aFile) || !Util.makeFileIfNotExist(bFile)) {
+            if (!Utils.makeFileIfNotExist(aFile) || !Utils.makeFileIfNotExist(bFile)) {
                 throw new Exception(OPEN_FILE_FAILED);
             }
             RandomAccessFile aAccessFile = new RandomAccessFile(aFile, "rw");
@@ -316,55 +321,8 @@ public final class FastKV extends AbsFastKV {
         src.limit(src.capacity());
     }
 
-    public synchronized void putBoolean(String key, boolean value) {
-        putBooleanValue(key, value);
-    }
-
-    public synchronized void putInt(String key, int value) {
-        putIntValue(key, value);
-    }
-
-    public synchronized void putFloat(String key, float value) {
-        putFloatValue(key, value);
-    }
-
-    public synchronized void putLong(String key, long value) {
-        putLongValue(key, value);
-    }
-
-    public synchronized void putDouble(String key, double value) {
-        putDoubleValue(key, value);
-    }
-
-    public synchronized void putString(String key, String value) {
-        putStringValue(key, value);
-    }
-
-    public synchronized void putArray(String key, byte[] value) {
-        putArrayValue(key, value);
-    }
-
-    /**
-     * @param key     The name of the data to modify
-     * @param value   The new value
-     * @param encoder The encoder to encode value to byte[], encoder must register in  Builder.encoder(),
-     *                for decoding byte[] to object in next loading.
-     * @param <T>     Type of value
-     */
-    public synchronized <T> void putObject(String key, T value, FastEncoder<T> encoder) {
-        putObjectValue(key, value, encoder);
-    }
-
-    public synchronized void putStringSet(String key, Set<String> set) {
-        putStringSetValue(key, set);
-    }
-
-    @Override
-    protected void removeKey(String key) {
-        remove(key);
-    }
-
-    public synchronized void remove(String key) {
+    public synchronized Editor remove(String key) {
+        if (closed) return this;
         BaseContainer container = data.get(key);
         if (container != null) {
             final String oldFileName;
@@ -394,7 +352,7 @@ public final class FastKV extends AbsFastKV {
             removeStart = 0;
             if (oldFileName != null) {
                 if (writingMode == NON_BLOCKING) {
-                    FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
+                    FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
                 } else {
                     deletedFiles.add(oldFileName);
                 }
@@ -402,17 +360,17 @@ public final class FastKV extends AbsFastKV {
             checkGC();
             checkIfCommit();
         }
+        return this;
     }
 
-    public synchronized void clear() {
+    public synchronized Editor clear() {
+        if (closed) return this;
         clearData();
         if (writingMode != NON_BLOCKING) {
             deleteCFiles();
         }
-    }
-
-    public void putAll(Map<String, Object> values) {
-        putAll(values, null);
+        notifyListeners(null);
+        return this;
     }
 
     /**
@@ -423,6 +381,7 @@ public final class FastKV extends AbsFastKV {
      * @param encoders map of value Class to Encoder
      */
     public synchronized void putAll(Map<String, Object> values, Map<Class, FastEncoder> encoders) {
+        if (closed) return;
         if (writingMode != NON_BLOCKING) {
             autoCommit = false;
         }
@@ -438,6 +397,7 @@ public final class FastKV extends AbsFastKV {
      * The system crash or power off before data syncing to disk might make recently update loss.
      */
     public synchronized void force() {
+        if (closed) return;
         if (writingMode == NON_BLOCKING) {
             aBuffer.force();
             bBuffer.force();
@@ -455,12 +415,22 @@ public final class FastKV extends AbsFastKV {
     }
 
     public synchronized boolean commit() {
+        if (closed) return false;
         autoCommit = true;
         return commitToCFile();
     }
 
+    @Override
+    public synchronized void apply() {
+        if (closed) return;
+        autoCommit = true;
+        commitToCFile();
+    }
+
+    @Override
     protected void handleChange(String key) {
         checkIfCommit();
+        notifyListeners(key);
     }
 
     private void checkIfCommit() {
@@ -481,7 +451,7 @@ public final class FastKV extends AbsFastKV {
     private synchronized boolean writeToCFile() {
         try {
             File tmpFile = new File(path, name + TEMP_SUFFIX);
-            if (Util.makeFileIfNotExist(tmpFile)) {
+            if (Utils.makeFileIfNotExist(tmpFile)) {
                 RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw");
                 accessFile.setLength(dataEnd);
                 accessFile.write(fastBuffer.hb, 0, dataEnd);
@@ -505,7 +475,7 @@ public final class FastKV extends AbsFastKV {
     private void clearDeletedFiles() {
         if (!deletedFiles.isEmpty()) {
             for (String oldFileName : deletedFiles) {
-                FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
+                FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
             }
             deletedFiles.clear();
         }
@@ -513,8 +483,8 @@ public final class FastKV extends AbsFastKV {
 
     private void toBlockingMode() {
         writingMode = ASYNC_BLOCKING;
-        Util.closeQuietly(aChannel);
-        Util.closeQuietly(bChannel);
+        Utils.closeQuietly(aChannel);
+        Utils.closeQuietly(bChannel);
         aChannel = null;
         bChannel = null;
         aBuffer = null;
@@ -526,12 +496,12 @@ public final class FastKV extends AbsFastKV {
             try {
                 resetBuffer(aBuffer);
                 resetBuffer(bBuffer);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 toBlockingMode();
             }
         }
         resetMemory();
-        Util.deleteFile(new File(path + name));
+        Utils.deleteFile(new File(path + name));
     }
 
     private void resetBuffer(MappedByteBuffer buffer) throws IOException {
@@ -673,7 +643,7 @@ public final class FastKV extends AbsFastKV {
 
     protected void removeOldFile(String oldFileName) {
         if (writingMode == NON_BLOCKING) {
-            FastKVConfig.getExecutor().execute(() -> Util.deleteFile(new File(path + name, oldFileName)));
+            FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
         } else {
             deletedFiles.add(oldFileName);
         }
@@ -787,14 +757,13 @@ public final class FastKV extends AbsFastKV {
     }
 
     /**
-     * If you just need to save data to file and don't want to keep data in memory,
-     * you could call this after put/get data.
-     * Note:
-     * The key-value (kv) must be a temporary variable
-     * to ensure that the associated memory can be reclaimed
-     * after the variable's lifecycle ends.
+     * Close the kv instance. <br>
+     * If the kv closed, it will not accept any updates.<br>
+     * If the kv is cached, don't forget to remove it from cache once you call this method.
      */
     public synchronized void close() {
+        if (closed) return;
+        closed = true;
         if (writingMode == NON_BLOCKING) {
             try {
                 aChannel.force(false);
