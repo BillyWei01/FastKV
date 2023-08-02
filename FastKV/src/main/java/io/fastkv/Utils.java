@@ -165,10 +165,10 @@ class Utils {
 
     static int binarySearch(int[] a, int value) {
         int lo = 0;
-        int hi = (a.length >> 1) - 1;
+        int hi = a.length - 1;
         while (lo <= hi) {
             final int mid = (lo + hi) >>> 1;
-            final int midVal = a[mid << 1];
+            final int midVal = a[mid];
             if (midVal < value) {
                 lo = mid + 1;
             } else if (midVal > value) {
@@ -179,6 +179,7 @@ class Utils {
         }
         return hi;
     }
+
 
     static void logError(Exception e) {
         FastLogger logger = FastKVConfig.sLogger;

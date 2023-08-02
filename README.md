@@ -42,7 +42,7 @@ FastKV有以下特点：
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.0.3'
+    implementation 'io.github.billywei01:fastkv:2.1.0'
 }
 ```
 
@@ -186,10 +186,6 @@ https://juejin.cn/post/7018522454171582500
 由于提供给Android平台的版本和纯JDK的版本的差异越来越多，所以分开仓库来维护。<br>
 纯JDK版本的链接为：<br>
 https://github.com/BillyWei01/FastKV-Java
-
-## 5. 讨论
-创建了一个QQ群：436359235 <br>
-对FastKV感兴趣的朋友可以加群讨论，提建议，提BUG，都可以。
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.

@@ -10,7 +10,6 @@ import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -661,74 +660,28 @@ public final class FastKV extends AbsFastKV {
         }
     }
 
-    void gc(int allocate) {
-        Collections.sort(invalids);
-        mergeInvalids();
-
-        final Segment head = invalids.get(0);
-        final int gcStart = head.start;
-        final int newDataEnd = dataEnd - invalidBytes;
-        final int newDataSize = newDataEnd - DATA_START;
-        final int updateSize = newDataEnd - gcStart;
-        final int gcSize = dataEnd - gcStart;
-        final boolean fullChecksum = newDataSize < gcSize + updateSize;
-        if (!fullChecksum) {
-            checksum ^= fastBuffer.getChecksum(gcStart, gcSize);
-        }
-        // compact and record shift
-        int n = invalids.size();
-        final int remain = dataEnd - invalids.get(n - 1).end;
-        int shiftCount = (remain > 0) ? n : n - 1;
-        int[] srcToShift = new int[shiftCount << 1];
-        int desPos = head.start;
-        int srcPos = head.end;
-        for (int i = 1; i < n; i++) {
-            Segment q = invalids.get(i);
-            int size = q.start - srcPos;
-            System.arraycopy(fastBuffer.hb, srcPos, fastBuffer.hb, desPos, size);
-            int index = (i - 1) << 1;
-            srcToShift[index] = srcPos;
-            srcToShift[index + 1] = srcPos - desPos;
-            desPos += size;
-            srcPos = q.end;
-        }
-        if (remain > 0) {
-            System.arraycopy(fastBuffer.hb, srcPos, fastBuffer.hb, desPos, remain);
-            int index = (n - 1) << 1;
-            srcToShift[index] = srcPos;
-            srcToShift[index + 1] = srcPos - desPos;
-        }
-        clearInvalid();
-
-        if (fullChecksum) {
-            checksum = fastBuffer.getChecksum(DATA_START, newDataEnd - DATA_START);
-        } else {
-            checksum ^= fastBuffer.getChecksum(gcStart, newDataEnd - gcStart);
-        }
-        dataEnd = newDataEnd;
-
+    protected void syncCompatBuffer(int gcStart, int allocate, int gcUpdateSize) {
+        int newDataSize = dataEnd - DATA_START;
         int packedSize = packSize(newDataSize);
         if (writingMode == NON_BLOCKING) {
             aBuffer.putInt(0, -1);
             aBuffer.putLong(4, checksum);
             aBuffer.position(gcStart);
-            aBuffer.put(fastBuffer.hb, gcStart, updateSize);
+            aBuffer.put(fastBuffer.hb, gcStart, gcUpdateSize);
             aBuffer.putInt(0, packedSize);
             bBuffer.putInt(0, packedSize);
             bBuffer.putLong(4, checksum);
             bBuffer.position(gcStart);
-            bBuffer.put(fastBuffer.hb, gcStart, updateSize);
+            bBuffer.put(fastBuffer.hb, gcStart, gcUpdateSize);
         } else {
             fastBuffer.putInt(0, packedSize);
             fastBuffer.putLong(4, checksum);
         }
 
-        updateOffset(gcStart, srcToShift);
-        int expectedEnd = newDataEnd + allocate;
+        int expectedEnd = dataEnd + allocate;
         if (fastBuffer.hb.length - expectedEnd > TRUNCATE_THRESHOLD) {
             truncate(expectedEnd);
         }
-        info(GC_FINISH);
     }
 
     private void truncate(int expectedEnd) {
@@ -748,7 +701,7 @@ public final class FastKV extends AbsFastKV {
                 bChannel.truncate(newCapacity);
                 bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, newCapacity);
                 bBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 error(new Exception(MAP_FAILED, e));
                 toBlockingMode();
             }

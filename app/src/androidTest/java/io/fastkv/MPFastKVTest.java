@@ -709,7 +709,7 @@ public class MPFastKVTest {
         kv1.commit();
 
         try {
-            Thread.sleep(100L);
+            Thread.sleep(50L);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -753,7 +753,7 @@ public class MPFastKVTest {
 
         try {
             // Waiting kv1 to finish saving big value.
-            Thread.sleep(100L);
+            Thread.sleep(50L);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

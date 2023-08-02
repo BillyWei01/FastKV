@@ -36,4 +36,8 @@ public class TagExecutor {
             scheduledTags.remove(tag);
         }
     }
+
+    synchronized boolean isEmpty() {
+        return scheduledTags.isEmpty() && waitingTasks.isEmpty();
+    }
 }

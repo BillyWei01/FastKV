@@ -776,56 +776,11 @@ public final class MPFastKV extends AbsFastKV /*implements SharedPreferences, Sh
 
     protected void checkGC() {
         if (invalidBytes >= bytesThreshold() || invalids.size() >= BASE_GC_KEYS_THRESHOLD) {
-            gc();
+            gc(0);
         }
     }
 
-    void gc() {
-        Collections.sort(invalids);
-        mergeInvalids();
-
-        final Segment head = invalids.get(0);
-        final int gcStart = head.start;
-        final int newDataEnd = dataEnd - invalidBytes;
-        final int newDataSize = newDataEnd - DATA_START;
-        final int updateSize = newDataEnd - gcStart;
-        final int gcSize = dataEnd - gcStart;
-        final boolean fullChecksum = newDataSize < gcSize + updateSize;
-        if (!fullChecksum) {
-            checksum ^= fastBuffer.getChecksum(gcStart, gcSize);
-        }
-        // compact and record shift
-        int n = invalids.size();
-        final int remain = dataEnd - invalids.get(n - 1).end;
-        int shiftCount = (remain > 0) ? n : n - 1;
-        int[] srcToShift = new int[shiftCount << 1];
-        int desPos = head.start;
-        int srcPos = head.end;
-        for (int i = 1; i < n; i++) {
-            Segment q = invalids.get(i);
-            int size = q.start - srcPos;
-            System.arraycopy(fastBuffer.hb, srcPos, fastBuffer.hb, desPos, size);
-            int index = (i - 1) << 1;
-            srcToShift[index] = srcPos;
-            srcToShift[index + 1] = srcPos - desPos;
-            desPos += size;
-            srcPos = q.end;
-        }
-        if (remain > 0) {
-            System.arraycopy(fastBuffer.hb, srcPos, fastBuffer.hb, desPos, remain);
-            int index = (n - 1) << 1;
-            srcToShift[index] = srcPos;
-            srcToShift[index + 1] = srcPos - desPos;
-        }
-        clearInvalid();
-
-        if (fullChecksum) {
-            checksum = fastBuffer.getChecksum(DATA_START, newDataEnd - DATA_START);
-        } else {
-            checksum ^= fastBuffer.getChecksum(gcStart, newDataEnd - gcStart);
-        }
-        dataEnd = newDataEnd;
-
+    protected void syncCompatBuffer(int gcStart, int allocate, int gcUpdateSize) {
         int minUpdateStart = gcStart;
         for (int i = 0; i < updateCount; i += 2) {
             int s = updateStartAndSize[i];
@@ -836,9 +791,6 @@ public final class MPFastKV extends AbsFastKV /*implements SharedPreferences, Sh
         updateStartAndSize[0] = minUpdateStart;
         updateStartAndSize[1] = dataEnd - minUpdateStart;
         updateCount = 2;
-
-        updateOffset(gcStart, srcToShift);
-        info(GC_FINISH);
     }
 
     private void truncate() {

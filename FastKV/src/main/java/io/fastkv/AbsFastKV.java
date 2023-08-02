@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +89,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected final WeakCache externalCache = new WeakCache();
     protected final WeakCache bigValueCache = new WeakCache();
 
-    private final TagExecutor externalExecutor = new TagExecutor();
+    protected final TagExecutor externalExecutor = new TagExecutor();
 
     protected int invalidBytes;
     protected final ArrayList<Segment> invalids = new ArrayList<>();
@@ -222,6 +223,15 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         data.putAll(tempKV.data);
 
         copyToMainFile(tempKV);
+
+        // Waiting for moving external files
+        while (!tempKV.externalExecutor.isEmpty()) {
+            try {
+                //noinspection BusyWait
+                Thread.sleep(10L);
+            } catch (Exception ignore) {
+            }
+        }
 
         // Move external files
         File tempDir = new File(path, tempName);
@@ -442,12 +452,67 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         }
     }
 
-    protected final void updateOffset(int gcStart, int[] srcToShift) {
+    protected void gc(int allocate) {
+        Collections.sort(invalids);
+        mergeInvalids();
+
+        final Segment head = invalids.get(0);
+        final int gcStart = head.start;
+        final int newDataEnd = dataEnd - invalidBytes;
+        final int newDataSize = newDataEnd - DATA_START;
+        final int gcUpdateSize = newDataEnd - gcStart;
+        final int gcSize = dataEnd - gcStart;
+        final boolean fullChecksum = newDataSize < gcSize + gcUpdateSize;
+        if (!fullChecksum) {
+            checksum ^= fastBuffer.getChecksum(gcStart, gcSize);
+        }
+        // compact and record shift
+        int n = invalids.size();
+        final int remain = dataEnd - invalids.get(n - 1).end;
+        int shiftCount = (remain > 0) ? n : n - 1;
+        int[] src = new int[shiftCount];
+        int[] shift = new int[shiftCount];
+        int desPos = head.start;
+        int srcPos = head.end;
+        for (int i = 1; i < n; i++) {
+            Segment q = invalids.get(i);
+            int size = q.start - srcPos;
+            System.arraycopy(fastBuffer.hb, srcPos, fastBuffer.hb, desPos, size);
+            int index = i - 1;
+            src[index] = srcPos;
+            shift[index] = srcPos - desPos;
+
+            desPos += size;
+            srcPos = q.end;
+        }
+        if (remain > 0) {
+            System.arraycopy(fastBuffer.hb, srcPos, fastBuffer.hb, desPos, remain);
+            int index = n - 1;
+            src[index] = srcPos;
+            shift[index] = srcPos - desPos;
+        }
+        clearInvalid();
+
+        if (fullChecksum) {
+            checksum = fastBuffer.getChecksum(DATA_START, newDataEnd - DATA_START);
+        } else {
+            checksum ^= fastBuffer.getChecksum(gcStart, newDataEnd - gcStart);
+        }
+        dataEnd = newDataEnd;
+
+        syncCompatBuffer(gcStart, allocate, gcUpdateSize);
+
+        updateOffset(gcStart, src, shift);
+
+        info(GC_FINISH);
+    }
+
+    protected final void updateOffset(int gcStart, int[] srcArray, int[] shiftArray) {
         Collection<BaseContainer> values = data.values();
         for (BaseContainer c : values) {
             if (c.offset > gcStart) {
-                int index = Utils.binarySearch(srcToShift, c.offset);
-                int shift = srcToShift[(index << 1) + 1];
+                int index = Utils.binarySearch(srcArray, c.offset);
+                int shift = shiftArray[index];
                 c.offset -= shift;
                 if (c.getType() >= DataType.STRING) {
                     ((VarContainer) c).start -= shift;
@@ -455,6 +520,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             }
         }
     }
+
+    protected abstract void syncCompatBuffer(int gcStart, int allocate, int gcUpdateSize);
 
     protected final void tryBlockingIO(File aFile, File bFile) {
         try {
