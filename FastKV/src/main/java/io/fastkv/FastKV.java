@@ -1,6 +1,7 @@
 package io.fastkv;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 
@@ -824,6 +825,31 @@ public final class FastKV extends AbsFastKV {
             }
             return kv;
         }
+    }
+
+    /**
+     * Adapt old SharePreferences,
+     * return a new SharedPreferences with storage strategy of FastKV.
+     * <p>
+     * Node: The old SharePreferences must implement getAll() method,
+     * otherwise can not import old data to new files.
+     *
+     * @param context       The context
+     * @param name          The name of SharePreferences
+     * @return The Wrapper of FastKV, which implement SharePreferences.
+     */
+    public static SharedPreferences adapt(Context context, String name) {
+        String path = context.getFilesDir().getAbsolutePath() + "/fastkv";
+        FastKV kv = new FastKV.Builder(path, name).build();
+        final String flag = "kv_import_flag";
+        if (!kv.contains(flag)) {
+            SharedPreferences oldPreferences = context.getSharedPreferences(name, Context.MODE_PRIVATE);
+            //noinspection unchecked
+            Map<String, Object> allData = (Map<String, Object>) oldPreferences.getAll();
+            kv.putAll(allData);
+            kv.putBoolean(flag, true);
+        }
+        return kv;
     }
 
     @Override

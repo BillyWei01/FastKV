@@ -122,21 +122,17 @@ refer to：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/ma
 
 ### 2.6 Migrate SharePreferences to FastKV
 
-SharePreferences supports getAll() , while fastkv supports putAll(),  so it is easy to import SharePreferences data to FastKV.
+It is easy to migrate SharePreferences to FastKV.
 
 ```java
-public class CommonStore {
-    public static final String NAME = "common_store";
-    // original case
-    // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+public class SpCase {
+   public static final String NAME = "common_store";
+   
+   // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
 
-    // import data of SharedPreferences
-    public static final SharedPreferences preferences = FastPreferences.adapt(GlobalConfig.appContext, NAME);
+   public static final SharedPreferences preferences = FastKV.adapt(AppContext.INSTANCE.getContext(), NAME);
 }
 ```
-
-[FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/FastPreferences.java)
-is the implementation class of SharedPreferences, which uses FastKV to store key-values.
 
 ### 2.7 Migrate MMKV to FastKV
 Since MMKV does not implement the 'getAll' interface, it cannot be migrated at once like SharePreferences. <br>

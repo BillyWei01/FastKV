@@ -110,21 +110,19 @@ FastKV kv = FastKV.Builder(path, name)
 
 ### 2.6 迁移 SharePreferences 到 FastKV
 
-SP支持getAll接口，而FastKV支持putAll接口，所以导入SP数据到FastKV很简单。
+FastKV实现了SharedPreferences接口，并且提供了迁移SP数据的方法。<br>
+用法如下：
 
 ```java
-public class CommonStore {
-    public static final String NAME = "common_store";
-    // 原本的获取SP的方法
-    // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
-
-    // 导入原SP数据
-    public static final SharedPreferences preferences = FastPreferences.adapt(GlobalConfig.appContext, NAME);
+public class SpCase {
+   public static final String NAME = "common_store";
+   // 原本的获取SP的方法
+   // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+   
+   // 导入原SP数据
+   public static final SharedPreferences preferences = FastKV.adapt(AppContext.INSTANCE.getContext(), NAME);
 }
 ```
-
-FastPreferences的代码实现：[FastPreferences](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/FastPreferences.java) <br>
-FastPreferences是SharedPreferences的实现类，由于接口不变，用FastPreferences替换之后，不需要改动其他代码。<br>
 
 ### 2.7 迁移 MMKV 到 FastKV
 由于MMKV没有实现 'getAll' 接口，所以无法像SharePreferences一样一次性迁移。<br>
@@ -139,7 +137,7 @@ MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接�
 和 [TestService](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/TestService.kt)
 
 需要提醒的是，由于支持多进程需要维护更多的状态，MPFastKV 的写入要比FastKV慢不少，
-所以在不需要多进程访问的情况下，尽量用 FastKV 或 FastPreferences。
+所以在不需要多进程访问的情况下，尽量用 FastKV。
 
 ### 2.9 Kotlin 委托
 Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。 <br>
