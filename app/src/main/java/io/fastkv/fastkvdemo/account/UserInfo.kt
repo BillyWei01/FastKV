@@ -1,5 +1,6 @@
 package io.fastkv.fastkvdemo.account
 
+import android.util.ArrayMap
 import io.fastkv.fastkvdemo.fastkv.LongListEncoder
 import io.fastkv.fastkvdemo.fastkv.UserStorage
 import io.fastkv.interfaces.FastEncoder
@@ -7,7 +8,24 @@ import io.fastkv.interfaces.FastEncoder
 /**
  * 用户信息
  */
-object UserInfo : UserStorage("user_data") {
+object UserInfo : ShadowUserInfo(0L) {
+    private val map = ArrayMap<Long, ShadowUserInfo>()
+
+    @Synchronized
+    fun get(uid: Long): ShadowUserInfo {
+        return map.getOrPut(uid) {
+            ShadowUserInfo(uid)
+        }
+    }
+
+    @Synchronized
+    fun close(uid: Long) {
+        map.remove(uid)
+        closeFastKV(uid)
+    }
+}
+
+open class ShadowUserInfo(uid: Long) : UserStorage("user_info", uid) {
     override fun encoders(): Array<FastEncoder<*>> {
         return arrayOf(AccountInfo.ENCODER, LongListEncoder)
     }

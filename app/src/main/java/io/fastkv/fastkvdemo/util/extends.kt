@@ -22,8 +22,8 @@ fun View.onClick(interval: Long = 300L, block: () -> Unit) {
     this.setOnClickListener {
         val now = SystemClock.elapsedRealtime()
         if ((now - lastTime) >= interval) {
-            block()
             lastTime = now
+            block()
         }
     }
 }

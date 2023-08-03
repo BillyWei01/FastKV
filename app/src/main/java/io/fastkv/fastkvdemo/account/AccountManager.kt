@@ -11,13 +11,9 @@ object AccountManager {
         return AppContext.uid != 0L
     }
 
-    /**
-     * 切换到注销状态前，最好发送一下"注销“事件给存在“写入用户数据”的异步任务，
-     * 如果这些任务正在执行，则取消之。
-     * 具体原因可参考：[io.fastkv.fastkvdemo.fastkv.UserStorage]
-     */
     fun logout(): Boolean {
-        // Post“注销”的消息（这里就不演示了）
+        // close是可选项，影响不大
+        UserInfo.close(AppContext.uid)
 
         AppContext.uid = 0L
         AppState.user_id = 0L
@@ -51,20 +47,25 @@ object AccountManager {
     }
 
     private fun onSuccess(accountInfo: AccountInfo) {
+        val uid = accountInfo.uid
         // 首先第一件事情就是切换上下AppContext中的uid,
-        // 因为后面的存储可能与uid相关
-        AppContext.uid = accountInfo.uid
+        // 因为后面的存储和逻辑可能与uid相关
+        AppContext.uid = uid
 
         // 记录当前登陆的用户ID
-        AppState.user_id = accountInfo.uid
+        AppState.user_id = uid
 
-        UserInfo.userAccount = accountInfo
-        fetchUserInfo(accountInfo.uid)
+
+        // 写入信息，要直接获取uid对应的实例来写入
+        // 避免用户ID切换后，异步任务写错到切换后的实例中（串数据）
+        UserInfo.get(uid).userAccount = accountInfo
+
+        fetchUserInfo(uid)
     }
 
     // mock values
     private fun fetchUserInfo(uid: Long) {
-        UserInfo.run {
+        UserInfo.get(uid).run {
             isVip = true
             gender = Gender.CONVERTER.intToType((uid % 10000 % 3).toInt())
             fansCount = Random.nextInt(10000)

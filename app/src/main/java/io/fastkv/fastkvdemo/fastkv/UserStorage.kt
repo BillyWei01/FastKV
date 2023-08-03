@@ -1,53 +1,59 @@
 package io.fastkv.fastkvdemo.fastkv
 
+import android.util.LongSparseArray
+import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.base.AppContext
-import io.fastkv.fastkvdemo.fastkv.cipher.CipherManager
-import io.fastkv.fastkvdemo.fastkv.cipher.NumberCipher
-import io.fastkv.fastkvdemo.util.Utils
+import io.fastkv.fastkvdemo.manager.PathManager
 
 /**
- * 用户数据存储，同时区分环境和用户ID
+ * 用户数据存储
  *
- * 切换用户时，会自动切换groupId。
- * 切换账号时，需注意停止用户相关的后台任务，尤其是设计有“写入数据”的任务。
- * 否则可能会发生“切换用户前的后台任务获取的数据，写到当前用户的存储空间”的问题。
+ * 如果不同环境下的UID绝不会相等（比如测试环境uid从1万开始，正式环境uid从1亿开始，测试账号不回到达1亿），
+ * 则不需要再根据env区分。
+ * 否则，需要同时区分环境和uid
+ *
+ * 包用用户数据，在切换用户时需要注意不要让数据写错到另外用户的空间。
  */
-open class UserStorage(name: String) : GroupStorage(name) {
-    @Volatile
-    private var currentUid = -1L
+abstract class UserStorage(
+    private val name: String,
+    private val userId: Long
+) : KVData() {
+    companion object {
+        private val kvCache = LongSparseArray<HashMap<String, FastKV>>()
+    }
 
-    private var gid = AppContext.env.tag
-
-    override val groupId: String
+    override val kv: FastKV
         get() {
-            val uid = AppContext.uid
-            if (currentUid != uid) {
-                updateGroup(uid)
+            synchronized(kvCache) {
+                val uid = if (userId != 0L) userId else AppContext.uid
+                var group = kvCache.get(uid)
+                if (group == null) {
+                    group = HashMap()
+                    kvCache.put(uid, group)
+                }
+                return group.getOrPut(name) {
+                    val path = PathManager.fastKVDir + "/user/" + uid
+                    buildKV(path, name)
+                }
             }
-            return gid
         }
 
-    @Synchronized
-    private fun updateGroup(uid: Long) {
-        // Double check
-        if (currentUid != uid) {
-            val tag = AppContext.env.tag
-            if (currentUid >= 0) {
-                // 切换账号时，如果之前有登陆账号，则关闭之前的KV。
-                // 此操作为可选项：
-                // 1. 如果关闭，可以释放之前的KV的内存
-                // 2. 如果不关闭，切换回来时能直接读取
-                closeFastKV(uidToGid(currentUid, tag))
+    protected fun closeFastKV(uid: Long) {
+        synchronized(kvCache) {
+            kvCache[uid]?.let { group ->
+                group.remove(name)?.close()
             }
-            gid = uidToGid(uid, tag)
-            currentUid = uid
         }
     }
 
-    private fun uidToGid(uid: Long, tag: String): String {
-        // 先加密uid, 再用来构建groupId(会作为文件路径的一部分）
+
+    /*
+    // 区分环境同时加密uid
+    private fun encrypt(uid: Long): String {
+        val tag = AppContext.env.tag
         val encryptUid = CipherManager.numberCipher.encryptLong(uid)
         val uidStr = Utils.bytes2Hex(NumberCipher.long2Bytes(encryptUid))
-        return if (tag.isEmpty()) uidStr else "$tag-$uidStr"
+        return if (tag.isEmpty()) uidStr else "$uidStr-$tag"
     }
+    */
 }
