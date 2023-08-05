@@ -198,6 +198,7 @@ object Benchmark {
         return newStr
     }
 
+    // 对value进行微调，以使得每次输入的值不同。
     private fun tuningObject(value: Any, r: Random): Any {
         val diff = 2 - r.nextInt(5)
         return if (value is String) {
@@ -222,9 +223,13 @@ object Benchmark {
         }
     }
 
+    // 目前这个all有685个value, 可以设定条件控制input的key-value的数量
     private fun generateInputList(all: Map<String, *>): ArrayList<Pair<String, Any>> {
         val list = ArrayList<Pair<String, Any>>(all.size)
+        var count = 0;
         for ((key, value) in all) {
+            count++;
+            // if(count >= 500) break
             list.add(Pair(key, value))
         }
         return list

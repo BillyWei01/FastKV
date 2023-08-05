@@ -142,6 +142,24 @@ public class MPFastKVTest {
     }
 
     @Test
+    public void testRemove(){
+        String name = "test_remove";
+        clearFile(name);
+
+        MPFastKV kv1 = new MPFastKV.Builder(TestHelper.DIR, name).build();
+        kv1.putBoolean("b", true);
+        kv1.putInt("i", 100);
+        kv1.putLong("L", Long.MIN_VALUE);
+        kv1.remove("i");
+        kv1.commit();
+
+        MPFastKV kv2 = new MPFastKV(TestHelper.DIR, name, null, null, false);
+        Assert.assertNotEquals(100, kv2.getInt("i"));
+        Assert.assertEquals(Long.MIN_VALUE, kv2.getLong("L"));
+    }
+
+
+    @Test
     public void testGC() {
         String name = "test_gc";
         MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name).disableWatchFileChange().build();

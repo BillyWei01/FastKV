@@ -14,7 +14,6 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -33,14 +32,16 @@ import io.fastkv.interfaces.FastEncoder;
  * <p>
  * This class support cross process storage and update notify.
  * It implements API of SharePreferences, so it could be used as SharePreferences.<br>
- * As it's usage like SharePreferences, remember to call 'commit' or 'apply' after editing.
  * <p>
- * Note:
+ * Note 1: <br>
+ * Remember to call 'commit' or 'apply' after editing !!!
+ * <p>
+ * Note 2: <br>
  * To support cross process storage, MPFastKV needs to do many state checks, it's slower than {@link FastKV}.
  * So if you don't need to access the data in multi-process, just use FastKV.
  */
 @SuppressWarnings("rawtypes")
-public final class MPFastKV extends AbsFastKV /*implements SharedPreferences, SharedPreferences.Editor*/ {
+public final class MPFastKV extends AbsFastKV {
     private static final int MSG_REFRESH = 1;
     private static final int MSG_APPLY = 2;
     private static final int MSG_DATA_CHANGE = 3;
@@ -372,6 +373,8 @@ public final class MPFastKV extends AbsFastKV /*implements SharedPreferences, Sh
         if (container != null) {
             String oldFileName = null;
             data.remove(key);
+            bigValueCache.remove(key);
+            externalCache.remove(key);
             byte type = container.getType();
             if (type <= DataType.DOUBLE) {
                 int keySize = FastBuffer.getStringSize(key);

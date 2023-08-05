@@ -154,6 +154,22 @@ public class FastKVTest {
     }
 
     @Test
+    public void testRemove(){
+        String name = "test_remove";
+        clearFile(name);
+
+        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).blocking().build();
+        kv1.putBoolean("b", true);
+        kv1.putInt("i", 100);
+        kv1.putLong("L", Long.MIN_VALUE);
+        kv1.remove("i");
+
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, null, FastKV.SYNC_BLOCKING);
+        Assert.assertNotEquals(100, kv2.getInt("i"));
+        Assert.assertEquals(Long.MIN_VALUE, kv2.getLong("L"));
+    }
+
+    @Test
     public void testGC() {
         String name = "test_gc";
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).build();
@@ -185,8 +201,8 @@ public class FastKVTest {
         int gc3 = TestHelper.gcCount.get();
         Assert.assertEquals(1, gc3 - gc2);
 
-        FastKV kvt3 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
-        Assert.assertEquals(100, kvt3.getInt("int_1"));
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals(100, kv3.getInt("int_1"));
 
         for (int i = 0; i < 10; i++) {
             kv1.putString("string_" + i, longStr);
@@ -197,8 +213,8 @@ public class FastKVTest {
         }
         int gc4 = TestHelper.gcCount.get();
         Assert.assertEquals(1, gc4 - gc3);
-        FastKV kvt4 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
-        Assert.assertEquals(100, kvt4.getInt("int_1"));
+        FastKV kv4 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals(100, kv4.getInt("int_1"));
 
         kv1.remove("int_2");
 
@@ -212,11 +228,11 @@ public class FastKVTest {
         int truncate2 = TestHelper.truncateCount.get();
         Assert.assertEquals(1, truncate2 - truncate1);
 
-        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
-        Assert.assertEquals(100, kv3.getInt("int_1"));
-        Assert.assertEquals(0, kv3.getInt("int_2"));
-        Assert.assertEquals(kv1.getBoolean("bool_1"), kv3.getBoolean("bool_1"));
-        Assert.assertEquals("", kv3.getString("empty_str"));
+        FastKV kv5 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals(100, kv5.getInt("int_1"));
+        Assert.assertEquals(0, kv5.getInt("int_2"));
+        Assert.assertEquals(kv1.getBoolean("bool_1"), kv5.getBoolean("bool_1"));
+        Assert.assertEquals("", kv5.getString("empty_str"));
     }
 
     @Test
@@ -700,15 +716,8 @@ public class FastKVTest {
     }
 
     @Test
-    public void testAsyncBlockingMode() throws Exception {
-        String name = "test_blocking";
-        testSync(name);
-        testSync2(name);
-        testAsync(name);
-        testDisableAutoCommit(name);
-    }
-
-    private void testSync(String name) throws Exception {
+    public void testSync() throws Exception {
+        String name = "test_sync";
         File cFile = new File(TestHelper.DIR, name + ".kvc");
         if (cFile.exists()) {
             cFile.delete();
@@ -738,7 +747,9 @@ public class FastKVTest {
         Assert.assertEquals(100L, kv3.getLong("time"));
     }
 
-    private void testSync2(String name) throws IOException {
+    @Test
+    public void testSync2() throws IOException {
+        String name = "test_sync2";
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).blocking().build();
         kv1.clear();
 
@@ -776,7 +787,9 @@ public class FastKVTest {
         Assert.assertEquals("hello", kv2.getString("flag"));
     }
 
-    private void testAsync(String name) throws Exception {
+    @Test
+    public void testAsync() throws Exception {
+        String name = "test_async";
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).asyncBlocking().build();
         kv1.clear();
 
@@ -803,7 +816,9 @@ public class FastKVTest {
         Assert.assertEquals(100L, kv3.getLong("time"));
     }
 
-    private void testDisableAutoCommit(String name) throws Exception {
+    @Test
+    public void testDisableAutoCommit() throws Exception {
+        String name = "test_disable_auto_commit";
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).blocking().build();
         kv1.clear();
 

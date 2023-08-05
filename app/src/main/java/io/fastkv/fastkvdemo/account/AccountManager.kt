@@ -12,8 +12,10 @@ object AccountManager {
     }
 
     fun logout(): Boolean {
-        // close是可选项，影响不大
-        UserInfo.close(AppContext.uid)
+        // close是可选项：
+        // close的话能释放一些内存，
+        // 不close的话能加速下一次登录。
+        // UserInfo.close(AppContext.uid)
 
         AppContext.uid = 0L
         AppState.user_id = 0L

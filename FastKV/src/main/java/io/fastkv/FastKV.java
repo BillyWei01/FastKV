@@ -451,19 +451,13 @@ public final class FastKV extends AbsFastKV {
     private synchronized boolean writeToCFile() {
         try {
             File tmpFile = new File(path, name + TEMP_SUFFIX);
-            if (Utils.makeFileIfNotExist(tmpFile)) {
-                RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw");
-                accessFile.setLength(dataEnd);
-                accessFile.write(fastBuffer.hb, 0, dataEnd);
-                accessFile.close();
+            if (Utils.saveBytes(tmpFile, fastBuffer.hb, dataEnd)) {
                 File cFile = new File(path, name + C_SUFFIX);
-                if (!cFile.exists() || cFile.delete()) {
-                    if (tmpFile.renameTo(cFile)) {
-                        clearDeletedFiles();
-                        return true;
-                    } else {
-                        warning(new Exception("rename failed"));
-                    }
+                if (tmpFile.renameTo(cFile)) {
+                    clearDeletedFiles();
+                    return true;
+                } else {
+                    warning(new Exception("rename failed"));
                 }
             }
         } catch (Exception e) {

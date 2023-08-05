@@ -9,14 +9,14 @@ import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 abstract class KVData {
-    protected abstract val kv: FastKV
+    abstract val kv: FastKV
 
     protected open fun encoders(): Array<FastEncoder<*>>? {
         return null
     }
 
     protected open fun cipher(): FastCipher? {
-        // return CipherManager.defaultCipher // 对所有FastKV加密
+        // return CipherManager.defaultCipher // 对所有KVData实例加密
         return null
     }
 
@@ -25,14 +25,6 @@ abstract class KVData {
             .encoder(encoders())
             .cipher(cipher())
             .build()
-    }
-
-    fun contains(key: String): Boolean {
-        return kv.contains(key)
-    }
-
-    fun clear() {
-        kv.clear()
     }
 
     protected fun boolean(key: String, defValue: Boolean = false) = BooleanProperty(key, defValue)

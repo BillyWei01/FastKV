@@ -7,6 +7,8 @@ import io.fastkv.interfaces.FastEncoder
 
 /**
  * 用户信息
+ *
+ * 入职用
  */
 object UserInfo : ShadowUserInfo(0L) {
     private val map = ArrayMap<Long, ShadowUserInfo>()

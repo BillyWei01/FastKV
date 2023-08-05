@@ -42,9 +42,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected static final String C_SUFFIX = ".kvc";
     protected static final String TEMP_SUFFIX = ".tmp";
 
-    // Use for transfer data from not encrypted to encrypted.
-    protected static final String TEMP_PREFIX = "temp_";
-
     protected static final int DATA_SIZE_LIMIT = 1 << 28; // 256M
     protected static final int CIPHER_MASK = 1 << 30;
 
@@ -150,7 +147,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected void rewrite() {
         FastEncoder[] encoders = new FastEncoder[encoderMap.size()];
         encoders = encoderMap.values().toArray(encoders);
-        String tempName = TEMP_PREFIX + name;
+        String tempName = "temp_" + name;
 
         // Here we use FastKV with blocking mode and close 'autoCommit',
         // to make data only keep on memory.
@@ -1402,21 +1399,13 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             info("Large value, key: " + key + ", size: " + value.length);
             String fileName = Utils.randomName();
 
-            // The reference of 'value' will not be gc before 'saveBytes' finish,
+            // The reference of 'value' will not be gc before finishing 'saveBytes',
             // So before the value saving to disk, it could be read with 'externalCache'.
             externalCache.put(fileName, value);
 
-            // In fact, there is a small probability of causing consistency issues
-            // by saving bytes asynchronously,
-            // But we have to save it asynchronously for efficiency.
             externalExecutor.execute(key, () -> {
-                long startTime = System.nanoTime();
                 if (!Utils.saveBytes(new File(path + name, fileName), value)) {
                     info("Write large value with key:" + key + " failed");
-                } else {
-                    long t = System.nanoTime() - startTime;
-                    String formatTime = (t / 1000000) + "." + ((t % 1000000) / 10000);
-                    info("Write large value with key:" + key + ", use time:" + formatTime + " ms");
                 }
             });
 

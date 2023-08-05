@@ -88,22 +88,23 @@ class Utils {
     }
 
     static boolean saveBytes(File file, byte[] bytes) {
+        return saveBytes(file, bytes, bytes.length);
+    }
+
+    static boolean saveBytes(File file, byte[] bytes, int len) {
         try {
             File tmpFile = new File(file.getParent(), file.getName() + ".tmp");
             if (!makeFileIfNotExist(tmpFile)) {
+                logError(new Exception("create file failed"));
                 return false;
             }
-            RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw");
-            try {
-                accessFile.setLength(bytes.length);
-                accessFile.write(bytes);
-            } finally {
-                closeQuietly(accessFile);
+            try (RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw")) {
+                accessFile.setLength(len);
+                accessFile.write(bytes, 0, len);
             }
-            if (!file.exists() || file.delete()) {
-                return tmpFile.renameTo(file);
-            }
-        } catch (Throwable ignore) {
+            return tmpFile.renameTo(file);
+        } catch (Throwable t) {
+            logError(new Exception("save bytes failed", t));
         }
         return false;
     }
