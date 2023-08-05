@@ -3,23 +3,17 @@ package io.fastkv.fastkvdemo.fastkv.cipher;
 import androidx.annotation.NonNull;
 
 import java.nio.ByteBuffer;
-import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;
 
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.BadPaddingException;
 
-import io.fastkv.fastkvdemo.fastkv.FastKVLogger;
 import io.fastkv.interfaces.FastCipher;
+import io.github.fastaes.FastAES;
 
 public class AESCipher implements FastCipher {
     private final SecureRandom random = new SecureRandom();
-    private final byte[] iv = new byte[16];
-    private final SecretKey secretKey;
-    private final Cipher aesCipher;
+    private final byte[] aesKey;
     private final int ivMask;
 
     final NumberCipher numberCipher;
@@ -28,6 +22,8 @@ public class AESCipher implements FastCipher {
         if (aesKey == null || aesKey.length != 16) {
             throw new IllegalArgumentException("Require a key with length of 16");
         }
+        this.aesKey = aesKey;
+
         // Use 'pseudo-random' to make key expansion.
         long seed = ByteBuffer.wrap(aesKey).getLong();
         CustomRandom r1 = new CustomRandom(seed & 0xFFFFFFFFL);
@@ -43,14 +39,6 @@ public class AESCipher implements FastCipher {
         numberCipher = new NumberCipher(intKey);
 
         ivMask = r1.nextInt();
-        ByteBuffer ivBuffer = ByteBuffer.wrap(iv);
-        ivBuffer.position(4);
-        ivBuffer.putInt(r2.nextInt());
-        ivBuffer.putInt(r1.nextInt());
-        ivBuffer.putInt(r2.nextInt());
-
-        secretKey = new SecretKeySpec(aesKey, "AES");
-        aesCipher = getAesCipher();
     }
 
     // Use custom random instead of 'Random' of JDK,
@@ -78,71 +66,39 @@ public class AESCipher implements FastCipher {
         }
     }
 
-    /**
-     * Test AES encrypt/decrypt, if the function ok, return the cipher.
-     */
-    private Cipher getAesCipher() {
-        try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
-            byte[] x = new byte[]{1, 2, 3, 4};
-            byte[] y = aesEncrypt(cipher, x);
-            byte[] z = aesDecrypt(cipher, y);
-            if (Arrays.equals(x, z)) {
-                return cipher;
-            }
-        } catch (Exception e) {
-            logError(e);
-        }
-        return null;
-    }
-
     @Override
     public byte[] encrypt(@NonNull byte[] src) {
-        return aesCipher == null ? src : aesEncrypt(aesCipher, src);
+        // AES CBC 的初始向量时16个字节，但我们只随机化其前4个字节（只记录4字节的随机数可节约空间）。
+        // 然后就是，因为key-value的数量不是很多，32bits的随机初始向量足以提供随机性。
+        int s = random.nextInt();
+        int v = s ^ ivMask;
+        byte[] iv = new byte[16];
+        iv[0] = (byte) (v);
+        iv[1] = (byte) (v >> 8);
+        iv[2] = (byte) (v >> 16);
+        iv[3] = (byte) (v >> 24);
+        byte[] cipherText = FastAES.encrypt(src, aesKey, iv);
+        byte[] result = new byte[4 + cipherText.length];
+        result[0] = (byte) (s);
+        result[1] = (byte) (s >> 8);
+        result[2] = (byte) (s >> 16);
+        result[3] = (byte) (s >> 24);
+        System.arraycopy(cipherText, 0, result, 4, cipherText.length);
+        return result;
     }
 
     @Override
     public byte[] decrypt(@NonNull byte[] dst) {
-        return aesCipher == null ? dst : aesDecrypt(aesCipher, dst);
-    }
-
-    private synchronized byte[] aesEncrypt(Cipher aesCipher, @NonNull byte[] src) {
+        byte[] iv = new byte[16];
+        iv[0] = (byte) (dst[0] ^ ivMask);
+        iv[1] = (byte) (dst[1] ^ (ivMask >> 8));
+        iv[2] = (byte) (dst[2] ^ (ivMask >> 16));
+        iv[3] = (byte) (dst[3] ^ (ivMask >> 24));
         try {
-            // Because number of key-value is no much,
-            // it's safety enough to use 32 bits random iv.
-            // On the other hand, long iv needs more space.
-            int s = random.nextInt();
-            int v = s ^ ivMask;
-            iv[0] = (byte) (v);
-            iv[1] = (byte) (v >> 8);
-            iv[2] = (byte) (v >> 16);
-            iv[3] = (byte) (v >> 24);
-            IvParameterSpec ivSpec = new IvParameterSpec(iv);
-            aesCipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
-            byte[] cipherText = aesCipher.doFinal(src);
-            byte[] result = new byte[4 + cipherText.length];
-            result[0] = (byte) (s);
-            result[1] = (byte) (s >> 8);
-            result[2] = (byte) (s >> 16);
-            result[3] = (byte) (s >> 24);
-            System.arraycopy(cipherText, 0, result, 4, cipherText.length);
-            return result;
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private synchronized byte[] aesDecrypt(Cipher aesCipher, byte[] dst) {
-        try {
-            iv[0] = (byte) (dst[0] ^ ivMask);
-            iv[1] = (byte) (dst[1] ^ (ivMask >> 8));
-            iv[2] = (byte) (dst[2] ^ (ivMask >> 16));
-            iv[3] = (byte) (dst[3] ^ (ivMask >> 24));
-            IvParameterSpec ivSpec = new IvParameterSpec(iv);
-            aesCipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec);
-            return aesCipher.doFinal(dst, 4, dst.length - 4);
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException(e);
+            byte[] cipherText = Arrays.copyOfRange(dst, 4, dst.length);
+            return FastAES.decrypt(cipherText, aesKey, iv);
+        } catch (BadPaddingException e) {
+            throw new IllegalStateException("Bad padding", e);
         }
     }
 
@@ -164,9 +120,5 @@ public class AESCipher implements FastCipher {
     @Override
     public long decrypt(long dst) {
         return numberCipher.decryptLong(dst);
-    }
-
-    private void logError(Exception e) {
-        FastKVLogger.INSTANCE.e("Cipher", e);
     }
 }

@@ -249,6 +249,12 @@ public class MPFastKVTest {
         kv1.putInt("int", 100);
         kv1.commit();
 
+        try {
+            Thread.sleep(20L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals(longStr, kv2.getString("str"));
         Assert.assertEquals(100, kv2.getInt("int"));
@@ -260,6 +266,11 @@ public class MPFastKVTest {
 
         kv1.putString("str", longStr);
         kv1.commit();
+        try {
+            Thread.sleep(20L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         MPFastKV kv4 = new MPFastKV(TestHelper.MP_DIR, name, null, null, false);
         Assert.assertEquals(longStr, kv4.getString("str"));
     }
@@ -708,6 +719,7 @@ public class MPFastKVTest {
         MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name)
                 .cipher(TestHelper.cipher)
                 .encoder(encoders)
+                .disableWatchFileChange()
                 .build();
 
         String longStr = TestHelper.makeString(10000);
@@ -748,6 +760,7 @@ public class MPFastKVTest {
 
         // not encrypted
         MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name)
+                .disableWatchFileChange()
                 .encoder(encoders)
                 .build();
 
@@ -778,6 +791,7 @@ public class MPFastKVTest {
 
         // test encrypt
         MPFastKV kv2 = new MPFastKV(TestHelper.MP_DIR, name, encoders, TestHelper.cipher, false);
+
         Assert.assertEquals(d1, kv1.getDouble("double"), 0);
         Assert.assertEquals("hello", kv2.getString("s1"));
         Assert.assertEquals(100, kv2.getInt("int"));

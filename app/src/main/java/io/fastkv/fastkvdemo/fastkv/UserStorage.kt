@@ -68,6 +68,7 @@ abstract class UserStorage(
 
     private fun uidToDir(uid: Long): String {
         val tag = AppContext.env.tag
+        // 如有需要，可以对uid进行加密
 //        val encryptUid = CipherManager.numberCipher.encryptLong(uid)
 //        val uidStr = Utils.bytes2Hex(NumberCipher.long2Bytes(encryptUid))
 //        return if (tag.isEmpty()) uidStr else "$uidStr-$tag"

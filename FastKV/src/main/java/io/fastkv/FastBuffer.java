@@ -155,16 +155,8 @@ class FastBuffer {
         return cipher != null ? cipher.decrypt(value) : value;
     }
 
-    public float getFloat() {
-        return Float.intBitsToFloat(getInt());
-    }
-
     public float getFloat(FastCipher cipher) {
         return Float.intBitsToFloat(getInt(cipher));
-    }
-
-    public double getDouble() {
-        return Double.longBitsToDouble(getLong());
     }
 
     public double getDouble(FastCipher cipher) {

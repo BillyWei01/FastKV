@@ -16,8 +16,7 @@ abstract class KVData {
     }
 
     protected open fun cipher(): FastCipher? {
-        // return CipherManager.defaultCipher // 对所有KVData实例加密
-        return null
+        return CipherManager.defaultCipher
     }
 
     protected fun buildKV(path: String, name: String): FastKV {

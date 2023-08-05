@@ -24,28 +24,20 @@ public class KeyStoreHelper {
      * The first time it's generating by random,
      * and in later time it will return the bytes which be the same as the first time.
      * So it's suitable to use as symmetric key.
-     */
-    @RequiresApi(api = Build.VERSION_CODES.M)
-    public static byte[] getKey(byte[] seed) {
-        byte[] digest = hash(seed);
-        return digest != null ? paddingKey(digest) : paddingKey(seed);
-    }
-
-    /**
+     *
+     * <br>
      * HMAC = H(KEY XOR opad, H(KEY XOR ipad, text))
      * <br>
      * The 'KEY' is generated and stored by KeyStore.
      */
     @RequiresApi(api = Build.VERSION_CODES.M)
-    private synchronized static byte[] hash(@NonNull byte[] text) {
+    public static byte[] getKey(byte[] seed) {
         try {
             String algorithm = KeyProperties.KEY_ALGORITHM_HMAC_SHA256;
             KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
             keyStore.load(null);
-            Key key;
-            if (keyStore.containsAlias(ALIAS)) {
-                key = keyStore.getKey(ALIAS, null);
-            } else {
+            Key key = keyStore.getKey(ALIAS, null);
+            if (key== null) {
                 // Generate the key and save to KeyStore, next time we can get it from KeyStore.
                 KeyGenerator keyGenerator = KeyGenerator.getInstance(algorithm, "AndroidKeyStore");
                 keyGenerator.init(new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN).build());
@@ -53,24 +45,11 @@ public class KeyStoreHelper {
             }
             Mac mac = Mac.getInstance(algorithm);
             mac.init(key);
-            return mac.doFinal(text);
+            byte[] digest = mac.doFinal(seed);
+            return Arrays.copyOf(digest, 16);
         } catch (Exception e) {
             FastKVLogger.INSTANCE.e("Cipher", e);
         }
-        return null;
-    }
-
-    private static byte[] paddingKey(byte[] key) {
-        if (key == null) {
-            return new byte[16];
-        } else if (key.length > 16) {
-            return Arrays.copyOf(key, 16);
-        } else if (key.length == 16) {
-            return key;
-        } else {
-            byte[] padding = new byte[16];
-            System.arraycopy(key, 0, padding, 0, key.length);
-            return padding;
-        }
+        return new byte[16];
     }
 }
