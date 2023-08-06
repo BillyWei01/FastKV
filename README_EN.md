@@ -48,7 +48,7 @@ FastKV had been published to Maven Central:
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.1.1'
+    implementation 'io.github.billywei01:fastkv:2.1.2'
 }
 ```
 
