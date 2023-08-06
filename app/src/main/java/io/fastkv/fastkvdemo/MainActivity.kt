@@ -19,7 +19,8 @@ import kotlinx.android.synthetic.main.activity_main.account_info_tv
 import kotlinx.android.synthetic.main.activity_main.login_btn
 import kotlinx.android.synthetic.main.activity_main.switch_account_btn
 import kotlinx.android.synthetic.main.activity_main.test_multi_process_btn
-import kotlinx.android.synthetic.main.activity_main.test_performance_btn
+import kotlinx.android.synthetic.main.activity_main.test_performance_1_btn
+import kotlinx.android.synthetic.main.activity_main.test_performance_2_btn
 import kotlinx.android.synthetic.main.activity_main.tips_tv
 import kotlinx.android.synthetic.main.activity_main.user_info_tv
 import kotlinx.coroutines.CoroutineScope
@@ -77,17 +78,31 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        test_performance_btn.onClick {
-            tips_tv.text = getString(R.string.running_tips)
-            tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
-            test_performance_btn.isEnabled = false
-            serialChannel.runBlock {
-                Benchmark.start()
-                CoroutineScope(Dispatchers.Main).launch {
-                    tips_tv.text = getString(R.string.test_tips)
-                    tips_tv.setTextColor(Color.parseColor("#FF009900"))
-                    test_performance_btn.isEnabled = true
-                }
+        test_performance_1_btn.onClick {
+            startBenchMark(true)
+        }
+
+        test_performance_2_btn.onClick {
+            startBenchMark(false)
+        }
+    }
+
+    private fun startBenchMark(isBenchmark_1: Boolean) {
+        tips_tv.text = getString(R.string.running_tips)
+        tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
+        test_performance_1_btn.isEnabled = false
+        test_performance_2_btn.isEnabled = false
+        serialChannel.runBlock {
+            if (isBenchmark_1) {
+                Benchmark1.start()
+            } else {
+                Benchmark2.start()
+            }
+            CoroutineScope(Dispatchers.Main).launch {
+                tips_tv.text = getString(R.string.test_tips)
+                tips_tv.setTextColor(Color.parseColor("#FF009900"))
+                test_performance_1_btn.isEnabled = true
+                test_performance_2_btn.isEnabled = true
             }
         }
     }

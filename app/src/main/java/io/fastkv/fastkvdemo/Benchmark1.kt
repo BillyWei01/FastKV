@@ -3,43 +3,53 @@ package io.fastkv.fastkvdemo
 import android.content.Context
 import android.util.Log
 import android.util.Pair
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.floatPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.tencent.mmkv.MMKV
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.base.AppContext
-import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.manager.PathManager.fastKVDir
 import io.fastkv.fastkvdemo.util.IOUtil
 import io.fastkv.fastkvdemo.util.Utils
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.IOException
 import java.util.*
 
-object Benchmark {
-    private const val TAG = "Benchmark"
-    private val sp = AppContext.context.getSharedPreferences("sp", Context.MODE_PRIVATE)
-    private val dataStore = PreferenceDataStoreFactory.create { File(PathManager.filesDir, "data_store.preferences_pb") }
-    private val mmkv = MMKV.defaultMMKV()
-    private val fastkv = FastKV.Builder(fastKVDir, "fastkv").build()
+/**
+ * 对比
+ * SharePreferences-apply,
+ * mmkv,
+ * fastkv-mmap
+ */
+object Benchmark1 {
+    private const val TAG = "Benchmark-1"
+    private val sp = AppContext.context.getSharedPreferences("sp_1", Context.MODE_PRIVATE)
+    private val mmkv = MMKV.mmkvWithID("mmkv_1")
+    private val fastkv = FastKV.Builder(fastKVDir, "fastkv_1").build()
 
     private const val MILLION = 1000000L
     private var hadWarmingUp = false
+
+    // 最多685
+    private const val KV_COUNT = 100;
+
     suspend fun start() {
         try {
             runTest(AppContext.context)
         } catch (e: Throwable) {
             Log.e(TAG, e.message, e)
         }
+    }
+
+    // 目前这个all有685个value, 可以设定条件控制input的key-value的数量
+    private fun generateInputList(all: Map<String, *>): ArrayList<Pair<String, Any>> {
+        val list = ArrayList<Pair<String, Any>>(all.size)
+        var count = 0;
+        for ((key, value) in all) {
+            count++
+            if(count > KV_COUNT) break
+            list.add(Pair(key, value))
+        }
+        return list
     }
 
     @Throws(InterruptedException::class, IOException::class)
@@ -50,83 +60,84 @@ object Benchmark {
         var inputList: List<Pair<String, Any>>
         Log.i(TAG, "Clear data")
         sp.edit().clear().apply()
-        dataStore.edit { it.clear() }
         mmkv.clear()
         fastkv.clear()
         Log.i(TAG, "Start test")
-        val time = LongArray(4)
+        val time = LongArray(3)
         Arrays.fill(time, 0L)
         inputList = ArrayList(srcList)
 
-        Log.w(TAG, "We remove DataStore's case because it writes too slow")
         for (i in 0..0) {
             val t1 = System.nanoTime()
             applyToSp(inputList)
             val t2 = System.nanoTime()
-            // applyToDataStore(inputList)
-            val t3 = System.nanoTime()
             putToMMKV(inputList)
-            val t4 = System.nanoTime()
+            val t3 = System.nanoTime()
             putToFastKV(inputList)
-            val t5 = System.nanoTime()
+            val t4 = System.nanoTime()
             time[0] += t2 - t1
             time[1] += t3 - t2
             time[2] += t4 - t3
-            time[3] += t5 - t4
         }
-        Log.i(TAG, "Fill, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
-                    + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
+        Log.i(
+            TAG, "Fill, sp: " + time[0] / MILLION
+                    + ", mmkv: " + time[1] / MILLION
+                    + ", fastkv:" + time[2] / MILLION
         )
+
+
+        System.gc()
+        delay(50)
+
         Arrays.fill(time, 0L)
         // You could change the round value to accelerate the test.
-        var round = 10
+        var round = 3
         for (i in 0 until round) {
             inputList = getDistributedList(srcList, r)
             val t1 = System.nanoTime()
             applyToSp(inputList)
             val t2 = System.nanoTime()
-            // DataStore writes too slow.
-            // applyToDataStore(inputList)
-            val t3 = System.nanoTime()
             putToMMKV(inputList)
-            val t4 = System.nanoTime()
+            val t3 = System.nanoTime()
             putToFastKV(inputList)
-            val t5 = System.nanoTime()
+            val t4 = System.nanoTime()
             val a = t2 - t1
             val b = t3 - t2
             val c = t4 - t3
-            val d = t5 - t4
             time[0] += a
             time[1] += b
             time[2] += c
-            time[3] += d
-            Log.d(TAG, "Update, sp: " + a / MILLION + ", dataStore: " + b / MILLION
-                        + ", mmkv: " + c / MILLION + ", fastkv:" + d / MILLION
+            Log.d(
+                TAG, "Update, sp: " + a / MILLION
+                        + ", mmkv: " + b / MILLION
+                        + ", fastkv:" + c / MILLION
             )
         }
-        Log.i(TAG, "Update total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
-                    + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
+        Log.i(
+            TAG, "Update total time, sp: " + time[0] / MILLION
+                    + ", mmkv: " + time[1] / MILLION
+                    + ", fastkv:" + time[2] / MILLION
         )
 
-        round = 10
+        round = 3
         Arrays.fill(time, 0L)
         for (i in 0 until round) {
             val t1 = System.nanoTime()
             readFromSp(inputList)
             val t2 = System.nanoTime()
-            readFromDataStore(inputList)
-            val t3 = System.nanoTime()
             readFromMMKV(inputList)
-            val t4 = System.nanoTime()
+            val t3 = System.nanoTime()
             readFromFastKV(inputList)
-            val t5 = System.nanoTime()
+            val t4 = System.nanoTime()
+
             time[0] += t2 - t1
             time[1] += t3 - t2
             time[2] += t4 - t3
-            time[3] += t5 - t4
         }
-        Log.i(TAG, "Read total time, sp: " + time[0] / MILLION + ", dataStore: " + time[1] / MILLION
-                    + ", mmkv: " + time[2] / MILLION + ", fastkv:" + time[3] / MILLION
+        Log.i(
+            TAG, "Read total time, sp: " + time[0] / MILLION
+                    + ", mmkv: " + time[1] / MILLION
+                    + ", fastkv:" + time[2] / MILLION
         )
     }
 
@@ -134,15 +145,12 @@ object Benchmark {
     private suspend fun warmingUp(srcList: ArrayList<Pair<String, Any>>, r: Random) {
         if (!hadWarmingUp) {
             applyToSp(srcList)
-            //applyToDataStore(srcList)
             putToMMKV(srcList)
             putToFastKV(srcList)
 
             for (i in 0 until 5) {
                 val inputList = getDistributedList(srcList, r)
                 applyToSp(inputList)
-                // applyToDataStore takes too much time
-                // applyToDataStore(inputList)
                 putToMMKV(inputList)
                 putToFastKV(inputList)
             }
@@ -223,17 +231,6 @@ object Benchmark {
         }
     }
 
-    // 目前这个all有685个value, 可以设定条件控制input的key-value的数量
-    private fun generateInputList(all: Map<String, *>): ArrayList<Pair<String, Any>> {
-        val list = ArrayList<Pair<String, Any>>(all.size)
-        var count = 0;
-        for ((key, value) in all) {
-            count++;
-            // if(count >= 500) break
-            list.add(Pair(key, value))
-        }
-        return list
-    }
 
     private fun applyToSp(list: List<Pair<String, Any>>) {
         val editor = sp.edit()
@@ -274,49 +271,6 @@ object Benchmark {
                 sp.getStringSet(key, null)
             }
         }
-    }
-
-    private suspend fun applyToDataStore(list: List<Pair<String, Any>>) {
-        for (pair in list) {
-            val key = pair.first
-            val value = pair.second
-            if (value is String) {
-                dataStore.edit { it[stringPreferencesKey(key)] = value }
-            } else if (value is Boolean) {
-                dataStore.edit { it[booleanPreferencesKey(key)] = value }
-            } else if (value is Int) {
-                dataStore.edit { it[intPreferencesKey(key)] = value }
-            } else if (value is Long) {
-                dataStore.edit { it[longPreferencesKey(key)] = value }
-            } else if (value is Float) {
-                dataStore.edit { it[floatPreferencesKey(key)] = value }
-            } else if (value is Set<*>) {
-                dataStore.edit { it[stringSetPreferencesKey(key)] = value as Set<String> }
-            }
-        }
-    }
-
-    private suspend fun readFromDataStore(list: List<Pair<String, Any>>) {
-        val value = dataStore.data.map { setting ->
-            for (pair in list) {
-                val key = pair.first
-                val value = pair.second
-                if (value is String) {
-                    setting[stringPreferencesKey(key)]
-                } else if (value is Boolean) {
-                    setting[booleanPreferencesKey(key)]
-                } else if (value is Int) {
-                    setting[intPreferencesKey(key)]
-                } else if (value is Long) {
-                    setting[longPreferencesKey(key)]
-                } else if (value is Float) {
-                    setting[floatPreferencesKey(key)]
-                } else if (value is Set<*>) {
-                    setting[stringSetPreferencesKey(key)]
-                }
-            }
-        }
-        val v = value.first()
     }
 
     private fun putToMMKV(list: List<Pair<String, Any>>) {
