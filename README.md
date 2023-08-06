@@ -153,29 +153,48 @@ Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPref
    再比如，同一个key, A处putString, B处putInt (不管是否同一个版本)，也会抛出类型转换异常。
 
 ## 3. 性能测试
-- 测试数据：搜集APP中的SharePreferences汇总的部份key-value数据（经过随机混淆）得到总共四百多个key-value。<br>
-          由于日常使用过程中部分key-value访问多，部分访问少，所以构造了一个正态分布的访问序列。<br>
-          此过程循环多遍，分别求其总耗时。
-- 比较对象： SharePreferences/DataStore/MMKV。
-- 测试机型：荣耀20S。
+- 测试数据：搜集APP中的SharePreferenses汇总的部份key-value数据（经过随机混淆）得到总共六百多个key-value。
+- 测试机型：华为P30 Pro
+- 测试代码：[Benchmark-1](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark1.kt),    [Benchmark-2](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark2.kt)
 
-测试代码：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
+测试结果如下：
+左边表头为写入方式，上边表头为初始key-value数量（据此构造正态分布的输入序列）, 执行三次，分别求时间总和（单位ms)。
 
-测试结果：
+写入：
 
-| | 写入(ms) |读取(ms) 
----|---|---
-SharePreferences | 1182 | 2
-DataStore | 33277 | 2
-MMKV | 29 | 10
-FastKV  | 19 | 1 
+|  序号 | 方式 | 25 | 50 | 100 | 200 | 400| 600
+---|---|---|---|---|---|---|---
+1 | SP-commit | 51 | 184 |371 | 713 | 2171| 6528|
+2 | DataStore | 103 | 199| 473| 1043| 5578| 8470|
+3 | SQLiteKV  | 110 | 215 |446 | 856| 2728|5070 |
+4 | FastKV-commit  | 24 | 61 |135 |238 |483 | 661|
+5 | SP-apply | 5 | 8 |16 |58 |156 | 287 |
+6 | MMKV  | 2 | 3| 8| 8| 9| 10 |
+7 | FastKV-mmap    | 2 | 3 | 4| 4 | 5 | 6 |
 
-- SharePreferences提交用的是apply, 耗时依然不少。
-- DataStore写入很慢。
-- MMKV的读取比SharePreferences/DataStore要慢，写入则比之快不少。
-- FastKV无论读取还是写入都比其他方式要快。
+----
 
-现实中通常情况下不会有此差距，因为一般而言不会几百个key-value写到同一个文件，此处仅为显示极端情况下的对比，读者可自行调整参数看对比数据。
+读取：
+
+|  序号 |  | 25 | 50 | 100 | 200 | 400| 600
+---|---|---|---|---|---|---|---
+1 | SP-commit | 0 | 0 |0 |1 |2 | 3 |
+2 | DataStore | 3 | 5| 5| 5| 5| 8|
+3 | SQLiteKV  | 43 | 91 | 165 | 331 | 555 | 850|
+4 | FastKV-commit  | 0 | 0 | 1| 1 | 2 | 2 |
+5 | SP-apply | 0 | 0 |0 |1 |1 | 3 |
+6 | MMKV  | 0 | 0| 1| 1| 2| 4|
+7 | FastKV-mmap    | 0 | 0 | 1| 1 | 1 | 2 |
+
+关于谁快谁慢就不一一描述了，这里讲一些别的。
+
+- 前4种写入方式是同步写入，在put方法返回的时候，数据时写入到磁盘了。
+- SP-apply为异步写入，put函数结束时提交了一份数据到队列，并不意味着数据就写入磁盘了。
+- 后两种通过mmap写入，put函数结束后数据就写到内核空间了，除非系统崩溃或者断电，否则数据会在适当时机由系统写入。
+- MMKV在执行写入数据到mmap内存时如果程序中断，可能会导致文件损坏（这点前面有讲）。
+- SP无论是commit还是apply, 都是将数据提交给QueueWork的一个队列，由一个单例的[HandlerThread](http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/app/QueuedWork.java#getHandler)执行。而且，整个进程的所有SP都由该单例串行执行。
+- [SQLiteKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/sqlitekv/SQLiteKV.java) 目前没加内存缓存，所以读取就比较慢，加个HashMap就和其他的差不多了，但是要加内存缓存的话需要加一些编码来标记存入时的类型。
+- SQLite虽然也是”增量写入“，但是相对其他“轻量级”存储而言，执行路径确实比较长，所以总体也是比较耗时，尤其是数据量少的时候，尤其是数据量少的时候劣势更明显。
 
 ## 4. 参考链接
 相关博客： <br>
