@@ -204,7 +204,7 @@ public final class FastKV extends AbsFastKV {
                     }
                 }
             }
-        } catch (Throwable e) {
+        } catch (Exception e) {
             error(e);
             resetMemory();
             toBlockingMode();
@@ -696,7 +696,7 @@ public final class FastKV extends AbsFastKV {
                 bChannel.truncate(newCapacity);
                 bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, newCapacity);
                 bBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            } catch (Throwable e) {
+            } catch (Exception e) {
                 error(new Exception(MAP_FAILED, e));
                 toBlockingMode();
             }

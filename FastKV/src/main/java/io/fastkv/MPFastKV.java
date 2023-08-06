@@ -217,7 +217,7 @@ public final class MPFastKV extends AbsFastKV {
             } finally {
                 lock.release();
             }
-        } catch (Throwable e) {
+        } catch (Exception e) {
             error(e);
             resetMemory();
         }
@@ -273,7 +273,7 @@ public final class MPFastKV extends AbsFastKV {
                 aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, bufferSize);
                 aBuffer.order(ByteOrder.LITTLE_ENDIAN);
             }
-        } catch (Throwable e) {
+        } catch (Exception e) {
             error(e);
             return false;
         }
@@ -513,7 +513,7 @@ public final class MPFastKV extends AbsFastKV {
             }
 
             return true;
-        } catch (Throwable e) {
+        } catch (Exception e) {
             error(e);
             needFullWrite = true;
         } finally {
@@ -545,7 +545,7 @@ public final class MPFastKV extends AbsFastKV {
                     // set a timeout to apply data (will release lock as well).
                     kvHandler.sendEmptyMessageDelayed(MSG_APPLY, LOCK_TIMEOUT);
                 }
-            } catch (Throwable e) {
+            } catch (Exception e) {
                 error(e);
             }
         }
@@ -687,7 +687,7 @@ public final class MPFastKV extends AbsFastKV {
                 syncAToB(0, DATA_START);
                 trySettingObserver();
             }
-        } catch (Throwable e) {
+        } catch (Exception e) {
             error(e);
             needFullWrite = true;
         }
