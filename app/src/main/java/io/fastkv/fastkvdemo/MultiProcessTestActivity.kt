@@ -134,7 +134,7 @@ class MultiProcessTestActivity : AppCompatActivity(), Observer {
             .putInt("client", clientCount)
             .putString("str_1", str)
             .putString("str_2", longStr)
-            .commit()
+            .apply()
     }
 
     override fun onDestroy() {

@@ -31,7 +31,7 @@ class TestService : Service() {
                 val key = bundle.getString("key")
                 val value = bundle.getInt("value")
                 Log.d(TAG, "message, key:$key value:$value")
-                mpTestKv.putInt(key, value).commit()
+                mpTestKv.putInt(key, value).apply()
             }
         }
     }
