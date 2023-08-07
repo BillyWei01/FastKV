@@ -521,10 +521,21 @@ public final class MPFastKV extends AbsFastKV {
             if (!deletedFiles.isEmpty()) {
                 deletedFiles.clear();
             }
+            waitExternalWriting();
             releaseLock();
             kvHandler.sendEmptyMessage(MSG_DATA_CHANGE);
         }
         return false;
+    }
+
+    private void waitExternalWriting() {
+        while (!externalExecutor.isEmpty()) {
+            try {
+                //noinspection BusyWait
+                Thread.sleep(10L);
+            } catch (Exception ignore) {
+            }
+        }
     }
 
     protected void lockAndCheckUpdate() {

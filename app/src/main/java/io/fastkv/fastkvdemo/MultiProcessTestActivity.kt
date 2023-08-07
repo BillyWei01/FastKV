@@ -125,13 +125,15 @@ class MultiProcessTestActivity : AppCompatActivity(), Observer {
         clientCount++
         val ch = if (clientCount % 2 == 0) 'a' else 'b'
         val diff = clientCount % 10
+
         val bytes = ByteArray(2030 + diff)
         bytes.fill(ch.code.toByte(), 0, bytes.size)
         val str = String(bytes)
+        val longStr = str + str + str
         mpTestKv
             .putInt("client", clientCount)
             .putString("str_1", str)
-            .putString("str_2", str)
+            .putString("str_2", longStr)
             .commit()
     }
 
