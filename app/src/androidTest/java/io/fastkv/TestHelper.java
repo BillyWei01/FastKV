@@ -18,7 +18,7 @@ public class TestHelper {
     public static final String DIR = PathManager.INSTANCE.getFilesDir() + "/test/";
     public static final String MP_DIR = PathManager.INSTANCE.getFilesDir() + "/mp_test/";
 
-    static final FastCipher cipher = new AESCipher("abc1234567890xyz".getBytes());
+    static final FastCipher cipher = new AESCipher("1234567890abcdef".getBytes());
 
     static AtomicInteger gcCount = new AtomicInteger();
     static AtomicInteger truncateCount = new AtomicInteger();

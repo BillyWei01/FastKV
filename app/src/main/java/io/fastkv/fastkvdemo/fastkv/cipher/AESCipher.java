@@ -3,6 +3,7 @@ package io.fastkv.fastkvdemo.fastkv.cipher;
 import androidx.annotation.NonNull;
 
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Arrays;
 
@@ -22,55 +23,28 @@ public class AESCipher implements FastCipher {
 
     final NumberCipher numberCipher;
 
-    public AESCipher(byte[] aesKey) {
-        if (aesKey == null || aesKey.length != 16) {
-            throw new IllegalArgumentException("Require a key with length of 16");
+    public AESCipher(byte[] key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key can't be null");
         }
-        this.aesKey = aesKey;
-
-        // 用“伪随机”来生成副密钥（用于加密数值）和 iv掩码（用于加密初始向量）.
-        long seed = ByteBuffer.wrap(aesKey).getLong();
-        CustomRandom r1 = new CustomRandom(seed & 0xFFFFFFFFL);
-        CustomRandom r2 = new CustomRandom(seed >>> 32);
-
-        byte[] intKey = new byte[NumberCipher.KEY_LEN];
-        ByteBuffer buffer = ByteBuffer.wrap(intKey);
-        int n = NumberCipher.KEY_LEN / 8;
-        for (int i = 0; i < n; i++) {
-            buffer.putInt(r1.nextInt());
-            buffer.putInt(r2.nextInt());
+        byte[] digest = md5(key);
+        byte[] numberKey = new byte[NumberCipher.KEY_LEN];
+        System.arraycopy(digest, 0, numberKey, 0, 16);
+        if (key.length > 16) {
+            int len = Math.min(NumberCipher.KEY_LEN - 16, key.length - 16);
+            System.arraycopy(key, 16, numberKey, 16, len);
         }
-        numberCipher = new NumberCipher(intKey);
-
-        ivMask = r1.nextInt();
+        numberCipher = new NumberCipher(numberKey);
+        ivMask = ByteBuffer.wrap(numberKey, 16, 4).getInt();
+        aesKey = Arrays.copyOf(key, 16);
     }
 
-    /**
-     * Copy JDK的Random构建自定义的随机发生器，
-     * 之所以不直接用Random类，主要时担心不同的SDK版本的实现或者常数不同（应该不会，但是稳妥期间还是自定义一个吧），
-     * 那样的话升级Android版本可能就导致解密失败了。
-     */
-    private static class CustomRandom {
-        private static final long multiplier = 0x5DEECE66DL;
-        private static final long addend = 0xBL;
-        private static final long mask = (1L << 48) - 1;
-        private long seed;
-
-        CustomRandom(long seed) {
-            this.seed = seed;
+    private byte[] md5(byte[] bytes) {
+        try {
+            return MessageDigest.getInstance("MD5").digest(bytes);
+        } catch (Exception ignore) {
         }
-
-        protected int nextInt() {
-            long oldSeed = seed;
-            do {
-                seed = (oldSeed * multiplier + addend) & mask;
-                if (oldSeed != seed) {
-                    break;
-                }
-                oldSeed++;
-            } while (true);
-            return (int) (seed >>> 12);
-        }
+        return new byte[16];
     }
 
     private byte[] getIV() {

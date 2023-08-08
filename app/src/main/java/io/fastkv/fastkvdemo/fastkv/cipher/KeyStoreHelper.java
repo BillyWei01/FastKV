@@ -45,11 +45,10 @@ public class KeyStoreHelper {
             }
             Mac mac = Mac.getInstance(algorithm);
             mac.init(key);
-            byte[] digest = mac.doFinal(seed);
-            return Arrays.copyOf(digest, 16);
+            return mac.doFinal(seed);
         } catch (Exception e) {
             FastKVLogger.INSTANCE.e("Cipher", e);
         }
-        return new byte[16];
+        return new byte[32];
     }
 }

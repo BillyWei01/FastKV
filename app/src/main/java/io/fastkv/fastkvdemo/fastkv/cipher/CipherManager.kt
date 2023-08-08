@@ -25,7 +25,7 @@ object CipherManager {
         }
         cipherSetting.close()
 
-        val seed = "seed1234567890ab".toByteArray()
+        val seed = "1234567890abcdef1234567890ABCDEF".toByteArray()
         return if (usedKeyStore && overAndroidM) {
             AESCipher(KeyStoreHelper.getKey(seed))
         } else {
