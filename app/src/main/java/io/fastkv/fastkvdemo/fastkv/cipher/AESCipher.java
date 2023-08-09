@@ -27,24 +27,25 @@ public class AESCipher implements FastCipher {
         if (key == null) {
             throw new IllegalArgumentException("key can't be null");
         }
-        byte[] digest = md5(key);
-        byte[] numberKey = new byte[NumberCipher.KEY_LEN];
-        System.arraycopy(digest, 0, numberKey, 0, 16);
-        if (key.length > 16) {
-            int len = Math.min(NumberCipher.KEY_LEN - 16, key.length - 16);
-            System.arraycopy(key, 16, numberKey, 16, len);
-        }
-        numberCipher = new NumberCipher(numberKey);
-        ivMask = ByteBuffer.wrap(numberKey, 16, 4).getInt();
+
+        // NumberCipher正好需要长度为32的byte数组
+        byte[] digest = sha256(key);
+        numberCipher = new NumberCipher(digest);
+
+        // AES key可以取16字节或者32字节，16字节的话计算快一些
         aesKey = Arrays.copyOf(key, 16);
+
+        // ivMask用于隐藏iv的原始值，因为iv是随机生成的，
+        // 所以和ivMask异或之后也是随机的
+        ivMask = ByteBuffer.wrap(digest).getInt();
     }
 
-    private byte[] md5(byte[] bytes) {
+    private byte[] sha256(byte[] bytes) {
         try {
-            return MessageDigest.getInstance("MD5").digest(bytes);
+            return MessageDigest.getInstance("SHA-256").digest(bytes);
         } catch (Exception ignore) {
         }
-        return new byte[16];
+        return Arrays.copyOf(bytes, 32);
     }
 
     private byte[] getIV() {
