@@ -191,7 +191,7 @@ Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPref
 - 前4种写入方式是同步写入，在put方法返回的时候，数据时写入到磁盘了。
 - SP-apply为异步写入，put函数结束时提交了一份数据到队列，并不意味着数据就写入磁盘了。
 - 后两种通过mmap写入，put函数结束后数据就写到内核空间了，除非系统崩溃或者断电，否则数据会在适当时机由系统写入。
-- MMKV在执行写入数据到mmap内存时如果程序中断，可能会导致文件损坏（这点前面有讲）。
+- MMKV在执行写入数据到mmap内存时如果程序中断，可能会导致文件损坏。
 - SP无论是commit还是apply, 都是将数据提交给QueueWork的一个队列，由一个单例的[HandlerThread](http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/app/QueuedWork.java#getHandler)执行。而且，整个进程的所有SP都由该单例串行执行。
 - [SQLiteKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/sqlitekv/SQLiteKV.java) 目前没加内存缓存，所以读取就比较慢，加个HashMap就和其他的差不多了，但是要加内存缓存的话需要加一些编码来标记存入时的类型。
 - SQLite虽然也是”增量写入“，但是相对其他“轻量级”存储而言，执行路径确实比较长，所以总体也是比较耗时，尤其是数据量少的时候，尤其是数据量少的时候劣势更明显。
