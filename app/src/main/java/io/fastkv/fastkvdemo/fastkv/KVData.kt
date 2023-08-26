@@ -48,6 +48,14 @@ abstract class KVData {
 
     protected fun combineKey(key: String) = CombineKeyProperty(key)
 
+    protected fun string2String(key: String) = StringToStringProperty(key)
+
+    protected fun string2Int(key: String) = StringToIntProperty(key)
+
+    protected fun string2Boolean(key: String) = StringToBooleanProperty(key)
+
+    protected fun int2Boolean(key: String) = IntToBooleanProperty(key)
+
     class BooleanProperty(private val key: String, private val defValue: Boolean) :
         ReadWriteProperty<KVData, Boolean> {
         override fun getValue(thisRef: KVData, property: KProperty<*>): Boolean {
@@ -184,7 +192,7 @@ abstract class KVData {
 
     inner class CombineKV(private val preKey: String) {
         private fun combineKey(key: String): String {
-            return "$preKey&$key"
+            return preKey + KEY_SEPARATOR + key
         }
 
         fun containsKey(key: String): Boolean {
@@ -235,19 +243,19 @@ abstract class KVData {
             return kv.getDouble(combineKey(key), defValue)
         }
 
-        fun putString(key: String, value: String) {
+        fun putString(key: String, value: String?) {
             kv.putString(combineKey(key), value)
         }
 
-        fun getString(key: String, defValue: String = ""): String {
+        fun getString(key: String, defValue: String? = null): String? {
             return kv.getString(combineKey(key), null) ?: defValue
         }
 
-        fun putArray(key: String, value: ByteArray) {
+        fun putArray(key: String, value: ByteArray?) {
             kv.putArray(combineKey(key), value)
         }
 
-        fun getArray(key: String, defValue: ByteArray = EMPTY_ARRAY): ByteArray {
+        fun getArray(key: String, defValue: ByteArray? = null): ByteArray? {
             return kv.getArray(combineKey(key), defValue)
         }
 
@@ -260,8 +268,87 @@ abstract class KVData {
         }
     }
 
+    inner class StringToStringProperty(preKey: String) : ReadOnlyProperty<KVData, String2String> {
+        private val mapper = String2String(CombineKV(preKey))
+        override fun getValue(thisRef: KVData, property: KProperty<*>): String2String {
+            return mapper
+        }
+    }
+
+    inner class StringToIntProperty(preKey: String) : ReadOnlyProperty<KVData, String2Int> {
+        private val mapper = String2Int(CombineKV(preKey))
+        override fun getValue(thisRef: KVData, property: KProperty<*>): String2Int {
+            return mapper
+        }
+    }
+
+    inner class StringToBooleanProperty(preKey: String) : ReadOnlyProperty<KVData, String2Boolean> {
+        private val mapper = String2Boolean(CombineKV(preKey))
+        override fun getValue(thisRef: KVData, property: KProperty<*>): String2Boolean {
+            return mapper
+        }
+    }
+
+    inner class IntToBooleanProperty(preKey: String) : ReadOnlyProperty<KVData, Int2Boolean> {
+        private val mapper = Int2Boolean(CombineKV(preKey))
+        override fun getValue(thisRef: KVData, property: KProperty<*>): Int2Boolean {
+            return mapper
+        }
+    }
+
     companion object {
-        val EMPTY_ARRAY = ByteArray(0)
+        private val EMPTY_ARRAY = ByteArray(0)
+        private const val KEY_SEPARATOR = "-&-"
+    }
+}
+
+open class KVMapper(protected val combineKV: KVData.CombineKV) {
+    fun contains(key: String): Boolean {
+        return combineKV.containsKey(key)
+    }
+
+    fun remove(key: String) {
+        combineKV.remove(key)
+    }
+}
+
+class String2String(combineKV: KVData.CombineKV) : KVMapper(combineKV) {
+    operator fun get(key: String): String? {
+        return combineKV.getString(key, null)
+    }
+
+    operator fun set(key: String, value: String?) {
+        combineKV.putString(key, value)
+    }
+}
+
+class String2Int(combineKV: KVData.CombineKV) : KVMapper(combineKV) {
+    operator fun get(key: String): Int {
+        return combineKV.getInt(key)
+    }
+
+    operator fun set(key: String, value: Int) {
+        combineKV.putInt(key, value)
+    }
+}
+
+class String2Boolean(combineKV: KVData.CombineKV) : KVMapper(combineKV) {
+    operator fun get(key: String): Boolean {
+        return combineKV.getBoolean(key)
+    }
+
+    operator fun set(key: String, value: Boolean) {
+        combineKV.putBoolean(key, value)
+    }
+}
+
+class Int2Boolean(combineKV: KVData.CombineKV) : KVMapper(combineKV) {
+    operator fun get(key: Int): Boolean {
+        return combineKV.getBoolean(key.toString())
+    }
+
+    operator fun set(key: Int, value: Boolean) {
+        combineKV.putBoolean(key.toString(), value)
     }
 }
 

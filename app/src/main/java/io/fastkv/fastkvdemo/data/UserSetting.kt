@@ -25,4 +25,7 @@ object UserSetting : ShadowUserSetting(0) {
 
 open class ShadowUserSetting(uid: Long) : UserStorage("user_setting", uid) {
     val lock by array("lock")
+
+    val flags by string2Boolean("switches")
+    val config by string2String("config")
 }

@@ -52,8 +52,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected final int INTERNAL_LIMIT = FastKVConfig.internalLimit;
 
     protected static final int PAGE_SIZE = Utils.getPageSize();
-    protected static final int DOUBLE_LIMIT = Math.max(PAGE_SIZE << 1, 1 << 14);
-    protected static final int TRUNCATE_THRESHOLD = DOUBLE_LIMIT << 1;
+    protected static final int DOUBLE_LIMIT = 1 << 15;
+    protected static final int TRUNCATE_THRESHOLD =1 << 15;
 
     protected final String path;
     protected final String name;

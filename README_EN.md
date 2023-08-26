@@ -155,27 +155,33 @@ Refer to [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/ja
 - Data source: Collecting part of the key-value data of SharePreferences in the app (with  confusion) , hundreds of key-values. <br/>
 Because some key values are accessed more and others accessed less in normally, <br>
 I make a normally distributed sequence to test the accessing.
+- Test device: Huawei P30 Pro
+- Test code：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
 
-- Test Code：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
-- Comparison component: SharePreferences/DataStore/MMKV
-- Device: Huawei Honor 20s
 
-Result:
+Write:
 
-| | Write(ms) | Read(ms) 
----|---|---
-SharePreferences | 1182 | 2
-DataStore | 33277 | 2
-MMKV | 29 | 10
-FastKV  | 19 | 1 
+| kv-count | SP-commit | DataStore| SQLiteKV | FastKV-commit | SP-apply | MMKV |FastKV-mmap
+----------|---|---|---|---|---|---|---
+ 25       | 121 | 94 | 161 | 107 |  2 | 3 | 1 | 
+ 50       | 189 | 226 | 333 | 150 |  10 | 3 | 2 | 
+ 100      | 443 | 524 | 663 | 338 |  37 | 6 | 3 | 
+ 200      | 773 | 1332 | 1353 | 601 |  109 | 6 | 5 | 
+ 400      | 2113 | 4422 | 3159 | 1359 |  279 | 11 | 14 |
+ 600      | 4801 | 10066 | 4299 | 2235 |  519 | 15 | 11 | 
 
-- SharePreferences use the apply mode. When use commit mode, it will be much slower.
-- DataStore writes data very slow.
-- MMKV read slower than SharePreferences/DataStore，but much faster in writing.
-- FastKV is the fastest both in writing or reading.
+---
 
-The test above writes hundreds of key-values on one file, so the results have a big difference.<br>
-Normally one file may only save several or tens of key-values, the result may be close.
+Read:
+
+|kv-count | SP-commit | DataStore|SQLiteKV | FastKV-commit | SP-apply | MMKV |FastKV-mmap 
+---|---|---|---|---|---|---|---
+25 | 0 | 25 | 112 | 0 |  0 | 0 | 0 | 
+50 | 1 | 5 | 183 | 1 |  1 | 1 | 1 | 
+100 | 2 | 2 | 281 | 1 |  1 | 3 | 1 | 
+200 | 1 | 1 | 480 | 2 |  1 | 3 | 2 | 
+400 | 1 | 1 | 740 | 3 |  2 | 8 | 1 | 
+600 | 1 | 2 | 1051 | 2 |  3 | 11 | 1 | 
 
 # Java-Version
 There is a project write with only API of JDK, no Android SDK. <br>

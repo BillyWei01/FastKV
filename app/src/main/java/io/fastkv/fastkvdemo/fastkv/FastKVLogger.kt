@@ -7,9 +7,10 @@ object FastKVLogger : FastLogger {
     private const val tag = "FastKV"
 
     override fun i(name: String, message: String) {
-        if(message != "gc finish"){
-            Log.i(tag, "$name $message")
-        }
+//        if(message != "gc finish"){
+//            Log.i(tag, "$name $message")
+//        }
+        Log.i(tag, "$name $message")
     }
 
     override fun w(name: String, e: Exception) {

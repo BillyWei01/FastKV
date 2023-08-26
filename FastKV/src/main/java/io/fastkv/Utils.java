@@ -101,6 +101,7 @@ class Utils {
             try (RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw")) {
                 accessFile.setLength(len);
                 accessFile.write(bytes, 0, len);
+                accessFile.getFD().sync();
             }
             return tmpFile.renameTo(file);
         } catch (Throwable t) {

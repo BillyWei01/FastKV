@@ -44,6 +44,14 @@ public final class SQLiteKV {
         db.execSQL("DELETE from " + BLOB_TABLE_NAME);
     }
 
+    public static void close(String name) {
+        SQLiteKV kv = Builder.INSTANCE_MAP.get(name);
+        if (kv != null) {
+            kv.db.close();
+            Builder.INSTANCE_MAP.remove(name);
+        }
+    }
+
     public static final class Builder {
         static final Map<String, SQLiteKV> INSTANCE_MAP = new ConcurrentHashMap<>();
 

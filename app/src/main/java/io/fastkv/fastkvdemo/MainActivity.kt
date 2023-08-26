@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import io.fastkv.FastKV
@@ -13,14 +14,14 @@ import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.data.SpCase
 import io.fastkv.fastkvdemo.data.UsageData
+import io.fastkv.fastkvdemo.data.UserSetting
 import io.fastkv.fastkvdemo.util.onClick
 import io.fastkv.fastkvdemo.util.runBlock
 import kotlinx.android.synthetic.main.activity_main.account_info_tv
 import kotlinx.android.synthetic.main.activity_main.login_btn
 import kotlinx.android.synthetic.main.activity_main.switch_account_btn
 import kotlinx.android.synthetic.main.activity_main.test_multi_process_btn
-import kotlinx.android.synthetic.main.activity_main.test_performance_1_btn
-import kotlinx.android.synthetic.main.activity_main.test_performance_2_btn
+import kotlinx.android.synthetic.main.activity_main.test_performance_btn
 import kotlinx.android.synthetic.main.activity_main.tips_tv
 import kotlinx.android.synthetic.main.activity_main.user_info_tv
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,7 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     companion object {
         private val serialChannel = Channel<Any>(1)
+        const val TAG = "MainActivity"
     }
 
     var lastUid = 0L
@@ -46,6 +48,8 @@ class MainActivity : AppCompatActivity() {
                 lastUid = AppContext.uid
                 AccountManager.logout()
                 switch_account_btn.isEnabled = false
+
+                UserSetting.flags["logged"] = false
             } else {
                 if (lastUid == 0L) {
                     AccountManager.login(10001L)
@@ -53,6 +57,9 @@ class MainActivity : AppCompatActivity() {
                     AccountManager.login(lastUid)
                 }
                 switch_account_btn.isEnabled = true
+
+
+                UserSetting.flags["logged"] = true
             }
             refreshAccountInfoViews()
         }
@@ -70,6 +77,10 @@ class MainActivity : AppCompatActivity() {
             refreshAccountInfoViews()
         }
 
+        // Test map
+        val logged = UserSetting.flags["logged"]
+        Log.d(TAG, "logged:$logged")
+
         // Test 'remove'
         // UserData.config.remove("notification")
 
@@ -78,31 +89,27 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        test_performance_1_btn.onClick {
-            startBenchMark(true)
-        }
-
-        test_performance_2_btn.onClick {
-            startBenchMark(false)
+        test_performance_btn.onClick {
+            startBenchMark()
         }
     }
 
-    private fun startBenchMark(isBenchmark_1: Boolean) {
+    @SuppressLint("SetTextI18n")
+    private fun startBenchMark() {
         tips_tv.text = getString(R.string.running_tips)
         tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
-        test_performance_1_btn.isEnabled = false
-        test_performance_2_btn.isEnabled = false
+        test_performance_btn.isEnabled = false
         serialChannel.runBlock {
-            if (isBenchmark_1) {
-                Benchmark1.start()
-            } else {
-                Benchmark2.start()
-            }
-            CoroutineScope(Dispatchers.Main).launch {
-                tips_tv.text = getString(R.string.test_tips)
-                tips_tv.setTextColor(Color.parseColor("#FF009900"))
-                test_performance_1_btn.isEnabled = true
-                test_performance_2_btn.isEnabled = true
+            Benchmark.start { kvCount ->
+                CoroutineScope(Dispatchers.Main).launch {
+                    if (kvCount >= 0) {
+                        tips_tv.text = "Testing, kvCount: $kvCount"
+                    } else {
+                        tips_tv.text = getString(R.string.test_tips)
+                        test_performance_btn.isEnabled = true
+                    }
+                    tips_tv.setTextColor(Color.parseColor("#FF009900"))
+                }
             }
         }
     }

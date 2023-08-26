@@ -17,5 +17,9 @@ object UsageData : GlobalStorage("common_storage") {
     var firstChannel by string("first_channel")
 
     // 上次安装版本（用于判断本次打开是否版本升级）
-    var lastVersion by int("lastVersion")
+    var lastVersion by int("last_version")
+
+    var benchmarkCount by int("benchmark_count")
+
+
 }
