@@ -161,27 +161,29 @@ I make a normally distributed sequence to test the accessing.
 
 Write:
 
-| kv-count | SP-commit | DataStore| SQLiteKV | FastKV-commit | SP-apply | MMKV |FastKV-mmap
-----------|---|---|---|---|---|---|---
- 25       | 121 | 94 | 161 | 107 |  2 | 3 | 1 | 
- 50       | 189 | 226 | 333 | 150 |  10 | 3 | 2 | 
- 100      | 443 | 524 | 663 | 338 |  37 | 6 | 3 | 
- 200      | 773 | 1332 | 1353 | 601 |  109 | 6 | 5 | 
- 400      | 2113 | 4422 | 3159 | 1359 |  279 | 11 | 14 |
- 600      | 4801 | 10066 | 4299 | 2235 |  519 | 15 | 11 | 
+|	| 25	| 50	| 100 |	200|	400	| 600
+---|---|---|---|---|---|---
+SP-commit	|121|	189	|443	|773	|2113	|4801
+DataStore	|94	|226	|524	|1332	|4422	|10066
+SQLiteKV	|161	|333	|663	|1353	|3159	|4299
+FastKV-commit	|107	|150	|338	|601	|1359	|2235
+SP-apply	|2	|10	|37	|109	|279	|519
+MMKV	|3	|3	|6	|6	|11	|15
+FastKV-mmap	|1	|2	|3	|5	|14	|11
 
 ---
 
 Read:
 
-|kv-count | SP-commit | DataStore|SQLiteKV | FastKV-commit | SP-apply | MMKV |FastKV-mmap 
----|---|---|---|---|---|---|---
-25 | 0 | 25 | 112 | 0 |  0 | 0 | 0 | 
-50 | 1 | 5 | 183 | 1 |  1 | 1 | 1 | 
-100 | 2 | 2 | 281 | 1 |  1 | 3 | 1 | 
-200 | 1 | 1 | 480 | 2 |  1 | 3 | 2 | 
-400 | 1 | 1 | 740 | 3 |  2 | 8 | 1 | 
-600 | 1 | 2 | 1051 | 2 |  3 | 11 | 1 | 
+|	|25	|50	|100	|200	|400	|600
+---|---|---|---|---|---|---
+SP-commit	|0	|1	|2	|1	|1	|1
+DataStore	|25	|5	|2	|1	|1	|2
+SQLiteKV	|112	|183	|281	|480	|740	|1051
+FastKV-commit	|0	|1	|1	|2	|3	|2
+SP-apply	|0	|1	|1	|1	|2	|3
+MMKV		|0	|1	|3	|3	|8	|11
+FastKV-mmap	|0	|1	|1	|2	|1	|1
 
 # Java-Version
 There is a project write with only API of JDK, no Android SDK. <br>
