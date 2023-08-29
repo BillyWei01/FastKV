@@ -42,7 +42,7 @@ FastKV有以下特点：
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.1.4'
+    implementation 'io.github.billywei01:fastkv:2.1.6'
 }
 ```
 
@@ -57,9 +57,9 @@ dependencies {
 ### 2.3 基本用法
 
 ```java
-    // FastKV kv = new FastKV.Builder(path, name).build();
-    FastKV kv = new FastKV.Builder(context, name).build();
-    
+    // FastKV kv = new FastKV.Builder(context, name).build();
+    FastKV kv = new FastKV.Builder(path, name).build();
+
     if(!kv.getBoolean("flag")){
         kv.putBoolean("flag" , true);
     }

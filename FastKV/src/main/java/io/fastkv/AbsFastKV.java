@@ -435,22 +435,31 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         }
     }
 
-    protected final void mergeInvalids() {
-        int i = invalids.size() - 1;
-        Segment p = invalids.get(i);
-        while (i > 0) {
-            Segment q = invalids.get(--i);
-            if (p.start == q.end) {
-                q.end = p.end;
-                invalids.remove(i + 1);
+    static void mergeInvalids(ArrayList<Segment> invalids) {
+        int index = 0;
+        Segment p = invalids.get(0);
+        int n = invalids.size();
+        for (int i = 1; i < n; i++) {
+            Segment q = invalids.get(i);
+            if (q.start == p.end) {
+                p.end = q.end;
+            } else {
+                index++;
+                if (index != i) {
+                    invalids.set(index, q);
+                }
+                p = q;
             }
-            p = q;
+        }
+        index++;
+        if (n > index) {
+            invalids.subList(index, n).clear();
         }
     }
 
     protected void gc(int allocate) {
         Collections.sort(invalids);
-        mergeInvalids();
+        mergeInvalids(invalids);
 
         final Segment head = invalids.get(0);
         final int gcStart = head.start;
@@ -561,7 +570,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         fastBuffer.putInt(0, packSize(0));
     }
 
-    protected final void countInvalid(int start, int end) {
+    private void countInvalid(int start, int end) {
         invalidBytes += (end - start);
         invalids.add(new Segment(start, end));
     }
