@@ -177,14 +177,13 @@ object Benchmark {
 
     private fun getTimeLog(time: LongArray): String {
         return StringBuilder()
-            .append(" | ").append(time[0] / MILLION)
-            .append(" | ").append(time[1] / MILLION)
-            .append(" | ").append(time[2] / MILLION)
-            .append(" | ").append(time[3] / MILLION)
-            .append(" |  ").append(time[4] / MILLION)
-            .append(" | ").append(time[5] / MILLION)
-            .append(" | ").append(time[6] / MILLION)
-            .append(" | ")
+            .append(" Sp-commit:").append(time[0] / MILLION).append(" ms, ")
+            .append(" DataStore:").append(time[1] / MILLION).append(" ms, ")
+            .append(" SQLite:").append(time[2] / MILLION).append(" ms, ")
+            .append(" FastKV-commit:").append(time[3] / MILLION).append(" ms, ")
+            .append(" Sp-apply:").append(time[4] / MILLION).append(" ms, ")
+            .append(" MMKV:").append(time[5] / MILLION).append(" ms, ")
+            .append(" FastKV-mmap:").append(time[6] / MILLION).append(" ms")
             .toString()
     }
 

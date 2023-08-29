@@ -42,7 +42,7 @@ FastKV有以下特点：
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.1.6'
+    implementation 'io.github.billywei01:fastkv:2.2.6'
 }
 ```
 
