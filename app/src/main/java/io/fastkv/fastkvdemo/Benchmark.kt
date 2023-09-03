@@ -43,7 +43,7 @@ import java.util.Random
  *
  */
 object Benchmark {
-    private const val TAG = "Benchmark-2"
+    private const val TAG = "Benchmark"
 
     private const val PREFIX_SP_COMMIT = "sp_commit_"
     private const val PREFIX_DATASTORE = "data_store_"
