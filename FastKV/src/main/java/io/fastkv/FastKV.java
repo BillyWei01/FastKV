@@ -268,23 +268,24 @@ public final class FastKV extends AbsFastKV {
         return hadWriteToABFile;
     }
 
-    @SuppressWarnings("resource")
     private boolean writeToABFile(FastBuffer buffer) {
-        int fileLen = buffer.hb.length;
-        File aFile = new File(path, name + A_SUFFIX);
-        File bFile = new File(path, name + B_SUFFIX);
+        RandomAccessFile aAccessFile = null;
+        RandomAccessFile bAccessFile = null;
         try {
+            int fileLen = buffer.hb.length;
+            File aFile = new File(path, name + A_SUFFIX);
+            File bFile = new File(path, name + B_SUFFIX);
             if (!Utils.makeFileIfNotExist(aFile) || !Utils.makeFileIfNotExist(bFile)) {
                 throw new Exception(OPEN_FILE_FAILED);
             }
-            RandomAccessFile aAccessFile = new RandomAccessFile(aFile, "rw");
+            aAccessFile = new RandomAccessFile(aFile, "rw");
             aAccessFile.setLength(fileLen);
             aChannel = aAccessFile.getChannel();
             aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
             aBuffer.order(ByteOrder.LITTLE_ENDIAN);
             aBuffer.put(buffer.hb, 0, dataEnd);
 
-            RandomAccessFile bAccessFile = new RandomAccessFile(bFile, "rw");
+            bAccessFile = new RandomAccessFile(bFile, "rw");
             bAccessFile.setLength(fileLen);
             bChannel = bAccessFile.getChannel();
             bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
@@ -292,6 +293,12 @@ public final class FastKV extends AbsFastKV {
             bBuffer.put(buffer.hb, 0, dataEnd);
             return true;
         } catch (Exception e) {
+            Utils.closeQuietly(aAccessFile);
+            Utils.closeQuietly(bAccessFile);
+            aChannel = null;
+            bChannel = null;
+            aBuffer = null;
+            bBuffer = null;
             error(e);
         }
         return false;
@@ -452,7 +459,12 @@ public final class FastKV extends AbsFastKV {
     private synchronized boolean writeToCFile() {
         try {
             File tmpFile = new File(path, name + TEMP_SUFFIX);
-            if (Utils.saveBytes(tmpFile, fastBuffer.hb, dataEnd)) {
+            if (Utils.makeFileIfNotExist(tmpFile)) {
+                try (RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw")) {
+                    accessFile.setLength(dataEnd);
+                    accessFile.write(fastBuffer.hb, 0, dataEnd);
+                    accessFile.getFD().sync();
+                }
                 File cFile = new File(path, name + C_SUFFIX);
                 if (Utils.renameFile(tmpFile, cFile)) {
                     clearDeletedFiles();
