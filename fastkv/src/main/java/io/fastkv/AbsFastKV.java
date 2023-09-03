@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 import io.fastkv.Container.*;
 import io.fastkv.interfaces.*;
@@ -86,6 +87,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected final WeakCache bigValueCache = new WeakCache();
 
     protected final TagExecutor externalExecutor = new TagExecutor();
+    protected final Executor applyExecutor = new LimitExecutor();
 
     protected int invalidBytes;
     protected final ArrayList<Segment> invalids = new ArrayList<>();
@@ -143,6 +145,9 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         }
     }
 
+    /**
+     * Rewrite data, from non-encrypt to encrypted.
+     */
     protected void rewrite() {
         FastEncoder[] encoders = new FastEncoder[encoderMap.size()];
         encoders = encoderMap.values().toArray(encoders);
@@ -435,7 +440,11 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         }
     }
 
+    /**
+     * Merge invalids to speed up compacting bytes.
+     */
     static void mergeInvalids(ArrayList<Segment> invalids) {
+        Collections.sort(invalids);
         int index = 0;
         Segment p = invalids.get(0);
         int n = invalids.size();
@@ -458,7 +467,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     protected void gc(int allocate) {
-        Collections.sort(invalids);
         mergeInvalids(invalids);
 
         final Segment head = invalids.get(0);
@@ -486,7 +494,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             int index = i - 1;
             src[index] = srcPos;
             shift[index] = srcPos - desPos;
-
             desPos += size;
             srcPos = q.end;
         }
@@ -505,12 +512,14 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         }
         dataEnd = newDataEnd;
 
-        syncCompatBuffer(gcStart, allocate, gcUpdateSize);
+        updateBuffer(gcStart, allocate, gcUpdateSize);
 
         updateOffset(gcStart, src, shift);
 
         info(GC_FINISH);
     }
+
+    protected abstract void updateBuffer(int gcStart, int allocate, int gcUpdateSize);
 
     protected final void updateOffset(int gcStart, int[] srcArray, int[] shiftArray) {
         Collection<BaseContainer> values = data.values();
@@ -525,8 +534,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             }
         }
     }
-
-    protected abstract void syncCompatBuffer(int gcStart, int allocate, int gcUpdateSize);
 
     protected final void tryBlockingIO(File aFile, File bFile) {
         try {

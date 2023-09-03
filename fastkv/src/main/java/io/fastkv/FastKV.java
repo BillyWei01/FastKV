@@ -13,7 +13,6 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
 
 import io.fastkv.Container.BaseContainer;
 import io.fastkv.Container.VarContainer;
@@ -28,8 +27,8 @@ import io.fastkv.interfaces.FastEncoder;
  * FastKV is not support multi-process, use {@link MPFastKV} if you want to support multi-process.
  * <br>
  * Note: <br>
- * 1. Do not change file name once create, or you will loss data. <br>
- * 2. Do not change cipher , or you will loss data.
+ * 1. Do not change file name once create, or you will lost data. <br>
+ * 2. Do not change cipher , or you will lost data.
  * But it's okay to transfer from no cipher to applying cipher.<br>
  * 3. Do not change value type for one key, or your app might crash.<br>
  * 4. Do not use one key to save two kind of value (same as note 3).
@@ -53,8 +52,6 @@ public final class FastKV extends AbsFastKV {
 
     // Only take effect when mode is not NON_BLOCKING
     boolean autoCommit = true;
-
-    private final Executor applyExecutor = new LimitExecutor();
 
     FastKV(final String path,
            final String name,
@@ -402,7 +399,7 @@ public final class FastKV extends AbsFastKV {
     /**
      * Forces any changes to be written to the storage device containing the mapped file.
      * No need to call this unless what's had written is very import.
-     * The system crash or power off before data syncing to disk might make recently update loss.
+     * The system crash or power off before data syncing to disk might make recently update lost.
      */
     public synchronized void force() {
         if (closed) return;
@@ -668,7 +665,7 @@ public final class FastKV extends AbsFastKV {
         }
     }
 
-    protected void syncCompatBuffer(int gcStart, int allocate, int gcUpdateSize) {
+    protected void updateBuffer(int gcStart, int allocate, int gcUpdateSize) {
         int newDataSize = dataEnd - DATA_START;
         int packedSize = packSize(newDataSize);
         if (writingMode == NON_BLOCKING) {
@@ -793,8 +790,8 @@ public final class FastKV extends AbsFastKV {
          * Assigned writing mode to SYNC_BLOCKING.
          * <p>
          * In non-blocking mode (write data with mmap),
-         * it might loss update if the system crash or power off before flush data to disk.
-         * You could use {@link #force()} to avoid loss update, or use SYNC_BLOCKING mode.
+         * it might lost update if the system crash or power off before flush data to disk.
+         * You could use {@link #force()} to avoid losing update, or use SYNC_BLOCKING mode.
          * <p>
          * In blocking mode, every update will write all data to the file, which is expensive cost.
          * <p>
@@ -859,9 +856,9 @@ public final class FastKV extends AbsFastKV {
         return kv;
     }
 
+    @NonNull
     @Override
-    public synchronized @NonNull
-    String toString() {
+    public String toString() {
         return "FastKV: path:" + path + " name:" + name;
     }
 }

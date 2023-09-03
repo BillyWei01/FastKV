@@ -190,7 +190,7 @@ class Utils {
     }
 
 
-    static void logError(Exception e) {
+    private static void logError(Exception e) {
         FastLogger logger = FastKVConfig.sLogger;
         if (logger != null) {
             logger.e("FastKV", e);
