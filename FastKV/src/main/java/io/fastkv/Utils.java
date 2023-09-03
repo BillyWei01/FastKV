@@ -103,11 +103,18 @@ class Utils {
                 accessFile.write(bytes, 0, len);
                 accessFile.getFD().sync();
             }
-            return tmpFile.renameTo(file);
-        } catch (Throwable t) {
+            return renameFile(tmpFile, file);
+        } catch (Exception t) {
             logError(new Exception("save bytes failed", t));
         }
         return false;
+    }
+
+    static boolean renameFile(File srcFile, File dstFile) {
+        if (srcFile.renameTo(dstFile)) {
+            return true;
+        }
+        return (!dstFile.exists() || dstFile.delete()) && srcFile.renameTo(dstFile);
     }
 
     static void closeQuietly(Closeable closeable) {

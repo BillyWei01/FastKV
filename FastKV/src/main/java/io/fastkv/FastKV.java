@@ -278,16 +278,17 @@ public final class FastKV extends AbsFastKV {
                 throw new Exception(OPEN_FILE_FAILED);
             }
             RandomAccessFile aAccessFile = new RandomAccessFile(aFile, "rw");
-            RandomAccessFile bAccessFile = new RandomAccessFile(bFile, "rw");
             aAccessFile.setLength(fileLen);
-            bAccessFile.setLength(fileLen);
             aChannel = aAccessFile.getChannel();
-            bChannel = bAccessFile.getChannel();
             aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
             aBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            aBuffer.put(buffer.hb, 0, dataEnd);
+
+            RandomAccessFile bAccessFile = new RandomAccessFile(bFile, "rw");
+            bAccessFile.setLength(fileLen);
+            bChannel = bAccessFile.getChannel();
             bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
             bBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            aBuffer.put(buffer.hb, 0, dataEnd);
             bBuffer.put(buffer.hb, 0, dataEnd);
             return true;
         } catch (Exception e) {
@@ -453,7 +454,7 @@ public final class FastKV extends AbsFastKV {
             File tmpFile = new File(path, name + TEMP_SUFFIX);
             if (Utils.saveBytes(tmpFile, fastBuffer.hb, dataEnd)) {
                 File cFile = new File(path, name + C_SUFFIX);
-                if (tmpFile.renameTo(cFile)) {
+                if (Utils.renameFile(tmpFile, cFile)) {
                     clearDeletedFiles();
                     return true;
                 } else {
