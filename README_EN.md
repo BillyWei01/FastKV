@@ -66,8 +66,8 @@ It is recommended to set your own thread pool to reuse threads.
 ### 2.3 Basic cases
 - Basic case
 ```java
- // FastKV kv = new FastKV.Builder(path, name).build();
- FastKV kv = new FastKV.Builder(context, name).build();
+ // FastKV kv = new FastKV.Builder(context, name).build();
+ FastKV kv = new FastKV.Builder(path, name).build();
 
  if(!kv.getBoolean("flag")){
      kv.putBoolean("flag" , true);
@@ -140,7 +140,7 @@ But you can create a KV class, create methods such as 'getInt', 'getString', etc
 Refer to [FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/FooKV.kt)
 
 ### 2.8 Multi-Process
-Multi-Process implement: [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/MPFastKV.java).<br>
+Multi-Process implement: [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java).<br>
 
 Example:
 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt)
