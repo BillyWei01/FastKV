@@ -39,6 +39,17 @@ class AppApplication : Application(), IAppContext {
         }
     }
 
+    // 全局替换SP实现，危险的操作，不建议
+/*
+    override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
+        return if (name != null) {
+            super.getSharedPreferences(name, mode)
+        } else {
+            FastKV.adapt(AppContext.context, name)
+        }
+    }
+*/
+
     private fun initMMKV(){
         /*
         val dir = filesDir.absolutePath + "/mmkv"

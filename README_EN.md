@@ -158,32 +158,29 @@ I make a normally distributed sequence to test the accessing.
 - Test device: Huawei P30 Pro
 - Test code：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
 
-
 Write:
 
-|	| 25	| 50	| 100 |	200|	400	| 600
+| | 25| 50| 100| 200| 400| 600
 ---|---|---|---|---|---|---
-SP-commit	|121|	189	|443	|773	|2113	|4801
-DataStore	|94	|226	|524	|1332	|4422	|10066
-SQLiteKV	|161	|333	|663	|1353	|3159	|4299
-FastKV-commit	|107	|150	|338	|601	|1359	|2235
-SP-apply	|2	|10	|37	|109	|279	|519
-MMKV	|3	|3	|6	|6	|11	|15
-FastKV-mmap	|1	|2	|3	|5	|14	|11
+SP-commit | 106| 158| 346| 677| 2230| 4586
+DataStore | 98| 189| 481| 1219| 4050| 8556
+SQLiteKV | 189| 359| 703| 1385| 2943| 7147
+SP-apply | 3| 12| 34| 96| 279| 520
+MMKV | 3| 7| 5| 9| 11| 17
+FastKV | 3| 6| 4| 6| 15| 11
 
 ---
 
 Read:
 
-|	|25	|50	|100	|200	|400	|600
----|---|---|---|---|---|---
-SP-commit	|0	|1	|2	|1	|1	|1
-DataStore	|25	|5	|2	|1	|1	|2
-SQLiteKV	|112	|183	|281	|480	|740	|1051
-FastKV-commit	|0	|1	|1	|2	|3	|2
-SP-apply	|0	|1	|1	|1	|2	|3
-MMKV		|0	|1	|3	|3	|8	|11
-FastKV-mmap	|0	|1	|1	|2	|1	|1
+| | 25| 50| 100| 200 | 400| 600
+---|---|---|---|-----|---|---
+SP-commit | 1| 4| 2| 1   | 1| 1
+DataStore | 25| 6| 2| 1   | 1| 2
+SQLiteKV | 93| 189| 277| 407 | 728| 1032
+SP-apply | 0| 0| 1| 1   | 2| 3
+MMKV | 0| 1| 3| 3   | 8| 9
+FastKV | 0| 1| 1| 3   | 3| 1
 
 # Java-Version
 There is a project write with only API of JDK, no Android SDK. <br>
