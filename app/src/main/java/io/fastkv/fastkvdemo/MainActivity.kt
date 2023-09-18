@@ -16,7 +16,6 @@ import io.fastkv.fastkvdemo.data.SpCase
 import io.fastkv.fastkvdemo.data.UsageData
 import io.fastkv.fastkvdemo.data.UserSetting
 import io.fastkv.fastkvdemo.util.onClick
-import io.fastkv.fastkvdemo.util.runBlock
 import kotlinx.android.synthetic.main.activity_main.account_info_tv
 import kotlinx.android.synthetic.main.activity_main.login_btn
 import kotlinx.android.synthetic.main.activity_main.switch_account_btn
@@ -31,7 +30,6 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     companion object {
-        private val serialChannel = Channel<Any>(1)
         const val TAG = "MainActivity"
     }
 
@@ -99,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         tips_tv.text = getString(R.string.running_tips)
         tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
         test_performance_btn.isEnabled = false
-        serialChannel.runBlock {
+        CoroutineScope(Dispatchers.Default).launch {
             Benchmark.start { kvCount ->
                 CoroutineScope(Dispatchers.Main).launch {
                     if (kvCount >= 0) {
