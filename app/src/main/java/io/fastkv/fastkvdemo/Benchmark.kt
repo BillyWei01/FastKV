@@ -78,7 +78,7 @@ object Benchmark {
             UsageData.benchmarkCount = count
             initFiles(count)
 
-            Log.i(TAG, "Start test, SpCommit | DataStore | sqlite | SpApply | MMKV | FastKV"  )
+            Log.i(TAG, "Start test, SpCommit | DataStore | SQLite | SpApply | MMKV | FastKV"  )
             val kvCountArray = arrayOf(25, 50, 100, 200, 400, 600)
             kvCountArray.forEach { kvCount ->
                 progress(kvCount)
@@ -93,13 +93,65 @@ object Benchmark {
 
     private fun initFiles(count: Int) {
         spCommit = AppContext.context.getSharedPreferences("$PREFIX_SP_COMMIT$count", Context.MODE_PRIVATE)
-        spApply = AppContext.context.getSharedPreferences("$PREFIX_SP_APPLY$count", Context.MODE_PRIVATE)
         dataStore = PreferenceDataStoreFactory.create {
             File(PathManager.filesDir, "$PREFIX_DATASTORE$count.preferences_pb")
         }
-        mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
         sqliteKV = SQLiteKV.Builder("$PREFIX_SQLITE$count").build()
+        spApply = AppContext.context.getSharedPreferences("$PREFIX_SP_APPLY$count", Context.MODE_PRIVATE)
+        mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
         fastkv = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_FASTKV$count").build()
+    }
+
+    // 测试初始化时间 (先写入600个key-value，修改代码，重启AP执行此方法）
+    private suspend fun testLoading(count: Int) {
+        val t0 = System.nanoTime()
+        spCommit = AppContext.context.getSharedPreferences("$PREFIX_SP_COMMIT$count", Context.MODE_PRIVATE)
+        spCommit.contains("")
+
+        val t1 = System.nanoTime()
+
+        dataStore = PreferenceDataStoreFactory.create {
+            File(PathManager.filesDir, "$PREFIX_DATASTORE$count.preferences_pb")
+        }
+        val flow = dataStore.data.map { setting ->
+            setting[stringPreferencesKey("")]
+        }
+        val v = flow.first()
+
+        val t2 = System.nanoTime()
+        sqliteKV = SQLiteKV.Builder("$PREFIX_SQLITE$count").build()
+        sqliteKV.getInt("", 0)
+
+
+        val t3 = System.nanoTime()
+
+        spApply = AppContext.context.getSharedPreferences("$PREFIX_SP_APPLY$count", Context.MODE_PRIVATE)
+        spApply.contains("")
+
+        val t4 = System.nanoTime()
+
+        mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
+        mmkv.containsKey("")
+
+        val t5 = System.nanoTime()
+
+        fastkv = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_FASTKV$count").build()
+        fastkv.contains("")
+
+        val t6 = System.nanoTime()
+
+        val msg = StringBuilder()
+            .append(" Sp-commit:").append((t1-t0) / MILLION).append(" ms, ")
+            .append(" DataStore:").append((t2-t1)  / MILLION).append(" ms, ")
+            .append(" SQLite:").append((t3-t2)  / MILLION).append(" ms, ")
+            .append(" Sp-apply:").append((t4-t3)  / MILLION).append(" ms, ")
+            .append(" MMKV:").append((t5-t4)  / MILLION).append(" ms, ")
+            .append(" FastKV:").append((t6-t5)  / MILLION).append(" ms")
+            .toString()
+        Log.i(TAG, "init time: $msg")
+
+        // key-value 数量 600， P30 Pro 测试结果
+        // init time:  Sp-commit:24 ms,  DataStore:109 ms,  SQLite:6 ms,  Sp-apply:10 ms,  MMKV:0 ms,  FastKV:6 ms
     }
 
     private suspend fun runTest(context: Context, kvCount: Int, testRound: Int) {
@@ -414,8 +466,8 @@ object Benchmark {
     }
 
     private suspend fun readFromDataStore(list: List<Pair<String, Any>>) {
-        val value = dataStore.data.map { setting ->
-            for (pair in list) {
+        for (pair in list) {
+            val flow = dataStore.data.map { setting ->
                 val key = pair.first
                 val value = pair.second
                 if (value is String) {
@@ -430,10 +482,12 @@ object Benchmark {
                     setting[floatPreferencesKey(key)]
                 } else if (value is Set<*>) {
                     setting[stringSetPreferencesKey(key)]
+                } else {
+                    null
                 }
             }
+            val result = flow.first()
         }
-        val v = value.first()
     }
 
     private fun putToSqlite(list: List<Pair<String, Any>>) {
