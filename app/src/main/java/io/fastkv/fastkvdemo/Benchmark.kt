@@ -102,51 +102,55 @@ object Benchmark {
         fastkv = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_FASTKV$count").build()
     }
 
-    // 测试初始化时间 (先写入600个key-value，修改代码，重启AP执行此方法）
+    // 测试加载时间 (先写入600个key-value，修改代码，重启AP执行此方法）
     private suspend fun testLoading(count: Int) {
         val t0 = System.nanoTime()
         spCommit = AppContext.context.getSharedPreferences("$PREFIX_SP_COMMIT$count", Context.MODE_PRIVATE)
-        spCommit.contains("")
-
+        // 因为有的KV的数据加载是异步的，所以实例化本身不耗时；
+        // 数据加载期间会加锁，如果此间有其他线程访问put/get接口，会阻塞，直到数据加载完成。
+        // 所以这里查询一个value, 等查询完成，就是基本数据加载完成的时间。
+        spCommit.getInt("", 0)
         val t1 = System.nanoTime()
+
+        // apply模式和commit模式只影响更新，数据加载是一样的
+//        spApply = AppContext.context.getSharedPreferences("$PREFIX_SP_APPLY$count", Context.MODE_PRIVATE)
+//        spApply.getInt("", 0)
 
         dataStore = PreferenceDataStoreFactory.create {
             File(PathManager.filesDir, "$PREFIX_DATASTORE$count.preferences_pb")
         }
+//        val data = runBlocking {
+//            dataStore.data.first()
+//        }
+//        val value = data[stringPreferencesKey("")]
         val flow = dataStore.data.map { setting ->
             setting[stringPreferencesKey("")]
         }
-        val v = flow.first()
+        val value = flow.first()
 
         val t2 = System.nanoTime()
         sqliteKV = SQLiteKV.Builder("$PREFIX_SQLITE$count").build()
-        sqliteKV.getInt("", 0)
-
+        // sqlite不是异步加载，所以不查询也没关系
+        // sqliteKV.getInt("", 0)
 
         val t3 = System.nanoTime()
 
-        spApply = AppContext.context.getSharedPreferences("$PREFIX_SP_APPLY$count", Context.MODE_PRIVATE)
-        spApply.contains("")
+        mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
+        mmkv.getInt("", 0)
 
         val t4 = System.nanoTime()
 
-        mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
-        mmkv.containsKey("")
+        fastkv = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_FASTKV$count").build()
+        fastkv.getInt("", 0)
 
         val t5 = System.nanoTime()
 
-        fastkv = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_FASTKV$count").build()
-        fastkv.contains("")
-
-        val t6 = System.nanoTime()
-
         val msg = StringBuilder()
-            .append(" Sp-commit:").append((t1-t0) / MILLION).append(" ms, ")
+            .append(" SharePreferences:").append((t1-t0) / MILLION).append(" ms, ")
             .append(" DataStore:").append((t2-t1)  / MILLION).append(" ms, ")
             .append(" SQLite:").append((t3-t2)  / MILLION).append(" ms, ")
-            .append(" Sp-apply:").append((t4-t3)  / MILLION).append(" ms, ")
-            .append(" MMKV:").append((t5-t4)  / MILLION).append(" ms, ")
-            .append(" FastKV:").append((t6-t5)  / MILLION).append(" ms")
+            .append(" MMKV:").append((t4-t3)  / MILLION).append(" ms, ")
+            .append(" FastKV:").append((t5-t4)  / MILLION).append(" ms")
             .toString()
         Log.i(TAG, "init time: $msg")
 
@@ -467,6 +471,27 @@ object Benchmark {
 
     private suspend fun readFromDataStore(list: List<Pair<String, Any>>) {
         for (pair in list) {
+//            val setting = runBlocking {
+//                dataStore.data.first()
+//            }
+//            val key = pair.first
+//            val value = pair.second
+//            if (value is String) {
+//                setting[stringPreferencesKey(key)]
+//            } else if (value is Boolean) {
+//                setting[booleanPreferencesKey(key)]
+//            } else if (value is Int) {
+//                setting[intPreferencesKey(key)]
+//            } else if (value is Long) {
+//                setting[longPreferencesKey(key)]
+//            } else if (value is Float) {
+//                setting[floatPreferencesKey(key)]
+//            } else if (value is Set<*>) {
+//                setting[stringSetPreferencesKey(key)]
+//            } else {
+//                null
+//            }
+
             val flow = dataStore.data.map { setting ->
                 val key = pair.first
                 val value = pair.second
