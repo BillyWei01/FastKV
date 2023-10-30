@@ -8,7 +8,7 @@ import io.fastkv.interfaces.FastEncoder
 /**
  * 用户信息
  *
- * 入职用
+ * 封装一个既可以用默认用当前uid，又可以指定uid的API。
  */
 object UserInfo : ShadowUserInfo(0L) {
     private val map = ArrayMap<Long, ShadowUserInfo>()
