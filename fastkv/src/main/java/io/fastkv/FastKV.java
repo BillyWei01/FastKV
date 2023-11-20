@@ -745,6 +745,14 @@ public final class FastKV extends AbsFastKV {
         private FastCipher cipher;
         private int writingMode = NON_BLOCKING;
 
+        public Builder(Context context) {
+            if (context == null) {
+                throw new IllegalArgumentException("context is null");
+            }
+            this.path = context.getFilesDir().getAbsolutePath() + "/fastkv/";
+            this.name = "spdata";
+        }
+
         public Builder(Context context, String name) {
             if (context == null) {
                 throw new IllegalArgumentException("context is null");
