@@ -3,9 +3,9 @@ package io.fastkv.interfaces;
 import androidx.annotation.NonNull;
 
 public interface FastEncoder<T> {
-    String tag();
+  String tag();
 
-    byte[] encode(@NonNull T obj);
+  byte[] encode(@NonNull T obj);
 
-    T decode(@NonNull byte[] bytes, int offset, int length);
+  T decode(@NonNull byte[] bytes, int offset, int length);
 }
