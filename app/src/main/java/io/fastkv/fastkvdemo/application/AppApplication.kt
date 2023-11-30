@@ -29,28 +29,30 @@ class AppApplication : Application(), IAppContext {
         AppContext.init(this)
 
         FastKVConfig.setLogger(FastKVLogger)
-        FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
+        FastKVConfig.setExecutor {
+            Dispatchers.Default.asExecutor().execute(it)
+        }
 
         appId = ProcessUtil.getProcessName(this)
 
         // Avoid files corruption in multi-process environment
-        if(isMainProcess) {
+        if (isMainProcess) {
             initMMKV()
         }
     }
 
     // 全局替换SP实现，危险的操作，不建议
-/*
-    override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
-        return if (name != null) {
-            super.getSharedPreferences(name, mode)
-        } else {
-            FastKV.adapt(AppContext.context, name)
+    /*
+        override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
+            return if (name != null) {
+                super.getSharedPreferences(name, mode)
+            } else {
+                FastKV.adapt(AppContext.context, name)
+            }
         }
-    }
-*/
+    */
 
-    private fun initMMKV(){
+    private fun initMMKV() {
         /*
         val dir = filesDir.absolutePath + "/mmkv"
         val rootDir = MMKV.initialize(this, dir, {
