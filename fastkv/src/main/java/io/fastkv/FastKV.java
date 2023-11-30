@@ -2,6 +2,7 @@ package io.fastkv;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.TextUtils;
 import androidx.annotation.NonNull;
 import io.fastkv.Container.BaseContainer;
 import io.fastkv.Container.VarContainer;
@@ -756,11 +757,27 @@ public final class FastKV extends AbsFastKV {
 
   public static final class Builder {
     static final Map<String, FastKV> INSTANCE_MAP = new ConcurrentHashMap<>();
+    static String initPath = "";
     private final String path;
     private final String name;
     private FastEncoder[] encoders;
     private FastCipher cipher;
     private int writingMode = NON_BLOCKING;
+
+    public static void initPath(String path) {
+      if (!TextUtils.isEmpty(path)) {
+        initPath = path;
+      }
+    }
+
+    public Builder() {
+      if (!TextUtils.isEmpty(initPath)) {
+        this.path = initPath;
+        this.name = "spdata";
+      } else {
+        throw new IllegalArgumentException("need init path first");
+      }
+    }
 
     public Builder(Context context) {
       if (context == null) {
