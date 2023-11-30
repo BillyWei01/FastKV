@@ -5,7 +5,7 @@ import java.util.concurrent.*;
 
 public final class FastKVConfig {
   static FastLogger sLogger = new DefaultLogger();
-  static volatile Executor sExecutor;
+  static volatile IExecutor sExecutor;
   static int internalLimit = 4096;
 
   private FastKVConfig() {}
@@ -25,20 +25,32 @@ public final class FastKVConfig {
    *
    * @param executor The executor for loading or writing.
    */
-  public static void setExecutor(Executor executor) {
+  public static void setExecutor(IExecutor executor) {
     if (executor != null) {
       sExecutor = executor;
     }
   }
 
-  static Executor getExecutor() {
+  static IExecutor getExecutor() {
     if (sExecutor == null) {
       synchronized (FastKVConfig.class) {
         if (sExecutor == null) {
-          sExecutor = Executors.newCachedThreadPool();
+          sExecutor =
+              new IExecutor() {
+                final Executor mExecutor = Executors.newCachedThreadPool();
+
+                @Override
+                public void execute(Runnable runnable) {
+                  mExecutor.execute(runnable);
+                }
+              };
         }
       }
     }
     return sExecutor;
+  }
+
+  public interface IExecutor {
+    void execute(Runnable runnable);
   }
 }
