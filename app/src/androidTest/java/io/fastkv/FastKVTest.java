@@ -14,6 +14,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -154,7 +155,7 @@ public class FastKVTest {
     }
 
     @Test
-    public void testRemove(){
+    public void testRemove() {
         String name = "test_remove";
         clearFile(name);
 
@@ -356,7 +357,7 @@ public class FastKVTest {
         kv1.clear();
         String longStr = TestHelper.makeString(10000);
         TestObject obj = new TestObject(12345, longStr);
-        kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
+        kv1.putObject("obj", obj.copy(), TestObjectEncoder.INSTANCE);
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
 
@@ -365,12 +366,12 @@ public class FastKVTest {
 
         obj.id = 123456;
         obj.info = "hello";
-        kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
+        kv1.putObject("obj", obj.copy(), TestObjectEncoder.INSTANCE);
         Assert.assertEquals(obj, kv1.getObject("obj"));
 
         obj.id = 123457;
         obj.info = longStr;
-        kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
+        kv1.putObject("obj", obj.copy(), TestObjectEncoder.INSTANCE);
         Assert.assertEquals(obj, kv1.getObject("obj"));
     }
 
@@ -888,7 +889,7 @@ public class FastKVTest {
         longArray[100] = 100;
 
         TestObject obj = new TestObject(12345, longStr);
-        kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
+        kv1.putObject("obj", obj.copy(), TestObjectEncoder.INSTANCE);
 
         Assert.assertEquals(obj, kv1.getObject("obj"));
 
@@ -933,7 +934,7 @@ public class FastKVTest {
         longArray[100] = 100;
 
         TestObject obj = new TestObject(12345, longStr);
-        kv1.putObject("obj", obj, TestObjectEncoder.INSTANCE);
+        kv1.putObject("obj", obj.copy(), TestObjectEncoder.INSTANCE);
         Assert.assertEquals(obj, kv1.getObject("obj"));
 
         double d1 = 3.14;
@@ -964,5 +965,69 @@ public class FastKVTest {
         Assert.assertEquals(longStr, kv2.getString("string"));
         Assert.assertArrayEquals(longArray, kv2.getArray("array"));
         Assert.assertEquals(obj, kv2.getObject("obj"));
+    }
+
+    /**
+     * 保存一个key-value, 调用其他类型的get方法：
+     * 验证不会崩溃， 并且返回默认值。
+     */
+    @Test
+    public void testGetDifferentType() {
+        String name = "test_get_different_type";
+        FastKV kv = new FastKV.Builder(TestHelper.DIR, name).build();
+        kv.clear();
+        String key = "test";
+        kv.putBoolean(key, true);
+
+        Assert.assertEquals(true, kv.getBoolean(key));
+        Assert.assertEquals(0, kv.getInt(key));
+        Assert.assertTrue(0f == kv.getFloat(key));
+        Assert.assertEquals(0L, kv.getLong(key));
+        Assert.assertTrue(0D == kv.getDouble(key));
+        Assert.assertEquals("", kv.getString(key));
+        Assert.assertArrayEquals(new byte[0], kv.getArray(key));
+        Assert.assertTrue(null == kv.getObject(key));
+    }
+
+    /**
+     * 往同一个key put不同的value：
+     * 验证不会崩溃，并且保存最后一次put的value。
+     */
+    @Test
+    public void testPutDifferentType() {
+        String name = "test_put_different_type";
+        FastKV kv = new FastKV.Builder(TestHelper.DIR, name).build();
+        kv.clear();
+        String key = "test";
+        kv.putBoolean(key, true);
+        Assert.assertEquals(true, kv.getBoolean(key));
+
+        kv.putInt(key, 1);
+        Assert.assertEquals(1, kv.getInt(key));
+
+        kv.putFloat(key, 1.5f);
+        Assert.assertTrue(1.5f == kv.getFloat(key));
+
+        kv.putLong(key, 2);
+        Assert.assertEquals(2, kv.getLong(key));
+
+        kv.putDouble(key, 2.5D);
+        Assert.assertTrue(2.5D == kv.getDouble(key));
+
+        kv.putString(key, "test");
+        Assert.assertEquals("test", kv.getString(key));
+
+        byte[] testArray = new byte[]{1, 2};
+        kv.putArray(key, testArray);
+        Assert.assertArrayEquals(testArray, kv.getArray(key));
+
+        Set<String> testSet = new HashSet<>();
+        testSet.add("1");
+        testSet.add("2");
+        kv.putStringSet(key, testSet);
+        Assert.assertEquals(testSet, kv.getStringSet(key));
+
+        FastKV kv1 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
+        Assert.assertEquals(testSet, kv1.getStringSet(key));
     }
 }

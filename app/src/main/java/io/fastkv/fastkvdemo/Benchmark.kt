@@ -274,7 +274,7 @@ object Benchmark {
         putToMMKV(srcList)
         putToFastKV(srcList)
 
-        for (i in 0 until 3) {
+        for (i in 0 until 2) {
             val inputList = getDistributedList(srcList, r)
             putToSpCommit(srcList)
             putToDataStore(inputList)
@@ -329,7 +329,7 @@ object Benchmark {
         } else if (newLen > len) {
             str + generateString(newLen - len)
         } else {
-            if (str.isEmpty()) "" else str.substring(0, len - 1) + "a"
+            str
         }
         return newStr
     }

@@ -42,7 +42,7 @@ FastKV有以下特点：
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.3.0'
+    implementation 'io.github.billywei01:fastkv:2.4.0'
 }
 ```
 
@@ -117,7 +117,7 @@ FastKV实现了SharedPreferences接口，并且提供了迁移SP数据的方法�
 public class SpCase {
    public static final String NAME = "common_store";
    // 原本的获取SP的方法
-   // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+   // public static final SharedPreferences preferences = AppContext.INSTANCE.getContext().getSharedPreferences(NAME, Context.MODE_PRIVATE);
    
    // 导入原SP数据
    public static final SharedPreferences preferences = FastKV.adapt(AppContext.INSTANCE.getContext(), NAME);

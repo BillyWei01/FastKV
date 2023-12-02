@@ -48,7 +48,7 @@ FastKV had been published to Maven Central:
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.3.0'
+    implementation 'io.github.billywei01:fastkv:2.4.0'
 }
 ```
 
@@ -128,7 +128,7 @@ It is easy to migrate SharePreferences to FastKV.
 public class SpCase {
    public static final String NAME = "common_store";
    
-   // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+   // public static final SharedPreferences preferences = AppContext.INSTANCE.getContext().getSharedPreferences(NAME, Context.MODE_PRIVATE);
 
    public static final SharedPreferences preferences = FastKV.adapt(AppContext.INSTANCE.getContext(), NAME);
 }

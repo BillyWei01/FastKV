@@ -7,27 +7,31 @@ import io.packable.PackEncoder;
 import io.packable.Packable;
 
 class TestObject implements Packable {
-   long id;
-   String info;
+    long id;
+    String info;
 
-    TestObject(long id, String info){
+    TestObject(long id, String info) {
         this.id = id;
         this.info = info;
     }
 
-   @Override
-   public boolean equals(Object o) {
-       if (this == o) return true;
-       if (!(o instanceof TestObject)) return false;
-       TestObject object = (TestObject) o;
-       return id == object.id &&
-               Objects.equals(info, object.info);
-   }
+    TestObject copy() {
+        return new TestObject(id, info);
+    }
 
-   @Override
-   public int hashCode() {
-       return Objects.hash(id, info);
-   }
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof TestObject)) return false;
+        TestObject object = (TestObject) o;
+        return id == object.id &&
+                Objects.equals(info, object.info);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, info);
+    }
 
     @Override
     public String toString() {
@@ -37,11 +41,11 @@ class TestObject implements Packable {
                 + '\'' + '}';
     }
 
-    private String truncateStr(String str){
-        if(str == null){
+    private String truncateStr(String str) {
+        if (str == null) {
             return null;
         }
-        if(str.length() > 50){
+        if (str.length() > 50) {
             return str.substring(0, 50) + "...";
         }
         return str;
