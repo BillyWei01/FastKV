@@ -1074,16 +1074,13 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         if (value == null) {
             remove(key);
         } else {
+            lockAndCheckUpdate();
             BaseContainer container = data.get(key);
             if (container != null && container.getType() != DataType.ARRAY) {
                 remove(key);
                 container = null;
             }
             ArrayContainer c = (ArrayContainer) container;
-            if (c != null && !c.external && Arrays.equals(value, (byte[]) c.value)) {
-                return this;
-            }
-            lockAndCheckUpdate();
             byte[] newBytes = cipher != null ? cipher.encrypt(value) : value;
             if (newBytes == null) {
                 error(new Exception(ENCRYPT_FAILED));
@@ -1138,9 +1135,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             container = null;
         }
         ObjectContainer c = (ObjectContainer) container;
-        if(c != null && !c.external && Objects.equals(c.value, value)) {
-            return this;
-        }
 
         // assemble object bytes
         int tagSize = FastBuffer.getStringSize(tag);
