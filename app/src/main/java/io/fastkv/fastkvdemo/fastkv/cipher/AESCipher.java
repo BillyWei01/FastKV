@@ -35,8 +35,7 @@ public class AESCipher implements FastCipher {
         // AES key可以取16字节或者32字节，16字节的话计算快一些
         aesKey = Arrays.copyOf(key, 16);
 
-        // ivMask用于隐藏iv的原始值，因为iv是随机生成的，
-        // 所以和ivMask异或之后也是随机的
+        // ivMask用于隐藏iv的原始值
         ivMask = ByteBuffer.wrap(digest).getInt();
     }
 
