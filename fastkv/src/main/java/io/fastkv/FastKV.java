@@ -27,11 +27,9 @@ import io.fastkv.interfaces.FastEncoder;
  * FastKV is not support multi-process, use {@link MPFastKV} if you want to support multi-process.
  * <br>
  * Note: <br>
- * 1. Do not change file name once create, or you will lost data. <br>
- * 2. Do not change cipher , or you will lost data.
+ * 1. Do not change file name once create, otherwise you will lose data. <br>
+ * 2. Do not change cipher , otherwise you will lose data.
  * But it's okay to transfer from no cipher to applying cipher.<br>
- * 3. Do not change value type for one key, or your app might crash.<br>
- * 4. Do not use one key to save two kind of value (same as note 3).
  */
 @SuppressWarnings("rawtypes")
 public final class FastKV extends AbsFastKV {
@@ -74,7 +72,7 @@ public final class FastKV extends AbsFastKV {
     }
 
     private synchronized void loadData() {
-        // we got the object lock, notify the waiter to continue the constructor
+        // Once obtained the object lock, notify the waiter to continue the constructor
         synchronized (data) {
             startLoading = true;
             data.notify();
