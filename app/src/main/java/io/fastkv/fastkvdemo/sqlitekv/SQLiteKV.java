@@ -38,11 +38,11 @@ public final class SQLiteKV {
         db = openHelper.getWritableDatabase();
     }
 
-    public void clear() {
-        db.execSQL("DELETE from " + NUMBER_TABLE_NAME);
-        db.execSQL("DELETE from " + STRING_TABLE_NAME);
-        db.execSQL("DELETE from " + BLOB_TABLE_NAME);
-    }
+//    public void clear() {
+//        db.execSQL("DELETE from " + NUMBER_TABLE_NAME);
+//        db.execSQL("DELETE from " + STRING_TABLE_NAME);
+//        db.execSQL("DELETE from " + BLOB_TABLE_NAME);
+//    }
 
     public static void close(String name) {
         SQLiteKV kv = Builder.INSTANCE_MAP.get(name);
@@ -112,13 +112,13 @@ public final class SQLiteKV {
         return Float.intBitsToFloat(getInt(key, 0));
     }
 
-    public boolean putDouble(String key, double value) {
-        return putLong(key, Double.doubleToRawLongBits(value));
-    }
-
-    public double getDouble(String key) {
-        return Double.longBitsToDouble(getLong(key, 0L));
-    }
+//    public boolean putDouble(String key, double value) {
+//        return putLong(key, Double.doubleToRawLongBits(value));
+//    }
+//
+//    public double getDouble(String key) {
+//        return Double.longBitsToDouble(getLong(key, 0L));
+//    }
 
     public boolean putInt(String key, int value) {
         return putLong(key, (long) value & 0xFFFFFFFFL);
@@ -132,7 +132,7 @@ public final class SQLiteKV {
         ContentValues contentValues = new ContentValues();
         contentValues.put("k", key);
         contentValues.put("v", value);
-        long rowID = db.insert(NUMBER_TABLE_NAME, null, contentValues);
+        long rowID = db.replace(NUMBER_TABLE_NAME, null, contentValues);
         return rowID != -1;
     }
 
@@ -152,7 +152,7 @@ public final class SQLiteKV {
         ContentValues contentValues = new ContentValues();
         contentValues.put("k", key);
         contentValues.put("v", value);
-        long rowID = db.insert(STRING_TABLE_NAME, null, contentValues);
+        long rowID = db.replace(STRING_TABLE_NAME, null, contentValues);
         return rowID != -1;
     }
 
@@ -173,7 +173,7 @@ public final class SQLiteKV {
         ContentValues contentValues = new ContentValues();
         contentValues.put("k", key);
         contentValues.put("v", bytes);
-        long rowID = db.insert(BLOB_TABLE_NAME, null, contentValues);
+        long rowID = db.replace(BLOB_TABLE_NAME, null, contentValues);
         return rowID != -1;
     }
 
