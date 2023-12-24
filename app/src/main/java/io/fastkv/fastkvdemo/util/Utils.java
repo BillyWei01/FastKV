@@ -4,6 +4,7 @@ package io.fastkv.fastkvdemo.util;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Random;
@@ -15,6 +16,17 @@ public class Utils {
 
     public static byte[] getMD5Array(byte[] msg) throws NoSuchAlgorithmException {
         return MessageDigest.getInstance("MD5").digest(msg);
+    }
+
+    public static String getMD5(byte[] msg) {
+        if (msg == null) {
+            return "";
+        }
+        try {
+            return bytes2Hex(getMD5Array(msg));
+        } catch (Exception ignore) {
+        }
+        return bytes2Hex(Arrays.copyOf(msg, 16));
     }
 
     public static String bytes2Hex(byte[] bytes) {
@@ -39,7 +51,7 @@ public class Utils {
     }
 
     /**
-     * Get array with normal distribution.
+     * 获取正态分布的数据
      */
     public static int[] getDistributedArray(int n, int times, Random r) {
         int avg = n / 2;

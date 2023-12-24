@@ -26,12 +26,13 @@ class AppApplication : Application(), IAppContext {
 
     override fun onCreate() {
         super.onCreate()
+        // 第一件事，先初始APP上下文
         AppContext.init(this)
+
+        appId = ProcessUtil.getProcessName(this)
 
         FastKVConfig.setLogger(FastKVLogger)
         FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
-
-        appId = ProcessUtil.getProcessName(this)
 
         // Avoid files corruption in multi-process environment
         if(isMainProcess) {

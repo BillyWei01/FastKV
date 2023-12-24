@@ -12,8 +12,8 @@ object AppContext : IAppContext {
     var uid: Long = 0L
 
     // 如果有切换环境操作，最好重启一下APP(kill当前进程），
-    // 以避免异步线程将之前环境的数据写入切换后的环境，从而导致串数据。
-    var env = Env.ONLINE
+    // 以避免不同环境之间串数据。
+    var env = Env.PPE
 
     fun init(appContext: IAppContext) {
         contextProxy = appContext

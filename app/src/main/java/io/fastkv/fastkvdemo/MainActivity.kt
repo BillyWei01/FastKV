@@ -4,17 +4,15 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.account.AccountManager
-import io.fastkv.fastkvdemo.account.UserInfo
+import io.fastkv.fastkvdemo.data.UserInfo
 import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.data.SpCase
 import io.fastkv.fastkvdemo.data.UsageData
-import io.fastkv.fastkvdemo.data.UserSetting
 import io.fastkv.fastkvdemo.util.onClick
 import kotlinx.android.synthetic.main.activity_main.account_info_tv
 import kotlinx.android.synthetic.main.activity_main.login_btn
@@ -25,16 +23,9 @@ import kotlinx.android.synthetic.main.activity_main.tips_tv
 import kotlinx.android.synthetic.main.activity_main.user_info_tv
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
-    companion object {
-        const val TAG = "MainActivity"
-    }
-
-    var lastUid = 0L
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -43,21 +34,15 @@ class MainActivity : AppCompatActivity() {
 
         login_btn.onClick {
             if (AccountManager.isLogin()) {
-                lastUid = AppContext.uid
                 AccountManager.logout()
                 switch_account_btn.isEnabled = false
-
-                UserSetting.flags["logged"] = false
             } else {
-                if (lastUid == 0L) {
+                if (UsageData.lastLoginUid == 0L) {
                     AccountManager.login(10001L)
                 } else {
-                    AccountManager.login(lastUid)
+                    AccountManager.login(UsageData.lastLoginUid)
                 }
                 switch_account_btn.isEnabled = true
-
-
-                UserSetting.flags["logged"] = true
             }
             refreshAccountInfoViews()
         }
@@ -75,12 +60,6 @@ class MainActivity : AppCompatActivity() {
             refreshAccountInfoViews()
         }
 
-        // Test map
-        val logged = UserSetting.flags["logged"]
-        Log.d(TAG, "logged:$logged")
-
-        // Test 'remove'
-        // UserData.config.remove("notification")
 
         test_multi_process_btn.onClick {
             val intent = Intent(this, MultiProcessTestActivity::class.java)
@@ -118,7 +97,7 @@ class MainActivity : AppCompatActivity() {
             login_btn.text = getString(R.string.logout)
             account_info_tv.visibility = View.VISIBLE
             user_info_tv.visibility = View.VISIBLE
-            UserInfo.userAccount?.run {
+            UserInfo.get().userAccount?.run {
                 //val uid = CommonStorage.uid
                 account_info_tv.text =
                     "uid: $uid\nnickname: $nickname\nphone: $phoneNo\nemail: $email"

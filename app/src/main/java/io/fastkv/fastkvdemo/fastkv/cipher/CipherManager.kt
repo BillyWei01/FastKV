@@ -6,7 +6,7 @@ import io.fastkv.fastkvdemo.manager.PathManager
 
 object CipherManager {
     val defaultCipher: AESCipher = getKVCipher()
-    val numberCipher: NumberCipher = defaultCipher.numberCipher
+    // val numberCipher: NumberCipher = defaultCipher.numberCipher
 
     private fun getKVCipher(): AESCipher {
        val cipherSetting = FastKV.Builder(PathManager.fastKVDir, "cipher_setting")

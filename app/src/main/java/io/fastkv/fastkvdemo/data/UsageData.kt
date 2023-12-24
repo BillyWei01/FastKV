@@ -1,11 +1,11 @@
 package io.fastkv.fastkvdemo.data
 
-import io.fastkv.fastkvdemo.fastkv.GlobalStorage
+import io.fastkv.fastkvdemo.fastkv.kvbase.GlobalKV
 
 /**
  * APP使用信息
  */
-object UsageData : GlobalStorage("common_storage") {
+object UsageData : GlobalKV("usage_data") {
     var launchCount by int("launch_count")
 
     // 首次启动时间
@@ -19,7 +19,8 @@ object UsageData : GlobalStorage("common_storage") {
     // 上次安装版本（用于判断本次打开是否版本升级）
     var lastVersion by int("last_version")
 
+    // 上次登录的账号
+    var lastLoginUid by long("last_login_uid")
+
     var benchmarkCount by int("benchmark_count")
-
-
 }

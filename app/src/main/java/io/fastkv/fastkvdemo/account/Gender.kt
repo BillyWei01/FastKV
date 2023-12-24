@@ -1,6 +1,7 @@
 package io.fastkv.fastkvdemo.account
 
-import io.fastkv.fastkvdemo.fastkv.IntEnumConverter
+import io.fastkv.fastkvdemo.fastkv.kvdelegate.IntEnumConverter
+
 
 enum class Gender(private val value: Int) {
     UNKNOWN(0),
