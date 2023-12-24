@@ -414,7 +414,7 @@ public final class MPFastKV extends AbsFastKV {
                 aBuffer.force();
             }
             if (bChannel != null) {
-                bChannel.force(false);
+                bChannel.force(true);
             }
         } catch (Exception e) {
             error(e);
@@ -503,7 +503,7 @@ public final class MPFastKV extends AbsFastKV {
 
             if (!deletedFiles.isEmpty()) {
                 for (String oldFileName : deletedFiles) {
-                    FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
+                    deleteExternalFile(oldFileName);
                 }
             }
 
@@ -528,7 +528,7 @@ public final class MPFastKV extends AbsFastKV {
     }
 
     private void waitExternalWriting() {
-        while (!externalExecutor.isEmpty()) {
+        while (externalExecutor.isNotEmpty()) {
             try {
                 //noinspection BusyWait
                 Thread.sleep(10L);

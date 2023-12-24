@@ -355,7 +355,7 @@ public final class FastKV extends AbsFastKV {
             removeStart = 0;
             if (oldFileName != null) {
                 if (writingMode == NON_BLOCKING) {
-                    FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
+                    deleteExternalFile(oldFileName);
                 } else {
                     deletedFiles.add(oldFileName);
                 }
@@ -477,7 +477,7 @@ public final class FastKV extends AbsFastKV {
     private void clearDeletedFiles() {
         if (!deletedFiles.isEmpty()) {
             for (String oldFileName : deletedFiles) {
-                FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
+                deleteExternalFile(oldFileName);
             }
             deletedFiles.clear();
         }
@@ -645,7 +645,7 @@ public final class FastKV extends AbsFastKV {
 
     protected void removeOldFile(String oldFileName) {
         if (writingMode == NON_BLOCKING) {
-            FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
+            deleteExternalFile(oldFileName);
         } else {
             deletedFiles.add(oldFileName);
         }
@@ -722,9 +722,9 @@ public final class FastKV extends AbsFastKV {
         closed = true;
         if (writingMode == NON_BLOCKING) {
             try {
-                aChannel.force(false);
+                aChannel.force(true);
                 aChannel.close();
-                bChannel.force(false);
+                bChannel.force(true);
                 bChannel.close();
             } catch (Exception e) {
                 error(e);

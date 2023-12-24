@@ -86,7 +86,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected final WeakCache externalCache = new WeakCache();
     protected final WeakCache bigValueCache = new WeakCache();
 
-    protected final TagExecutor externalExecutor = new TagExecutor();
+    protected final ExternalExecutor externalExecutor = new ExternalExecutor();
     protected final Executor applyExecutor = new LimitExecutor();
 
     protected int invalidBytes;
@@ -226,7 +226,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         copyToMainFile(tempKV);
 
         // Waiting for moving external files
-        while (!tempKV.externalExecutor.isEmpty()) {
+        while (tempKV.externalExecutor.isNotEmpty()) {
             try {
                 //noinspection BusyWait
                 Thread.sleep(10L);
@@ -279,6 +279,14 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             return true;
         }
         return false;
+    }
+
+    protected final void deleteExternalFile(String fileName) {
+        FastKVConfig.getExecutor().execute(() -> {
+            if (!externalExecutor.cancelTask(fileName)) {
+                Utils.deleteFile(new File(path + name, fileName));
+            }
+        });
     }
 
     protected final void deleteCFiles() {
@@ -1483,11 +1491,14 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             int offset = wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
             if (offset > 0) {
                 // The reference of 'value' will not be gc before finishing 'saveBytes',
-                // So before the value saving to disk, it could be read with 'externalCache'.
+                // So before the value saving to disk, we can read it from 'externalCache'.
                 externalCache.put(fileName, value);
-                externalExecutor.execute(key, () -> {
-                    if (!Utils.saveBytes(new File(path + name, fileName), value)) {
-                        info("Write large value with key:" + key + " failed");
+                externalExecutor.execute(fileName, canceled -> {
+                    if (!canceled.get()) {
+                        File file = new File(path + name, fileName);
+                        if (!Utils.saveBytes(file, value, canceled)) {
+                            info("Write large value with key:" + key + " failed");
+                        }
                     }
                 });
                 tempExternalName = fileName;
