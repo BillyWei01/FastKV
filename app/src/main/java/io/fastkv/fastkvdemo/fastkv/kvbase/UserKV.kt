@@ -2,6 +2,7 @@ package io.fastkv.fastkvdemo.fastkv.kvbase
 
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.base.AppContext
+import io.fastkv.fastkvdemo.fastkv.cipher.CipherManager
 import io.fastkv.fastkvdemo.fastkv.kvdelegate.KVData
 import io.fastkv.fastkvdemo.manager.PathManager
 
@@ -17,7 +18,10 @@ abstract class UserKV(
     override val kv: FastKV by lazy {
         val dir = "${userId}_${AppContext.env.tag}"
         val path = PathManager.fastKVDir + "/user/" + dir
-        buildKV(path, name)
+        FastKV.Builder(path, name)
+            .encoder(encoders())
+            .cipher(CipherManager.defaultCipher)
+            .build()
     }
 
     /*

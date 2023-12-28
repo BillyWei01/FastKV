@@ -11,6 +11,8 @@ import io.fastkv.fastkvdemo.manager.PathManager
 open class EnvironmentKV(private val name: String) : KVData() {
     override val kv: FastKV by lazy {
         val path = PathManager.fastKVDir +"/"+AppContext.env.tag
-        buildKV(path, name)
+        FastKV.Builder(path, name)
+            .encoder(encoders())
+            .build()
     }
 }

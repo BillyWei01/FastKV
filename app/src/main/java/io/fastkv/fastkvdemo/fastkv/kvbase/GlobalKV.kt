@@ -6,6 +6,6 @@ import io.fastkv.fastkvdemo.manager.PathManager
 
 open class GlobalKV(name: String) : KVData() {
     override val kv: FastKV by lazy {
-        buildKV(PathManager.fastKVDir, name)
+        FastKV.Builder(PathManager.fastKVDir, name).encoder(encoders()).build()
     }
 }
