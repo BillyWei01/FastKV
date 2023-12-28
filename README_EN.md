@@ -149,7 +149,7 @@ and [TestService](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/ja
 ### 2.9 Kotlin delegation
 Kotlin is compatible with java, so you could directly use FastKV or SharedPreferences APIs in Kotlin.
 In addition, kotlin provides the syntax of delegate, which can be used to improve key-value API.
-Refer to [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/KVData.kt)
+Refer to [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt)
 
 ## 3. Benchmark
 - Data source: Collecting part of the key-value data of SharePreferences in the app (with  confusion) , hundreds of key-values. <br/>

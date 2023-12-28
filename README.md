@@ -142,7 +142,7 @@ MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接�
 ### 2.9 Kotlin 委托
 Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。 <br>
 此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。 <br>
-可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/KVData.kt) <br>
+可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt) <br>
 KVData中包含了基础类型，对象类型，枚举类型，Map等的封装，具体可参考项目中的Demo。
 
 ### 2.10 注意事项
