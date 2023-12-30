@@ -6,7 +6,7 @@ import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
 
 
-//------------------------“两级Key”属性委托的实现-------------------------
+//------------------------组合key的属性委托实现-------------------------
 
 private class LazyInitializer<T>(initializer: (KVData) -> T) : LazyInitWrapper<KVData, T>(initializer)
 
@@ -19,6 +19,7 @@ class CombineKeyProperty(private val preKey: String) : ReadOnlyProperty<KVData, 
 }
 
 class CombineKV(private val preKey: String, private val kvData: KVData) {
+    // 组合两级 'key'
     private fun combineKey(key: String): String {
         return "${preKey}__${key}"
     }
@@ -105,7 +106,7 @@ class CombineKV(private val preKey: String, private val kvData: KVData) {
 }
 
 
-//------------------------Map类型属性委托的实现-------------------------
+//------------------------Map类型的属性委托实现-------------------------
 
 open class KVMapper(protected val combineKV: CombineKV) {
     fun contains(key: String): Boolean {
