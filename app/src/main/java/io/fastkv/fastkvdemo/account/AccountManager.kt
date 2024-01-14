@@ -20,7 +20,7 @@ object AccountManager {
         // UserInfo.close(AppContext.uid)
 
         AppContext.uid = 0L
-        AppState.user_id = 0L
+        AppState.userId = 0L
         return true
     }
 
@@ -57,7 +57,7 @@ object AccountManager {
         AppContext.uid = uid
 
         // 保存用户ID
-        AppState.user_id = uid
+        AppState.userId = uid
 
         // 记录当前登录ID，以便在登出后再登录时记忆上次登录的账号
         UsageData.lastLoginUid = uid

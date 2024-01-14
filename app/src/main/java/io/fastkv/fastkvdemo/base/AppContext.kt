@@ -17,7 +17,7 @@ object AppContext : IAppContext {
 
     fun init(appContext: IAppContext) {
         contextProxy = appContext
-        uid = AppState.user_id
+        uid = AppState.userId
         env = AppState.environment
     }
 

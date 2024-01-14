@@ -26,8 +26,10 @@ abstract class KVData {
     protected fun string(key: String, defValue: String = "") = StringProperty(key, defValue)
     protected fun array(key: String, defValue: ByteArray = EMPTY_ARRAY) = ArrayProperty(key, defValue)
 
-    // 对象类型
+    // 内置的对象类型
     protected fun stringSet(key: String, defValue: Set<String>? = null) = StringSetProperty(key, defValue)
+
+    // 自定义对象类型
     protected fun <T> obj(key: String, encoder: FastEncoder<T>, defValue: T? = null) = ObjectProperty(key, encoder, defValue)
 
     // 枚举类型

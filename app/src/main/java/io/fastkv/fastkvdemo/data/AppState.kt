@@ -4,14 +4,14 @@ import io.fastkv.fastkvdemo.base.Env
 import io.fastkv.fastkvdemo.fastkv.kvbase.GlobalKV
 
 /**
- * 本地信息，不需要同步。
+ * APP信息
  */
 object AppState : GlobalKV("app_state") {
     // 服务器环境
     var environment by stringEnum("environment", Env.CONVERTER)
 
     // 用户ID
-    var user_id by long("user_id")
+    var userId by long("user_id")
 
     // 设备ID
     var deviceId by string("device_id")
