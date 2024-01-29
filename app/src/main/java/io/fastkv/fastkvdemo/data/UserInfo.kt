@@ -4,7 +4,7 @@ import android.util.ArrayMap
 import io.fastkv.fastkvdemo.account.AccountInfo
 import io.fastkv.fastkvdemo.account.Gender
 import io.fastkv.fastkvdemo.base.AppContext
-import io.fastkv.fastkvdemo.fastkv.LongListEncoder
+import io.fastkv.fastkvdemo.fastkv.utils.LongListEncoder
 import io.fastkv.fastkvdemo.fastkv.kvbase.UserKV
 import io.fastkv.interfaces.FastEncoder
 
@@ -29,11 +29,15 @@ class UserInfo(uid: Long): UserKV("user_info", uid) {
     }
 
     override fun encoders(): Array<FastEncoder<*>> {
-        return arrayOf(AccountInfo.ENCODER, LongListEncoder)
+        return arrayOf(
+            AccountInfo.ENCODER,
+            Gender.CONVERTER,
+            LongListEncoder
+        )
     }
 
-    var userAccount by obj("user_account", AccountInfo.ENCODER)
-    var gender by intEnum("gender", Gender.CONVERTER)
+    var userAccount by nullableObj("user_account", AccountInfo.ENCODER)
+    var gender by obj("gender", Gender.CONVERTER, Gender.UNKNOWN)
     var isVip by boolean("is_vip")
     var fansCount by int("fans_count")
     var score by float("score")
@@ -42,8 +46,8 @@ class UserInfo(uid: Long): UserKV("user_info", uid) {
     var sign by string("sing")
     var lock by array("lock")
     var tags by stringSet("tags")
-    var friendIdList by obj("favorite_channels", LongListEncoder)
-    val favorites by string2Set("favorites")
-    val config by combineKey("config")
+    var friendIdList by obj("favorite_channels", LongListEncoder, emptyList())
+    val favorites by extNullableStringSet("favorites")
+    val config by combineKV("config")
 }
 

@@ -8,7 +8,7 @@ import io.fastkv.FastKVConfig
 import io.fastkv.fastkvdemo.BuildConfig
 import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.base.IAppContext
-import io.fastkv.fastkvdemo.fastkv.FastKVLogger
+import io.fastkv.fastkvdemo.fastkv.utils.FastKVLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 

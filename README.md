@@ -88,8 +88,11 @@ Builder的构造可传Context或者path。<br>
     List<Long> list2 = kv.getObject("long_list");
 ```
 
-除了支持基本类型外，FastKV还支持写入对象，只需在构建FastKV实例时传入对象的编码器即可。<br>
-编码器为实现FastEncoder接口的对象。<br>
+除了支持基本类型外，FastKV还支持写入对象。 <br>
+如果要写入自定义对象，需在构建FastKV实例时传入对象的编码器(实现了FastEncoder接口的对象）。<br>
+因为FastKV实例加载时会执行自动反序列化，所以需要在实例创建时注入编码器。<br>
+另外，如果没有注入编码器，调用putObject接口时会抛出异常（提醒使用者给FastKV实例传入编码器）。<br>
+
 上面LongListEncoder就实现了FastEncoder接口，代码实现可参考：
 [LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt)<br>
 

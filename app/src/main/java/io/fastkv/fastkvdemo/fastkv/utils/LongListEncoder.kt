@@ -1,4 +1,4 @@
-package io.fastkv.fastkvdemo.fastkv
+package io.fastkv.fastkvdemo.fastkv.utils
 
 import io.fastkv.interfaces.FastEncoder
 import io.packable.PackDecoder

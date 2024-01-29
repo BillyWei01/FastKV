@@ -4,17 +4,15 @@ import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 import java.security.Key;
 import java.security.KeyStore;
-import java.util.Arrays;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 
-import io.fastkv.fastkvdemo.fastkv.FastKVLogger;
+import io.fastkv.fastkvdemo.fastkv.utils.FastKVLogger;
 
 public class KeyStoreHelper {
     private static final String ALIAS = "KeyStoreHelper";

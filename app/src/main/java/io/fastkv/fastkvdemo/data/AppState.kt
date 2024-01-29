@@ -8,7 +8,7 @@ import io.fastkv.fastkvdemo.fastkv.kvbase.GlobalKV
  */
 object AppState : GlobalKV("app_state") {
     // 服务器环境
-    var environment by stringEnum("environment", Env.CONVERTER)
+    var environment by obj("environment", Env.CONVERTER, Env.PPE)
 
     // 用户ID
     var userId by long("user_id")

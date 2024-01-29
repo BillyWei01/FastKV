@@ -4,6 +4,8 @@ import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.fastkv.cipher.CipherManager
 import io.fastkv.fastkvdemo.fastkv.kvdelegate.KVData
+import io.fastkv.fastkvdemo.fastkv.kvdelegate.KVStore
+import io.fastkv.fastkvdemo.fastkv.utils.FastKVStore
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.util.Utils
 
@@ -16,7 +18,7 @@ abstract class UserKV(
     private val name: String,
     private val userId: Long
 ) : KVData() {
-    override val kv: FastKV by lazy {
+    override val kv: KVStore by lazy {
         val dir = "${userId}_${AppContext.env.tag}"
         val finalDir = if (AppContext.debug) {
             dir
@@ -25,9 +27,11 @@ abstract class UserKV(
             Utils.getMD5(dir.toByteArray())
         }
         val path = PathManager.fastKVDir + "/user/" + finalDir
-        FastKV.Builder(path, name)
-            .encoder(encoders())
-            .cipher(CipherManager.defaultCipher)
-            .build()
+        FastKVStore(
+            FastKV.Builder(path, name)
+                .encoder(encoders())
+                .cipher(CipherManager.defaultCipher)
+                .build()
+        )
     }
 }

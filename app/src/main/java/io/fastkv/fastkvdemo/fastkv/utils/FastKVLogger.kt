@@ -1,4 +1,4 @@
-package io.fastkv.fastkvdemo.fastkv
+package io.fastkv.fastkvdemo.fastkv.utils
 
 import android.util.Log
 import io.fastkv.interfaces.FastLogger

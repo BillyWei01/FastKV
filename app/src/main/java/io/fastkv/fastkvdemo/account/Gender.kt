@@ -1,6 +1,7 @@
 package io.fastkv.fastkvdemo.account
 
-import io.fastkv.fastkvdemo.fastkv.kvdelegate.IntEnumConverter
+import io.fastkv.interfaces.FastEncoder
+import java.nio.ByteBuffer
 
 
 enum class Gender(private val value: Int) {
@@ -9,17 +10,25 @@ enum class Gender(private val value: Int) {
     FEMALE(2);
 
     companion object {
-        val CONVERTER = object : IntEnumConverter<Gender> {
-            override fun intToType(value: Int): Gender {
-                return when (value) {
-                    1 -> MALE
-                    2 -> FEMALE
-                    else -> UNKNOWN
-                }
+        fun intToType(value: Int): Gender {
+            return when (value) {
+                1 -> MALE
+                2 -> FEMALE
+                else -> UNKNOWN
+            }
+        }
+
+        val CONVERTER = object : FastEncoder<Gender> {
+            override fun tag(): String {
+                return "Gender"
             }
 
-            override fun typeToInt(type: Gender): Int {
-                return type.value
+            override fun decode(bytes: ByteArray, offset: Int, length: Int): Gender {
+                return intToType(ByteBuffer.wrap(bytes, offset, length).int)
+            }
+
+            override fun encode(obj: Gender): ByteArray {
+                return ByteBuffer.allocate(4).putInt(obj.value).array()
             }
         }
     }

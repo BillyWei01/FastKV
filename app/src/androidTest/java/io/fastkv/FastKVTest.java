@@ -14,7 +14,6 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -24,7 +23,7 @@ import java.util.Random;
 import java.util.Set;
 
 import io.fastkv.fastkvdemo.base.AppContext;
-import io.fastkv.fastkvdemo.fastkv.LongListEncoder;
+import io.fastkv.fastkvdemo.fastkv.utils.LongListEncoder;
 import io.fastkv.interfaces.FastEncoder;
 
 /*

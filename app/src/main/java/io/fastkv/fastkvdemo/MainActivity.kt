@@ -98,7 +98,6 @@ class MainActivity : AppCompatActivity() {
             account_info_tv.visibility = View.VISIBLE
             user_info_tv.visibility = View.VISIBLE
             UserInfo.get().userAccount?.run {
-                //val uid = CommonStorage.uid
                 account_info_tv.text =
                     "uid: $uid\nnickname: $nickname\nphone: $phoneNo\nemail: $email"
             }
