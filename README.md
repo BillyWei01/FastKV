@@ -146,15 +146,13 @@ MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接�
 Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。 <br>
 此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。 <br>
 可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt) <br>
-KVData中包含了基础类型，对象类型，枚举类型，Map等的封装，具体可参考项目中的Demo。
 
 ### 2.10 注意事项
 1. 不同版本之间，不要改变路径和名字，否则会打开不同的文件。 <br>
 2. 如果使用了Cipher(加密)，不要更换，否则会打开文件时会解析不了。
    不过从没有使用Cipher到使用Cipher是可以的，FastKV会先解析未加密的数据，然后在重新加密写入<br>
-3. 同一个key, 对应的value需要从一而终。
-   例如，上一个版本是putString，下一个版本切换到putInt，会抛出类型转换异常。 <br>
-   再比如，同一个key, A处putString, B处putInt (不管是否同一个版本)，也会抛出类型转换异常。
+3. 同一个key, 对应的value的操作应保持类型一致。
+   比如，同一个key, A处putString, B处getInt, 则无法返回预期的value。
 
 ## 3. 性能测试
 - 测试数据：搜集APP中的SharePreferences汇总的部份key-value数据（经过随机混淆）得到总共六百多个key-value。<br>
