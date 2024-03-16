@@ -102,14 +102,14 @@ You only need to pass in the encoder of the object when building FastKV instance
 The encoder is an object that implements
 [FastEncoder](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastEncoder.java).<br/>
 For example, the code of 'LongListEncoder' like:
-[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt)<br>
+[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/androidTest/java/io/fastkv/LongListEncoder.kt)<br>
 
 Encoding objects needs serialization/deserialization. <br/>
 Here recommend my serialization project: https://github.com/BillyWei01/Packable
 
 ### 2.5 Data encryption
 If you need to encrypt data, just pass in the implementation of
-[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastCipher.java)  when creating a FastKV instance
+[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java)  when creating a FastKV instance
 
 ```
 FastKV kv = FastKV.Builder(path, name)

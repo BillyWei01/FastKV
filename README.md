@@ -94,14 +94,14 @@ Builder的构造可传Context或者path。<br>
 另外，如果没有注入编码器，调用putObject接口时会抛出异常（提醒使用者给FastKV实例传入编码器）。<br>
 
 上面LongListEncoder就实现了FastEncoder接口，代码实现可参考：
-[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt)<br>
+[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/androidTest/java/io/fastkv/LongListEncoder.kt)<br>
 
 编码对象涉及序列化/反序列化。<br>
 这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
 
 ### 2.5 数据加密
 如需对数据进行加密，在创建FastKV实例时传入
-[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastCipher.java) 的实现即可。
+[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java) 的实现即可。
 
 ```
 FastKV kv = FastKV.Builder(path, name)
