@@ -13,10 +13,6 @@ import io.fastkv.fastkvdemo.manager.PathManager
  */
 open class GlobalKV(name: String) : KVData() {
     override val kv: KVStore by lazy {
-        FastKVStore(
-            FastKV.Builder(PathManager.fastKVDir, name)
-                .encoder(encoders())
-                .build()
-        )
+        FastKVStore(FastKV.Builder(PathManager.fastKVDir, name).build())
     }
 }

@@ -1,7 +1,6 @@
 package io.fastkv.fastkvdemo.base
 
-import io.fastkv.interfaces.FastEncoder
-
+import io.fastkv.fastkvdemo.fastkv.kvdelegate.ObjectEncoder
 
 /**
  * Server Environment
@@ -27,18 +26,14 @@ enum class Env(val tag: String) {
     BOE("boe");
 
     companion object {
-        val CONVERTER = object : FastEncoder<Env> {
-            override fun tag(): String {
-               return "Env"
-            }
-
-            override fun decode(bytes: ByteArray, offset: Int, length: Int): Env {
-                val value = String(bytes, offset, length, Charsets.UTF_8)
+        val CONVERTER = object : ObjectEncoder<Env> {
+            override fun decode(data: ByteArray): Env {
+                val value = String(data)
                 return if (value == BOE.tag) BOE else PPE
             }
 
             override fun encode(obj: Env): ByteArray {
-                return obj.tag.toByteArray(Charsets.UTF_8)
+                return obj.tag.toByteArray()
             }
         }
     }

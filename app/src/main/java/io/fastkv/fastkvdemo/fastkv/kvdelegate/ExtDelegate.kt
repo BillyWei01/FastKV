@@ -1,6 +1,5 @@
 package io.fastkv.fastkvdemo.fastkv.kvdelegate
 
-import io.fastkv.interfaces.FastEncoder
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
 
@@ -32,9 +31,8 @@ class CombineKV(private val key: String, private val kvData: KVData): KVStore {
     private val kv: KVStore
         get() = kvData.kv
 
-    private fun combineKey(extKey: Any): String {
-        val extKeyStr = extKey.toString()
-        return if (extKeyStr.isEmpty()) key else "$key$SEPARATOR$extKeyStr"
+    private fun combineKey(extKey: String): String {
+        return if (extKey.isEmpty()) key else "$key$SEPARATOR$extKey"
     }
 
     override fun putBoolean(extKey: String, value: Boolean?) {
@@ -121,12 +119,20 @@ class CombineKV(private val key: String, private val kvData: KVData): KVStore {
         return kv.getStringSet(combineKey(extKey))
     }
 
-    override fun <T> putObject(key: String, value: T?, encoder: FastEncoder<T>) {
-        kv.putObject(key, value, encoder)
+    override fun <T> putObject(extKey: String, value: T, encoder: ObjectEncoder<T>) {
+        kv.putObject(combineKey(extKey), value, encoder)
     }
 
-    override fun <T> getObject(key: String): T? {
-        return kv.getObject(key)
+    override fun <T> getObject(extKey: String, encoder: ObjectEncoder<T>, defValue: T): T {
+        return kv.getObject(combineKey(extKey), encoder, defValue)
+    }
+
+    override fun <T> putNullableObject(extKey: String, value: T?, encoder: NullableObjectEncoder<T>) {
+        kv.putNullableObject(combineKey(extKey), value, encoder)
+    }
+
+    override fun <T> getNullableObject(extKey: String, encoder: NullableObjectEncoder<T>): T? {
+        return kv.getNullableObject(combineKey(extKey), encoder)
     }
 }
 
@@ -405,16 +411,16 @@ class ExtSetNullableString(combineKV: CombineKV) : ExtKV(combineKV) {
 
 //--------------------------------------------------------------------
 
-class ExtObjectProperty<T>(key: String, encoder: FastEncoder<T>, defValue: T) :
+class ExtObjectProperty<T>(key: String, encoder: ObjectEncoder<T>, defValue: T) :
     ExtProperty<ExtObject<T>>(key, { ExtObject(it, encoder, defValue) })
 
 class ExtObject<T>(
     combineKV: CombineKV,
-    private val encoder: FastEncoder<T>,
+    private val encoder: ObjectEncoder<T>,
     private val defValue: T
 ) : ExtKV(combineKV) {
     operator fun get(extKey: Any): T {
-        return combineKV.getObject(extKey.toString()) ?: defValue
+        return combineKV.getObject(extKey.toString(), encoder, defValue)
     }
 
     operator fun set(extKey: Any, value: T) {
@@ -422,19 +428,19 @@ class ExtObject<T>(
     }
 }
 
-class ExtNullableObjectProperty<T>(key: String, encoder: FastEncoder<T>) :
+class ExtNullableObjectProperty<T>(key: String, encoder: NullableObjectEncoder<T>) :
     ExtProperty<ExtNullableObject<T>>(key, { ExtNullableObject(it, encoder) })
 
 class ExtNullableObject<T>(
     combineKV: CombineKV,
-    private val encoder: FastEncoder<T>,
+    private val encoder: NullableObjectEncoder<T>,
 ) : ExtKV(combineKV) {
     operator fun get(extKey: Any): T? {
-        return combineKV.getObject(extKey.toString())
+        return combineKV.getNullableObject(extKey.toString(), encoder)
     }
 
     operator fun set(extKey: Any, value: T?) {
-        combineKV.putObject(extKey.toString(), value, encoder)
+        combineKV.putNullableObject(extKey.toString(), value, encoder)
     }
 }
 

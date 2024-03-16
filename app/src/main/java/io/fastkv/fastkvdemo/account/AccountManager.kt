@@ -73,7 +73,7 @@ object AccountManager {
     private fun fetchUserInfo(uid: Long) {
         UserInfo.get(uid).run {
             isVip = true
-            gender = Gender.intToType((uid % 10000 % 3).toInt())
+            gender = Gender.parse((uid % 10000 % 3).toInt())
             fansCount = Random.nextInt(10000)
             score = 4.5f
             loginTime = System.currentTimeMillis()

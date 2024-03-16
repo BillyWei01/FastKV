@@ -20,7 +20,7 @@ import io.fastkv.interfaces.FastEncoder;
  */
 class Container {
     static abstract class BaseContainer {
-        // The offset record the start of value, not the start of key-value.
+        // Note: This is the offset of value, not offset of key-value.
         int offset;
 
         abstract byte getType();

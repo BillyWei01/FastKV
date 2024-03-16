@@ -6,7 +6,6 @@ import io.fastkv.fastkvdemo.account.Gender
 import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.fastkv.utils.LongListEncoder
 import io.fastkv.fastkvdemo.fastkv.kvbase.UserKV
-import io.fastkv.interfaces.FastEncoder
 
 /**
  * 用户信息
@@ -26,14 +25,6 @@ class UserInfo(uid: Long): UserKV("user_info", uid) {
                 UserInfo(uid)
             }
         }
-    }
-
-    override fun encoders(): Array<FastEncoder<*>> {
-        return arrayOf(
-            AccountInfo.ENCODER,
-            Gender.CONVERTER,
-            LongListEncoder
-        )
     }
 
     var userAccount by nullableObj("user_account", AccountInfo.ENCODER)

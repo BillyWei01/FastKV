@@ -1,6 +1,5 @@
 package io.fastkv.fastkvdemo.fastkv.kvdelegate
 
-import io.fastkv.interfaces.FastEncoder
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
@@ -197,24 +196,40 @@ class NullableStringSetProperty(private val key: String) :
 
 //--------------------------------------------------------------------
 
-class ObjectProperty<T>(private val key: String, private val encoder: FastEncoder<T>, private val defValue: T) :
-    ReadWriteProperty<KVData, T> {
+class ObjectProperty<T>(
+    private val key: String,
+    private val encoder: ObjectEncoder<T>,
+    private val defValue: T
+) : ReadWriteProperty<KVData, T> {
+    private var instance: T? = null
+
+    @Synchronized
     override fun getValue(thisRef: KVData, property: KProperty<*>): T {
-        return thisRef.kv.getObject(key) ?: defValue
+        return instance ?: thisRef.kv.getObject(key, encoder, defValue).also { instance = it }
     }
 
+    @Synchronized
     override fun setValue(thisRef: KVData, property: KProperty<*>, value: T) {
+        instance = value
         thisRef.kv.putObject(key, value, encoder)
     }
 }
 
-class NullableObjectSetProperty<T>(private val key: String, private val encoder: FastEncoder<T>) :
+class NullableObjectSetProperty<T>(
+    private val key: String,
+    private val encoder: NullableObjectEncoder<T>
+) :
     ReadWriteProperty<KVData, T?> {
+    private var instance: T? = null
+
+    @Synchronized
     override fun getValue(thisRef: KVData, property: KProperty<*>): T? {
-        return thisRef.kv.getObject(key)
+        return instance ?: thisRef.kv.getNullableObject(key, encoder)?.also { instance = it }
     }
 
+    @Synchronized
     override fun setValue(thisRef: KVData, property: KProperty<*>, value: T?) {
-        thisRef.kv.putObject(key, value, encoder)
+        instance = value
+        thisRef.kv.putNullableObject(key, value, encoder)
     }
 }

@@ -23,7 +23,6 @@ import java.util.Random;
 import java.util.Set;
 
 import io.fastkv.fastkvdemo.base.AppContext;
-import io.fastkv.fastkvdemo.fastkv.utils.LongListEncoder;
 import io.fastkv.interfaces.FastEncoder;
 
 public class MPFastKVTest {

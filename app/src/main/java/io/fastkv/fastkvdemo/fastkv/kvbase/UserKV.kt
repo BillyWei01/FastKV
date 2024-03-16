@@ -29,7 +29,6 @@ abstract class UserKV(
         val path = PathManager.fastKVDir + "/user/" + finalDir
         FastKVStore(
             FastKV.Builder(path, name)
-                .encoder(encoders())
                 .cipher(CipherManager.defaultCipher)
                 .build()
         )

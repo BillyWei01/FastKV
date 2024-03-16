@@ -1,5 +1,6 @@
 package io.fastkv.fastkvdemo.account
 
+import io.fastkv.fastkvdemo.fastkv.kvdelegate.NullableObjectEncoder
 import io.fastkv.interfaces.FastEncoder
 import io.packable.PackCreator
 import io.packable.PackDecoder
@@ -33,17 +34,15 @@ data class AccountInfo(
             )
         }
 
-        val ENCODER = object : FastEncoder<AccountInfo> {
-            override fun tag(): String {
-                return "UserAccount"
-            }
-
-            override fun encode(obj: AccountInfo): ByteArray {
+        val ENCODER = object : NullableObjectEncoder<AccountInfo> {
+            override fun encode(obj: AccountInfo?): ByteArray? {
+                if(obj == null) return null
                 return PackEncoder.marshal(obj)
             }
 
-            override fun decode(bytes: ByteArray, offset: Int, length: Int): AccountInfo {
-               return PackDecoder.unmarshal(bytes, offset, length, CREATOR)
+            override fun decode(data: ByteArray?): AccountInfo? {
+                if(data == null) return null
+                return PackDecoder.unmarshal(data, CREATOR)
             }
         }
     }

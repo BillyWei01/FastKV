@@ -25,14 +25,6 @@ abstract class KVData {
      */
     abstract val kv: KVStore
 
-    /**
-     * 当子类需要定义 [obj] 类型的属性时，
-     * 需要重载此方法并返回对应的 [FastEncoder]
-     */
-    protected open fun encoders(): Array<FastEncoder<*>>? {
-        return null
-    }
-
     // 基础类型
     protected fun boolean(key: String, defValue: Boolean = false) = BooleanProperty(key, defValue)
     protected fun int(key: String, defValue: Int = 0) = IntProperty(key, defValue)
@@ -42,7 +34,7 @@ abstract class KVData {
     protected fun string(key: String, defValue: String = "") = StringProperty(key, defValue)
     protected fun array(key: String, defValue: ByteArray = EMPTY_ARRAY) = ArrayProperty(key, defValue)
     protected fun stringSet(key: String, defValue: Set<String> = emptySet()) = StringSetProperty(key, defValue)
-    protected fun <T> obj(key: String, encoder: FastEncoder<T>, defValue: T) = ObjectProperty(key, encoder, defValue)
+    protected fun <T> obj(key: String, encoder: ObjectEncoder<T>, defValue: T) = ObjectProperty(key, encoder, defValue)
 
     protected fun nullableBoolean(key: String) = NullableBooleanProperty(key)
     protected fun nullableInt(key: String) = NullableIntProperty(key)
@@ -52,7 +44,7 @@ abstract class KVData {
     protected fun nullableString(key: String) = NullableStringProperty(key)
     protected fun nullableArray(key: String) = NullableArrayProperty(key)
     protected fun nullableStringSet(key: String) = NullableStringSetProperty(key)
-    protected fun <T> nullableObj(key: String, encoder: FastEncoder<T>) = NullableObjectSetProperty(key, encoder)
+    protected fun <T> nullableObj(key: String, encoder: NullableObjectEncoder<T>) = NullableObjectSetProperty(key, encoder)
 
     // 扩展key的基础类型
     protected fun extBoolean(key: String, defValue: Boolean = false) = ExtBooleanProperty(key, defValue)
@@ -63,7 +55,7 @@ abstract class KVData {
     protected fun extString(key: String, defValue: String = "") = ExtStringProperty(key, defValue)
     protected fun extArray(key: String, defValue: ByteArray = EMPTY_ARRAY) = ExtArrayProperty(key, defValue)
     protected fun extStringSet(key: String, defValue: Set<String> = emptySet()) = ExtStringSetProperty(key, defValue)
-    protected fun <T> extObj(key: String, encoder: FastEncoder<T>, defValue: T) = ExtObjectProperty(key, encoder, defValue)
+    protected fun <T> extObj(key: String, encoder: ObjectEncoder<T>, defValue: T) = ExtObjectProperty(key, encoder, defValue)
 
     protected fun extNullableBoolean(key: String) = ExtNullableBooleanProperty(key)
     protected fun extNullableInt(key: String) = ExtNullableIntProperty(key)
@@ -73,7 +65,7 @@ abstract class KVData {
     protected fun extNullableString(key: String) = ExtNullableStringProperty(key)
     protected fun extNullableArray(key: String) = ExtNullableArrayProperty(key)
     protected fun extNullableStringSet(key: String) = ExtNullableStringSetProperty(key)
-    protected fun <T> extNullableObj(key: String, encoder: FastEncoder<T>) = ExtNullableObjectProperty(key, encoder)
+    protected fun <T> extNullableObj(key: String, encoder: NullableObjectEncoder<T>) = ExtNullableObjectProperty(key, encoder)
 
     /**
      * [CombineKV] 属性委托
