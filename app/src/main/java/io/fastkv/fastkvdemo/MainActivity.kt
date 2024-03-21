@@ -4,12 +4,15 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import com.tencent.mmkv.MMKV
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.account.AccountManager
 import io.fastkv.fastkvdemo.data.UserInfo
 import io.fastkv.fastkvdemo.base.AppContext
+import io.fastkv.fastkvdemo.data.MMKV2FastKV
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.data.SpCase
 import io.fastkv.fastkvdemo.data.UsageData
@@ -26,11 +29,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
+    companion object{
+        private const val TAG = "MainActivity"
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         printLaunchTime()
         refreshAccountInfoViews()
+        testMMKV2FastKV()
 
         login_btn.onClick {
             if (AccountManager.isLogin()) {
@@ -143,5 +150,27 @@ class MainActivity : AppCompatActivity() {
         val t = UsageData.launchCount + 1
         tips_tv.text = getString(R.string.main_tips, t)
         UsageData.launchCount = t
+    }
+
+    /**
+     * 测试迁移 MMKV 到 FastKV
+     */
+    private fun testMMKV2FastKV() {
+        // 构造旧数据
+        val name = "foo_kv"
+        val mmkv = MMKV.mmkvWithID(name)
+        if (!mmkv.containsKey("int")) {
+            mmkv.putInt("int", 100)
+            mmkv.putString("string", "hello")
+        }
+
+        // 使用新的API
+        val fastkv = MMKV2FastKV(name)
+        val intValue = fastkv.getInt("int") ?: 0
+        Log.d(TAG, "int value: $intValue")
+        Log.d(TAG, "string value: ${fastkv.getString("string")}")
+
+        fastkv.putInt("int", intValue + 1)
+        Log.d(TAG, "new int value: ${fastkv.getInt("int")}")
     }
 }

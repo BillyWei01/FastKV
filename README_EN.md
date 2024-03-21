@@ -137,7 +137,7 @@ public class SpCase {
 ### 2.7 Migrate MMKV to FastKV
 Since MMKV does not implement the 'getAll' interface, it cannot be migrated at once like SharePreferences. <br>
 But you can create a KV class, create methods such as 'getInt', 'getString', etc., and do adaptation processing in it.<br>
-Refer to [FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/FooKV.kt)
+Refer to [MMKV2FastKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/MMKV2FastKV.kt)
 
 ### 2.8 Multi-Process
 Multi-Process implement: [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java).<br>

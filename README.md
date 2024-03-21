@@ -130,7 +130,7 @@ public class SpCase {
 ### 2.7 迁移 MMKV 到 FastKV
 由于MMKV没有实现 'getAll' 接口，所以无法像SharePreferences一样一次性迁移。<br>
 但是可以封装一个KV类，创建 'getInt'，'getString' ... 等方法，并在其中做适配处理。
-可参考：[FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/data/FooKV.kt)
+可参考：[MMKV2FastKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/data/MMKV2FastKV.kt)
 
 ### 2.8 多进程
 项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java)。<br>
