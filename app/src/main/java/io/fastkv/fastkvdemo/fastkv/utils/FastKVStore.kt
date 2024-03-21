@@ -2,9 +2,7 @@ package io.fastkv.fastkvdemo.fastkv.utils
 
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.fastkv.kvdelegate.KVStore
-import io.fastkv.fastkvdemo.fastkv.kvdelegate.NullableObjectEncoder
-import io.fastkv.fastkvdemo.fastkv.kvdelegate.ObjectEncoder
-import io.fastkv.interfaces.FastEncoder
+import io.fastkv.fastkvdemo.fastkv.kvdelegate.ObjectConvertor
 
 class FastKVStore(val kv: FastKV) : KVStore {
     override fun putBoolean(key: String, value: Boolean?) {
@@ -112,23 +110,19 @@ class FastKVStore(val kv: FastKV) : KVStore {
        return kv.getStringSet(key, null)
     }
 
-    override fun <T> putObject(key: String, value: T, encoder: ObjectEncoder<T>) {
-        kotlin.runCatching { putArray(key, encoder.encode(value)) }
+    override fun <T> putObject(key: String, value: T?, encoder: ObjectConvertor<T>) {
+        if (value == null) {
+            kv.remove(key)
+        } else {
+            kotlin.runCatching { putArray(key, encoder.encode(value)) }
+        }
     }
 
-    override fun <T> getObject(key: String, encoder: ObjectEncoder<T>, defValue: T): T {
+    override fun <T> getObject(key: String, encoder: ObjectConvertor<T>): T? {
         val bytes = getArray(key)
         return if (bytes == null)
-            defValue
+            null
         else
-            kotlin.runCatching { encoder.decode(bytes) }.getOrDefault(defValue)
-    }
-
-    override fun <T> putNullableObject(key: String, value: T?, encoder: NullableObjectEncoder<T>) {
-        kotlin.runCatching { putArray(key, encoder.encode(value)) }
-    }
-
-    override fun <T> getNullableObject(key: String, encoder: NullableObjectEncoder<T>): T? {
-        return kotlin.runCatching { encoder.decode(getArray(key)) }.getOrNull()
+            kotlin.runCatching { encoder.decode(bytes) }.getOrNull()
     }
 }

@@ -58,11 +58,7 @@ interface KVStore {
 
     fun getArray(key: String): ByteArray?
 
-    fun <T> putObject(key: String, value: T, encoder: ObjectEncoder<T>)
+    fun <T> putObject(key: String, value: T?, encoder: ObjectConvertor<T>)
 
-    fun <T> getObject(key: String, encoder: ObjectEncoder<T>, defValue: T): T
-
-    fun <T> putNullableObject(key: String, value: T?, encoder: NullableObjectEncoder<T>)
-
-    fun <T> getNullableObject(key: String, encoder: NullableObjectEncoder<T>): T?
+    fun <T> getObject(key: String, encoder: ObjectConvertor<T>): T?
 }

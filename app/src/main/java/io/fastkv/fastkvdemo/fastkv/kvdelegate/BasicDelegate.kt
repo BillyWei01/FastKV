@@ -198,14 +198,14 @@ class NullableStringSetProperty(private val key: String) :
 
 class ObjectProperty<T>(
     private val key: String,
-    private val encoder: ObjectEncoder<T>,
+    private val encoder: ObjectConvertor<T>,
     private val defValue: T
 ) : ReadWriteProperty<KVData, T> {
     private var instance: T? = null
 
     @Synchronized
     override fun getValue(thisRef: KVData, property: KProperty<*>): T {
-        return instance ?: thisRef.kv.getObject(key, encoder, defValue).also { instance = it }
+        return instance ?: thisRef.kv.getObject(key, encoder)?.also { instance = it } ?: defValue
     }
 
     @Synchronized
@@ -217,19 +217,19 @@ class ObjectProperty<T>(
 
 class NullableObjectSetProperty<T>(
     private val key: String,
-    private val encoder: NullableObjectEncoder<T>
+    private val encoder: ObjectConvertor<T>
 ) :
     ReadWriteProperty<KVData, T?> {
     private var instance: T? = null
 
     @Synchronized
     override fun getValue(thisRef: KVData, property: KProperty<*>): T? {
-        return instance ?: thisRef.kv.getNullableObject(key, encoder)?.also { instance = it }
+        return instance ?: thisRef.kv.getObject(key, encoder)?.also { instance = it }
     }
 
     @Synchronized
     override fun setValue(thisRef: KVData, property: KProperty<*>, value: T?) {
         instance = value
-        thisRef.kv.putNullableObject(key, value, encoder)
+        thisRef.kv.putObject(key, value, encoder)
     }
 }

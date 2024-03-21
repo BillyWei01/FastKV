@@ -119,20 +119,12 @@ class CombineKV(private val key: String, private val kvData: KVData): KVStore {
         return kv.getStringSet(combineKey(extKey))
     }
 
-    override fun <T> putObject(extKey: String, value: T, encoder: ObjectEncoder<T>) {
+    override fun <T> putObject(extKey: String, value: T?, encoder: ObjectConvertor<T>) {
         kv.putObject(combineKey(extKey), value, encoder)
     }
 
-    override fun <T> getObject(extKey: String, encoder: ObjectEncoder<T>, defValue: T): T {
-        return kv.getObject(combineKey(extKey), encoder, defValue)
-    }
-
-    override fun <T> putNullableObject(extKey: String, value: T?, encoder: NullableObjectEncoder<T>) {
-        kv.putNullableObject(combineKey(extKey), value, encoder)
-    }
-
-    override fun <T> getNullableObject(extKey: String, encoder: NullableObjectEncoder<T>): T? {
-        return kv.getNullableObject(combineKey(extKey), encoder)
+    override fun <T> getObject(extKey: String, encoder: ObjectConvertor<T>): T? {
+        return kv.getObject(combineKey(extKey), encoder)
     }
 }
 
@@ -411,16 +403,16 @@ class ExtSetNullableString(combineKV: CombineKV) : ExtKV(combineKV) {
 
 //--------------------------------------------------------------------
 
-class ExtObjectProperty<T>(key: String, encoder: ObjectEncoder<T>, defValue: T) :
+class ExtObjectProperty<T>(key: String, encoder: ObjectConvertor<T>, defValue: T) :
     ExtProperty<ExtObject<T>>(key, { ExtObject(it, encoder, defValue) })
 
 class ExtObject<T>(
     combineKV: CombineKV,
-    private val encoder: ObjectEncoder<T>,
+    private val encoder: ObjectConvertor<T>,
     private val defValue: T
 ) : ExtKV(combineKV) {
     operator fun get(extKey: Any): T {
-        return combineKV.getObject(extKey.toString(), encoder, defValue)
+        return combineKV.getObject(extKey.toString(), encoder) ?: defValue
     }
 
     operator fun set(extKey: Any, value: T) {
@@ -428,19 +420,19 @@ class ExtObject<T>(
     }
 }
 
-class ExtNullableObjectProperty<T>(key: String, encoder: NullableObjectEncoder<T>) :
+class ExtNullableObjectProperty<T>(key: String, encoder: ObjectConvertor<T>) :
     ExtProperty<ExtNullableObject<T>>(key, { ExtNullableObject(it, encoder) })
 
 class ExtNullableObject<T>(
     combineKV: CombineKV,
-    private val encoder: NullableObjectEncoder<T>,
+    private val encoder: ObjectConvertor<T>,
 ) : ExtKV(combineKV) {
     operator fun get(extKey: Any): T? {
-        return combineKV.getNullableObject(extKey.toString(), encoder)
+        return combineKV.getObject(extKey.toString(), encoder)
     }
 
     operator fun set(extKey: Any, value: T?) {
-        combineKV.putNullableObject(extKey.toString(), value, encoder)
+        combineKV.putObject(extKey.toString(), value, encoder)
     }
 }
 
