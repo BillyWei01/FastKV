@@ -33,7 +33,7 @@ class MMKV2FastKV(val name: String) : KVStore {
     override fun getBoolean(key: String): Boolean? {
         if (!fastkv.contains(key)) {
             if (!mmkv.containsKey(key)) return null
-            mmkv.decodeBool(key).also { fastkv.putBoolean(key, it) }
+            return mmkv.decodeBool(key).also { fastkv.putBoolean(key, it) }
         }
         return fastkv.getBoolean(key)
     }
@@ -54,7 +54,7 @@ class MMKV2FastKV(val name: String) : KVStore {
     override fun getInt(key: String): Int? {
         if (!fastkv.contains(key)) {
             if (!mmkv.containsKey(key)) return null
-            mmkv.decodeInt(key).also { fastkv.putInt(key, it) }
+            return mmkv.decodeInt(key).also { fastkv.putInt(key, it) }
         }
         return fastkv.getInt(key)
     }
@@ -75,7 +75,7 @@ class MMKV2FastKV(val name: String) : KVStore {
     override fun getFloat(key: String): Float? {
         if (!fastkv.contains(key)) {
             if (!mmkv.containsKey(key)) return null
-            mmkv.decodeFloat(key).also { fastkv.putFloat(key, it) }
+            return mmkv.decodeFloat(key).also { fastkv.putFloat(key, it) }
         }
         return fastkv.getFloat(key)
     }
@@ -96,7 +96,7 @@ class MMKV2FastKV(val name: String) : KVStore {
     override fun getLong(key: String): Long? {
         if (!fastkv.contains(key)) {
             if (!mmkv.containsKey(key)) return null
-            mmkv.decodeLong(key).also { fastkv.putLong(key, it) }
+            return mmkv.decodeLong(key).also { fastkv.putLong(key, it) }
         }
         return fastkv.getLong(key)
     }
@@ -117,7 +117,7 @@ class MMKV2FastKV(val name: String) : KVStore {
     override fun getDouble(key: String): Double? {
         if (!fastkv.contains(key)) {
             if (!mmkv.containsKey(key)) return null
-            mmkv.decodeDouble(key).also { fastkv.putDouble(key, it) }
+            return mmkv.decodeDouble(key).also { fastkv.putDouble(key, it) }
         }
         return fastkv.getDouble(key)
     }
