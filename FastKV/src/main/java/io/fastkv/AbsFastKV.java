@@ -47,13 +47,13 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected static final int[] TYPE_SIZE = {0, 1, 4, 4, 8, 8};
     protected static final byte[] EMPTY_ARRAY = new byte[0];
     protected static final int DATA_START = 12;
-    protected static final int BASE_GC_KEYS_THRESHOLD = 80;
-    protected static final int BASE_GC_BYTES_THRESHOLD = 4096;
     protected final int INTERNAL_LIMIT = FastKVConfig.internalLimit;
 
     protected static final int PAGE_SIZE = Utils.getPageSize();
-    protected static final int DOUBLE_LIMIT = 1 << 15;
-    protected static final int TRUNCATE_THRESHOLD =1 << 15;
+    protected static final int TRUNCATE_THRESHOLD = Math.max(PAGE_SIZE, 1 << 15);
+
+    protected static final int BASE_GC_BYTES_THRESHOLD = 8192;
+    protected static final int BASE_GC_KEYS_THRESHOLD = 80;
 
     protected final String path;
     protected final String name;
@@ -133,11 +133,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             return PAGE_SIZE;
         } else {
             while (capacity < expected) {
-                if (capacity <= DOUBLE_LIMIT) {
-                    capacity <<= 1;
-                } else {
-                    capacity += DOUBLE_LIMIT;
-                }
+                capacity <<= 1;
             }
             return capacity;
         }
@@ -608,7 +604,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         if (dataEnd <= (1 << 14)) {
             return BASE_GC_BYTES_THRESHOLD;
         } else {
-            return dataEnd <= (1 << 16) ? BASE_GC_BYTES_THRESHOLD << 1 : BASE_GC_BYTES_THRESHOLD << 2;
+            return BASE_GC_BYTES_THRESHOLD << 1;
         }
     }
 

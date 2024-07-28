@@ -165,7 +165,7 @@ public class MPFastKVTest {
         MPFastKV kv1 = new MPFastKV.Builder(TestHelper.MP_DIR, name).disableWatchFileChange().build();
         kv1.clear();
 
-        String longStr = TestHelper.makeString(2000);
+        String longStr = TestHelper.makeString(4000);
         String shortStr = TestHelper.makeString(200);
 
         int gc1 = TestHelper.gcCount.get();

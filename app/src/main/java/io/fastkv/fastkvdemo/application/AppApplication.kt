@@ -9,6 +9,7 @@ import io.fastkv.fastkvdemo.BuildConfig
 import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.base.IAppContext
 import io.fastkv.fastkvdemo.fastkv.FastKVLogger
+import io.fastkv.fastkvdemo.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 
@@ -34,7 +35,7 @@ class AppApplication : Application(), IAppContext {
         appId = ProcessUtil.getProcessName(this)
 
         // Avoid files corruption in multi-process environment
-        if(isMainProcess) {
+        if(isMainProcess && !Utils.is16KPageSize()) {
             initMMKV()
         }
     }

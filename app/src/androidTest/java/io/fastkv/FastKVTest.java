@@ -175,7 +175,7 @@ public class FastKVTest {
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).build();
         kv1.clear();
 
-        String longStr = TestHelper.makeString(2000);
+        String longStr = TestHelper.makeString(4000);
         String shortStr = TestHelper.makeString(200);
 
         int gc1 = TestHelper.gcCount.get();
@@ -241,7 +241,7 @@ public class FastKVTest {
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).blocking().build();
         kv1.clear();
 
-        String longStr = TestHelper.makeString(2000);
+        String longStr = TestHelper.makeString(4000);
         String shortStr = TestHelper.makeString(200);
 
         int gc1 = TestHelper.gcCount.get();
@@ -900,7 +900,7 @@ public class FastKVTest {
         kv1.close();
 
         try {
-            Thread.sleep(50L);
+            Thread.sleep(100L);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

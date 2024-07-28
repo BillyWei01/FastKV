@@ -5,13 +5,13 @@ plugins {
 }
 
 android {
-    compileSdkVersion 31
+    compileSdkVersion 33
 
     defaultConfig {
         applicationId "io.github.fastkvdemo"
         //minSdkVersion 19
         minSdkVersion 21
-        targetSdkVersion 31
+        targetSdkVersion 33
         versionCode 1
         versionName "1.0"
 
@@ -48,7 +48,7 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.4.1"
     implementation 'com.tencent:mmkv-static:1.2.10'
     implementation 'io.github.billywei01:packable:1.1.0'
-    implementation 'io.github.billywei01:fastaes:1.1.2'
+    implementation 'io.github.billywei01:fastaes:1.1.5'
     //implementation 'io.github.billywei01:fastkv:1.0.4'
     implementation "androidx.datastore:datastore-preferences:1.0.0"
     implementation project(":fastkv")

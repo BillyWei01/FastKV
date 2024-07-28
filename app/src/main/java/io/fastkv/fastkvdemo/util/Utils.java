@@ -1,6 +1,11 @@
 package io.fastkv.fastkvdemo.util;
 
 
+import android.annotation.SuppressLint;
+import android.util.Log;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
@@ -13,8 +18,41 @@ public class Utils {
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
             'a', 'b', 'c', 'd', 'e', 'f'};
 
+    private static final int PAGE_SIZE_16K = 16 * 1024;
+    private static int sPageSize = 0;
+
     public static byte[] getMD5Array(byte[] msg) throws NoSuchAlgorithmException {
         return MessageDigest.getInstance("MD5").digest(msg);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked", "ConstantConditions"})
+    @SuppressLint("DiscouragedPrivateApi")
+    private static int getPageSize() {
+        try {
+            Class unsafeClass = Class.forName("sun.misc.Unsafe");
+            Field theUnsafe = unsafeClass.getDeclaredField("theUnsafe");
+            theUnsafe.setAccessible(true);
+            Method method = unsafeClass.getDeclaredMethod("pageSize");
+            method.setAccessible(true);
+            int pageSize = (int) (Integer) method.invoke(theUnsafe.get(null));
+            Log.d("MyTag", "page size: " + pageSize);
+            return pageSize;
+        } catch (Throwable ignore) {
+        }
+        Log.d("MyTag", "DEFAULT_PAGE_SIZE: " + PAGE_SIZE_16K);
+        return PAGE_SIZE_16K;
+    }
+
+    /**
+     * 系统page size是否是 16K。
+     * Android新版本会逐步版本会开启16K page size, 未适配的so会崩溃。
+     * 目前 MMKV 还没适配16K, 所以判断系统 page size 是16K则不自行MMKV的性能测试。
+     */
+    public static boolean is16KPageSize() {
+        if (sPageSize == 0) {
+            sPageSize = getPageSize() ;
+        }
+        return sPageSize == PAGE_SIZE_16K;
     }
 
     public static String bytes2Hex(byte[] bytes) {
@@ -63,5 +101,4 @@ public class Utils {
         }
         return a;
     }
-
 }

@@ -18,6 +18,8 @@ class Utils {
     }
 
     static final int NAME_SIZE = 32;
+    private static final int DEFAULT_PAGE_SIZE = 16 * 1024;
+
 
     /**
      * Like UUID.randomUUID().toString(), but without '-'.
@@ -48,7 +50,7 @@ class Utils {
             return (int) (Integer) method.invoke(theUnsafe.get(null));
         } catch (Throwable ignore) {
         }
-        return 4096;
+        return DEFAULT_PAGE_SIZE;
     }
 
     static boolean makeFileIfNotExist(File file) throws IOException {

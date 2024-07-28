@@ -53,6 +53,8 @@ object Benchmark {
     private const val PREFIX_MMKV = "mmkv_"
     private const val PREFIX_MMAP = "fastkv_mmap_"
 
+    private val is16KPageSize = Utils.is16KPageSize()
+
     private lateinit var spCommit: SharedPreferences
     private lateinit var dataStore: DataStore<Preferences>
     private lateinit var sqliteKV: SQLiteKV
@@ -99,7 +101,10 @@ object Benchmark {
         dataStore = PreferenceDataStoreFactory.create {
             File(PathManager.filesDir, "$PREFIX_DATASTORE$count.preferences_pb")
         }
-        mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
+
+        if(!is16KPageSize) {
+            mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
+        }
         sqliteKV = SQLiteKV.Builder("$PREFIX_SQLITE$count").build()
         fastkvCommit = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_COMMIT$count").blocking().build()
         fastkvMMAP = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_MMAP$count").build()
@@ -122,7 +127,9 @@ object Benchmark {
         putToSqlite(inputList)
         putToFastKVCommit(inputList)
         putToSpApply(inputList)
-        putToMMKV(inputList)
+        if(!is16KPageSize) {
+            putToMMKV(inputList)
+        }
         putToFastKVMMAP(inputList)
 
         Arrays.fill(time, 0L)
@@ -141,7 +148,9 @@ object Benchmark {
         time[2] = test(testRound) { putToSqlite(testArray[it]) }
         time[3] = test(testRound) { putToFastKVCommit(testArray[it]) }
         time[4] = test(testRound) { putToSpApply(testArray[it]) }
-        time[5] = test(testRound) { putToMMKV(testArray[it]) }
+        if(!is16KPageSize) {
+            time[5] = test(testRound) { putToMMKV(testArray[it]) }
+        }
         time[6] = test(testRound) { putToFastKVMMAP(testArray[it]) }
 
         Log.i(TAG, "Write, count: $kvCount" + getTimeLog(time))
@@ -153,7 +162,9 @@ object Benchmark {
         time[2] = test(testRound) { readFromSqlite(testArray[it]) }
         time[3] = test(testRound) { readFromFastKVCommit(testArray[it]) }
         time[4] = test(testRound) { readFromSpApply(testArray[it]) }
-        time[5] = test(testRound) { readFromMMKV(testArray[it]) }
+        if(!is16KPageSize) {
+            time[5] = test(testRound) { readFromMMKV(testArray[it]) }
+        }
         time[6] = test(testRound) { readFromFastKVMMAP(testArray[it]) }
 
         Log.i(TAG, "Read, count: $kvCount" + getTimeLog(time))
@@ -176,15 +187,17 @@ object Benchmark {
     }
 
     private fun getTimeLog(time: LongArray): String {
-        return StringBuilder()
+        val builder = StringBuilder()
             .append(" Sp-commit:").append(time[0] / MILLION).append(" ms, ")
             .append(" DataStore:").append(time[1] / MILLION).append(" ms, ")
             .append(" SQLite:").append(time[2] / MILLION).append(" ms, ")
             .append(" FastKV-commit:").append(time[3] / MILLION).append(" ms, ")
             .append(" Sp-apply:").append(time[4] / MILLION).append(" ms, ")
-            .append(" MMKV:").append(time[5] / MILLION).append(" ms, ")
-            .append(" FastKV-mmap:").append(time[6] / MILLION).append(" ms")
-            .toString()
+        if (!is16KPageSize) {
+            builder.append(" MMKV:").append(time[5] / MILLION).append(" ms, ")
+        }
+        builder.append(" FastKV-mmap:").append(time[6] / MILLION).append(" ms")
+        return builder.toString()
     }
 
     private suspend fun test(round: Int, block: suspend (i: Int) -> Unit): Long {
@@ -211,7 +224,9 @@ object Benchmark {
         putToSpCommit(srcList)
         putToDataStore(srcList)
         putToSqlite(srcList)
-        putToMMKV(srcList)
+        if(!is16KPageSize) {
+            putToMMKV(srcList)
+        }
         putToFastKVCommit(srcList)
         putToFastKVMMAP(srcList)
 
@@ -221,7 +236,9 @@ object Benchmark {
             putToSpCommit(srcList)
             putToDataStore(inputList)
             putToSqlite(inputList)
-            putToMMKV(inputList)
+            if(!is16KPageSize) {
+                putToMMKV(inputList)
+            }
             putToFastKVCommit(inputList)
             putToFastKVMMAP(inputList)
         }
@@ -592,7 +609,9 @@ object Benchmark {
             deleteSP(PREFIX_SP_COMMIT, count)
             deleteSP(PREFIX_SP_APPLY, count)
             deleteDataStore(count)
-            deleteMMKV(count)
+            if(!is16KPageSize){
+                deleteMMKV(count)
+            }
             deleteDB(count)
 
             if (this::fastkvCommit.isInitialized) {
