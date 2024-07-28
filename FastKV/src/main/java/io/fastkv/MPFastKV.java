@@ -37,7 +37,7 @@ import io.fastkv.interfaces.FastEncoder;
  * Remember to call 'commit' or 'apply' after editing !!!
  * <p>
  * Note 2: <br>
- * To support cross process storage, MPFastKV needs to do many state checks, it's slower than {@link FastKV}.
+ * To support cross process storage, MPFastKV needs to do many state checking, it's slower than {@link FastKV}.
  * So if you don't need to access the data in multi-process, just use FastKV.
  */
 @SuppressWarnings("rawtypes")

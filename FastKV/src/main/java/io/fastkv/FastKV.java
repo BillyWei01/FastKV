@@ -28,11 +28,10 @@ import io.fastkv.interfaces.FastEncoder;
  * FastKV is not support multi-process, use {@link MPFastKV} if you want to support multi-process.
  * <br>
  * Note: <br>
- * 1. Do not change file name once create, or you will loss data. <br>
- * 2. Do not change cipher , or you will loss data.
- * But it's okay to transfer from no cipher to applying cipher.<br>
- * 3. Do not change value type for one key, or your app might crash.<br>
- * 4. Do not use one key to save two kind of value (same as note 3).
+ * 1. Do not change file name once create. <br>
+ * 2. Do not change cipher once create.
+ *    But it's okay to apply cipher from the state of no cipher.<br>
+ * 3. Do not change value type for one key.<br>
  */
 @SuppressWarnings("rawtypes")
 public final class FastKV extends AbsFastKV {
