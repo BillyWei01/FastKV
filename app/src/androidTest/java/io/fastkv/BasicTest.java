@@ -57,8 +57,8 @@ public class BasicTest {
         invalids.add(new AbsFastKV.Segment(0, 1));
         invalids.add(new AbsFastKV.Segment(1, 2));
 
-        invalids.add(new AbsFastKV.Segment(3, 4));
         invalids.add(new AbsFastKV.Segment(4, 5));
+        invalids.add(new AbsFastKV.Segment(3, 4));
 
         AbsFastKV.mergeInvalids(invalids);
         Assert.assertEquals(2, invalids.size());
@@ -105,9 +105,9 @@ public class BasicTest {
 
     private void case6() {
         ArrayList<AbsFastKV.Segment> invalids = new ArrayList<>();
-        invalids.add(new AbsFastKV.Segment(0, 1));
-        invalids.add(new AbsFastKV.Segment(1, 3));
         invalids.add(new AbsFastKV.Segment(3, 4));
+        invalids.add(new AbsFastKV.Segment(1, 3));
+        invalids.add(new AbsFastKV.Segment(0, 1));
         invalids.add(new AbsFastKV.Segment(4, 5));
 
         AbsFastKV.mergeInvalids(invalids);

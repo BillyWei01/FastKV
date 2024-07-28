@@ -1,7 +1,6 @@
 package io.fastkv.fastkvdemo.base
 
-import io.fastkv.fastkvdemo.fastkv.StringEnumConverter
-
+import io.fastkv.fastkvdemo.fastkv.kvdelegate.ObjectConvertor
 
 /**
  * Server Environment
@@ -9,22 +8,32 @@ import io.fastkv.fastkvdemo.fastkv.StringEnumConverter
  * 命名为ServerEnvironment又太长，
  * 命名为Environment又太多重名的类，
  * 所以命名为简化的Env好了。
+ *
+ * 不同的团队，对于环境的命名不相同：
+ * 有的团队命名为：线上环境/开发环境；
+ * 有的团队命名为：生产环境/上线前环境。
+ * 具体命名按照团队命名习惯即可。
  */
 enum class Env(val tag: String) {
-    // 线上环境（正式服）
-    ONLINE(""),
+    /**
+     * Post-Production Environment, 生产环境
+     */
+    PPE("ppe"),
 
-    // 开发环境（测试服)
-    DEVELOP("develop");
+    /**
+     * Before Online Environment，上线前环境
+     */
+    BOE("boe");
 
     companion object {
-        val CONVERTER = object : StringEnumConverter<Env> {
-            override fun stringToType(str: String?): Env {
-               return if (str == DEVELOP.tag) DEVELOP else ONLINE
+        val CONVERTER = object : ObjectConvertor<Env> {
+            override fun decode(bytes: ByteArray): Env {
+                val value = String(bytes)
+                return if (value == BOE.tag) BOE else PPE
             }
 
-            override fun typeToString(type: Env): String {
-               return type.tag
+            override fun encode(obj: Env): ByteArray {
+                return obj.tag.toByteArray()
             }
         }
     }

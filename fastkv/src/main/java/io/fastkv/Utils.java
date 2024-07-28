@@ -6,6 +6,7 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.SecureRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.fastkv.interfaces.FastLogger;
 
@@ -89,28 +90,38 @@ class Utils {
         }
     }
 
-    static boolean saveBytes(File file, byte[] bytes) {
-        return saveBytes(file, bytes, bytes.length);
-    }
-
-    static boolean saveBytes(File file, byte[] bytes, int len) {
+    static boolean saveBytes(File dstFile, byte[] bytes, AtomicBoolean canceled) {
+        File tmpFile = null;
         try {
-            File tmpFile = new File(file.getParent(), file.getName() + ".tmp");
+            int len = bytes.length;
+            tmpFile = new File(dstFile.getParent(), dstFile.getName() + ".tmp");
             if (!makeFileIfNotExist(tmpFile)) {
                 logError(new Exception("create file failed"));
+                return false;
+            }
+            if (canceled != null && canceled.get()) {
                 return false;
             }
             try (RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw")) {
                 accessFile.setLength(len);
                 accessFile.write(bytes, 0, len);
+                if (canceled != null && canceled.get()) {
+                    return false;
+                }
                 accessFile.getFD().sync();
             }
-            return renameFile(tmpFile, file);
-        } catch (Exception t) {
-            logError(new Exception("save bytes failed", t));
+            return renameFile(tmpFile, dstFile);
+        } catch (Exception e) {
+            logError(new Exception("save bytes failed", e));
+        } finally {
+            if (canceled != null && canceled.get()) {
+                deleteFile(tmpFile);
+                deleteFile(dstFile);
+            }
         }
         return false;
     }
+
 
     static boolean renameFile(File srcFile, File dstFile) {
         if (srcFile.renameTo(dstFile)) {
@@ -170,7 +181,8 @@ class Utils {
             return;
         }
         if (!srcFile.renameTo(dstFile)) {
-            saveBytes(dstFile, getBytes(srcFile));
+            saveBytes(dstFile, getBytes(srcFile), null);
+            deleteFile(srcFile);
         }
     }
 
@@ -192,7 +204,7 @@ class Utils {
     }
 
 
-    static void logError(Exception e) {
+    private static void logError(Exception e) {
         FastLogger logger = FastKVConfig.sLogger;
         if (logger != null) {
             logger.e("FastKV", e);

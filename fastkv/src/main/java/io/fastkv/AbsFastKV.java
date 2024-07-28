@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 import io.fastkv.Container.*;
 import io.fastkv.interfaces.*;
@@ -44,8 +45,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected static final int DATA_SIZE_LIMIT = 1 << 28; // 256M
     protected static final int CIPHER_MASK = 1 << 30;
 
+    private static final byte[] EMPTY_ARRAY = new byte[0];
     protected static final int[] TYPE_SIZE = {0, 1, 4, 4, 8, 8};
-    protected static final byte[] EMPTY_ARRAY = new byte[0];
     protected static final int DATA_START = 12;
     protected final int INTERNAL_LIMIT = FastKVConfig.internalLimit;
 
@@ -85,7 +86,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected final WeakCache externalCache = new WeakCache();
     protected final WeakCache bigValueCache = new WeakCache();
 
-    protected final TagExecutor externalExecutor = new TagExecutor();
+    protected final ExternalExecutor externalExecutor = new ExternalExecutor();
+    protected final Executor applyExecutor = new LimitExecutor();
 
     protected int invalidBytes;
     protected final ArrayList<Segment> invalids = new ArrayList<>();
@@ -139,6 +141,9 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         }
     }
 
+    /**
+     * Rewrite data, from non-encrypt to encrypted.
+     */
     protected void rewrite() {
         FastEncoder[] encoders = new FastEncoder[encoderMap.size()];
         encoders = encoderMap.values().toArray(encoders);
@@ -217,7 +222,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         copyToMainFile(tempKV);
 
         // Waiting for moving external files
-        while (!tempKV.externalExecutor.isEmpty()) {
+        while (tempKV.externalExecutor.isNotEmpty()) {
             try {
                 //noinspection BusyWait
                 Thread.sleep(10L);
@@ -270,6 +275,14 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             return true;
         }
         return false;
+    }
+
+    protected final void deleteExternalFile(String fileName) {
+        FastKVConfig.getExecutor().execute(() -> {
+            if (!externalExecutor.cancelTask(fileName)) {
+                Utils.deleteFile(new File(path + name, fileName));
+            }
+        });
     }
 
     protected final void deleteCFiles() {
@@ -431,7 +444,11 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         }
     }
 
+    /**
+     * Merge invalids to speed up compacting bytes.
+     */
     static void mergeInvalids(ArrayList<Segment> invalids) {
+        Collections.sort(invalids);
         int index = 0;
         Segment p = invalids.get(0);
         int n = invalids.size();
@@ -454,7 +471,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     protected void gc(int allocate) {
-        Collections.sort(invalids);
         mergeInvalids(invalids);
 
         final Segment head = invalids.get(0);
@@ -482,7 +498,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             int index = i - 1;
             src[index] = srcPos;
             shift[index] = srcPos - desPos;
-
             desPos += size;
             srcPos = q.end;
         }
@@ -501,12 +516,14 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         }
         dataEnd = newDataEnd;
 
-        syncCompatBuffer(gcStart, allocate, gcUpdateSize);
+        updateBuffer(gcStart, allocate, gcUpdateSize);
 
         updateOffset(gcStart, src, shift);
 
         info(GC_FINISH);
     }
+
+    protected abstract void updateBuffer(int gcStart, int allocate, int gcUpdateSize);
 
     protected final void updateOffset(int gcStart, int[] srcArray, int[] shiftArray) {
         Collection<BaseContainer> values = data.values();
@@ -521,8 +538,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             }
         }
     }
-
-    protected abstract void syncCompatBuffer(int gcStart, int allocate, int gcUpdateSize);
 
     protected final void tryBlockingIO(File aFile, File bFile) {
         try {
@@ -622,8 +637,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     public synchronized boolean getBoolean(String key, boolean defValue) {
-        BooleanContainer c = (BooleanContainer) data.get(key);
-        return c == null ? defValue : c.value;
+        BaseContainer c = data.get(key);
+        return c == null || c.getType() != DataType.BOOLEAN ? defValue : ((BooleanContainer) c).value;
     }
 
     public int getInt(String key) {
@@ -631,8 +646,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     public synchronized int getInt(String key, int defValue) {
-        IntContainer c = (IntContainer) data.get(key);
-        return c == null ? defValue : c.value;
+        BaseContainer c = data.get(key);
+        return c == null || c.getType() != DataType.INT ? defValue : ((IntContainer) c).value;
     }
 
     public float getFloat(String key) {
@@ -640,18 +655,17 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     public synchronized float getFloat(String key, float defValue) {
-        FloatContainer c = (FloatContainer) data.get(key);
-        return c == null ? defValue : c.value;
+        BaseContainer c = data.get(key);
+        return c == null || c.getType() != DataType.FLOAT ? defValue : ((FloatContainer) c).value;
     }
 
-    public synchronized long getLong(String key) {
-        LongContainer c = (LongContainer) data.get(key);
-        return c == null ? 0L : c.value;
+    public long getLong(String key) {
+        return getLong(key, 0L);
     }
 
     public synchronized long getLong(String key, long defValue) {
-        LongContainer c = (LongContainer) data.get(key);
-        return c == null ? defValue : c.value;
+        BaseContainer c = data.get(key);
+        return c == null || c.getType() != DataType.LONG ? defValue : ((LongContainer) c).value;
     }
 
     public double getDouble(String key) {
@@ -659,8 +673,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     public synchronized double getDouble(String key, double defValue) {
-        DoubleContainer c = (DoubleContainer) data.get(key);
-        return c == null ? defValue : c.value;
+        BaseContainer c = data.get(key);
+        return c == null || c.getType() != DataType.DOUBLE ? defValue : ((DoubleContainer) c).value;
     }
 
     public String getString(String key) {
@@ -668,25 +682,27 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     public synchronized String getString(String key, String defValue) {
-        StringContainer c = (StringContainer) data.get(key);
-        if (c != null) {
-            if (c.external) {
-                Object value = bigValueCache.get(key);
-                if (value instanceof String) {
-                    return (String) value;
-                }
-                String str = getStringFromFile(c, cipher);
-                if (str == null || str.isEmpty()) {
-                    remove(key);
-                } else {
-                    bigValueCache.put(key, str);
-                    return str;
-                }
-            } else {
-                return (String) c.value;
-            }
+        BaseContainer container = data.get(key);
+        if (container == null || container.getType() != DataType.STRING) {
+            return defValue;
         }
-        return defValue;
+        StringContainer c = (StringContainer) container;
+        if (c.external) {
+            Object value = bigValueCache.get(key);
+            if (value instanceof String) {
+                return (String) value;
+            }
+            String str = getStringFromFile(c, cipher);
+            if (str == null || str.isEmpty()) {
+                remove(key);
+                return defValue;
+            } else {
+                bigValueCache.put(key, str);
+                return str;
+            }
+        } else {
+            return (String) c.value;
+        }
     }
 
     protected String getStringFromFile(StringContainer c, FastCipher fastCipher) {
@@ -709,25 +725,27 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     public synchronized byte[] getArray(String key, byte[] defValue) {
-        ArrayContainer c = (ArrayContainer) data.get(key);
-        if (c != null) {
-            if (c.external) {
-                Object value = bigValueCache.get(key);
-                if (value instanceof byte[]) {
-                    return (byte[]) value;
-                }
-                byte[] bytes = getArrayFromFile(c, cipher);
-                if (bytes == null || bytes.length == 0) {
-                    remove(key);
-                } else {
-                    bigValueCache.put(key, bytes);
-                    return bytes;
-                }
-            } else {
-                return (byte[]) c.value;
-            }
+        BaseContainer container = data.get(key);
+        if (container == null || container.getType() != DataType.ARRAY) {
+            return defValue;
         }
-        return defValue;
+        ArrayContainer c = (ArrayContainer) container;
+        if (c.external) {
+            Object value = bigValueCache.get(key);
+            if (value instanceof byte[]) {
+                return (byte[]) value;
+            }
+            byte[] bytes = getArrayFromFile(c, cipher);
+            if (bytes == null || bytes.length == 0) {
+                remove(key);
+                return defValue;
+            } else {
+                bigValueCache.put(key, bytes);
+                return bytes;
+            }
+        } else {
+            return (byte[]) c.value;
+        }
     }
 
     protected byte[] getArrayFromFile(ArrayContainer c, FastCipher fastCipher) {
@@ -746,28 +764,30 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
 
     @SuppressWarnings("unchecked")
     public synchronized <T> T getObject(String key) {
-        ObjectContainer c = (ObjectContainer) data.get(key);
-        if (c != null) {
-            if (c.external) {
-                Object value = bigValueCache.get(key);
-                if (value != null) {
-                    return (T) value;
-                }
-                Object obj = getObjectFromFile(c, cipher);
-                if (obj == null) {
-                    remove(key);
-                } else {
-                    bigValueCache.put(key, obj);
-                    return (T) obj;
-                }
-            } else {
-                return (T) c.value;
-            }
+        BaseContainer container = data.get(key);
+        if (container == null || container.getType() != DataType.OBJECT) {
+            return null;
         }
-        return null;
+        ObjectContainer c = (ObjectContainer) container;
+        if (c.external) {
+            Object value = bigValueCache.get(key);
+            if (value != null) {
+                return (T) value;
+            }
+            Object obj = getObjectFromFile(c, cipher);
+            if (obj == null) {
+                remove(key);
+                return null;
+            } else {
+                bigValueCache.put(key, obj);
+                return (T) obj;
+            }
+        } else {
+            return (T) c.value;
+        }
     }
 
-    protected Object getObjectFromFile(ObjectContainer c, FastCipher fastCipher) {
+    private Object getObjectFromFile(ObjectContainer c, FastCipher fastCipher) {
         String fileName = (String) c.value;
         byte[] cache = (byte[]) externalCache.get(fileName);
         try {
@@ -813,7 +833,12 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
-        BooleanContainer c = (BooleanContainer) data.get(key);
+        BaseContainer container = data.get(key);
+        if (container != null && container.getType() != DataType.BOOLEAN) {
+            remove(key);
+            container = null;
+        }
+        BooleanContainer c = (BooleanContainer) container;
         if (c == null) {
             if (!wrapHeader(key, DataType.BOOLEAN)) return this;
             int offset = fastBuffer.position;
@@ -834,7 +859,12 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
-        IntContainer c = (IntContainer) data.get(key);
+        BaseContainer container = data.get(key);
+        if (container != null && container.getType() != DataType.INT) {
+            remove(key);
+            container = null;
+        }
+        IntContainer c = (IntContainer) container;
         if (c == null) {
             if (!wrapHeader(key, DataType.INT)) return this;
             int offset = fastBuffer.position;
@@ -858,7 +888,12 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
-        FloatContainer c = (FloatContainer) data.get(key);
+        BaseContainer container = data.get(key);
+        if (container != null && container.getType() != DataType.FLOAT) {
+            remove(key);
+            container = null;
+        }
+        FloatContainer c = (FloatContainer) container;
         if (c == null) {
             if (!wrapHeader(key, DataType.FLOAT)) return this;
             int offset = fastBuffer.position;
@@ -882,7 +917,12 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
-        LongContainer c = (LongContainer) data.get(key);
+        BaseContainer container = data.get(key);
+        if (container != null && container.getType() != DataType.LONG) {
+            remove(key);
+            container = null;
+        }
+        LongContainer c = (LongContainer) container;
         if (c == null) {
             if (!wrapHeader(key, DataType.LONG)) return this;
             int offset = fastBuffer.position;
@@ -905,7 +945,12 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         if (closed) return this;
         checkKey(key);
         lockAndCheckUpdate();
-        DoubleContainer c = (DoubleContainer) data.get(key);
+        BaseContainer container = data.get(key);
+        if (container != null && container.getType() != DataType.DOUBLE) {
+            remove(key);
+            container = null;
+        }
+        DoubleContainer c = (DoubleContainer) container;
         if (c == null) {
             if (!wrapHeader(key, DataType.DOUBLE)) return this;
             int offset = fastBuffer.position;
@@ -931,11 +976,19 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         if (value == null) {
             remove(key);
         } else {
+            BaseContainer container = data.get(key);
+            if (container != null && container.getType() != DataType.STRING) {
+                remove(key);
+                container = null;
+            }
+            StringContainer c = (StringContainer) container;
+            if (c != null && !c.external && value.equals(c.value)) {
+                return this;
+            }
             lockAndCheckUpdate();
-            StringContainer c = (StringContainer) data.get(key);
             if (cipher == null && value.length() * 3 < INTERNAL_LIMIT) {
-                // 'putString' is a frequent operation,
-                // so we make some strategies to speed up 'putString'.
+                // 'putString' 是比较常用的API
+                // 所以这里我们用一些而外的策略来加速'putString'
                 fastPutString(key, value, c);
             } else {
                 byte[] bytes = value.isEmpty() ? EMPTY_ARRAY : value.getBytes(StandardCharsets.UTF_8);
@@ -952,9 +1005,9 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     /**
-     * If length of string is equal in UFT-8 and UTF-16,
-     * it can use 'getBytes(int srcBegin, int srcEnd, byte dst[], int dstBegin)' to wrap the data,
-     * which is faster then 'getBytes(String charsetName)'
+     * 如果String对象的UFT-8长度和UTF-16长度一样，
+     * 则可以用'getBytes(int srcBegin, int srcEnd, byte dst[], int dstBegin)'来获取字符串到buffer,
+     * 效率比'getBytes("UFT-8")'更高。
      */
     protected void fastPutString(String key, String value, StringContainer c) {
         int stringLen = FastBuffer.getStringSize(value);
@@ -1024,7 +1077,12 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             remove(key);
         } else {
             lockAndCheckUpdate();
-            ArrayContainer c = (ArrayContainer) data.get(key);
+            BaseContainer container = data.get(key);
+            if (container != null && container.getType() != DataType.ARRAY) {
+                remove(key);
+                container = null;
+            }
+            ArrayContainer c = (ArrayContainer) container;
             byte[] newBytes = cipher != null ? cipher.encrypt(value) : value;
             if (newBytes == null) {
                 error(new Exception(ENCRYPT_FAILED));
@@ -1072,6 +1130,14 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             return this;
         }
 
+        lockAndCheckUpdate();
+        BaseContainer container = data.get(key);
+        if (container != null && container.getType() != DataType.OBJECT) {
+            remove(key);
+            container = null;
+        }
+        ObjectContainer c = (ObjectContainer) container;
+
         // assemble object bytes
         int tagSize = FastBuffer.getStringSize(tag);
         FastBuffer buffer = new FastBuffer(1 + tagSize + objBytes.length);
@@ -1080,8 +1146,6 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         buffer.putBytes(objBytes);
         byte[] bytes = buffer.hb;
 
-        lockAndCheckUpdate();
-        ObjectContainer c = (ObjectContainer) data.get(key);
         byte[] newBytes = cipher != null ? cipher.encrypt(bytes) : bytes;
         if (newBytes == null) return this;
         addOrUpdate(key, value, newBytes, c, DataType.OBJECT);
@@ -1101,6 +1165,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     protected synchronized void notifyListeners(String key) {
+        if (listeners.isEmpty()) return;
         for (SharedPreferences.OnSharedPreferenceChangeListener listener : listeners) {
             mainHandler.post(() -> listener.onSharedPreferenceChanged(this, key));
         }
@@ -1330,7 +1395,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     private void wrapStringValue(String value, int valueSize) {
         fastBuffer.putShort((short) valueSize);
         if (valueSize == value.length()) {
-            //noinspection deprecation
+            // 快速获取String到buffer
+            // noinspection deprecation
             value.getBytes(0, valueSize, fastBuffer.hb, fastBuffer.position);
         } else {
             fastBuffer.putString(value);
@@ -1421,11 +1487,14 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             int offset = wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
             if (offset > 0) {
                 // The reference of 'value' will not be gc before finishing 'saveBytes',
-                // So before the value saving to disk, it could be read with 'externalCache'.
+                // So before the value saving to disk, we can read it from 'externalCache'.
                 externalCache.put(fileName, value);
-                externalExecutor.execute(key, () -> {
-                    if (!Utils.saveBytes(new File(path + name, fileName), value)) {
-                        info("Write large value with key:" + key + " failed");
+                externalExecutor.execute(fileName, canceled -> {
+                    if (!canceled.get()) {
+                        File file = new File(path + name, fileName);
+                        if (!Utils.saveBytes(file, value, canceled)) {
+                            info("Write large value with key:" + key + " failed");
+                        }
                     }
                 });
                 tempExternalName = fileName;

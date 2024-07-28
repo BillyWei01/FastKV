@@ -1,6 +1,6 @@
 package io.fastkv.fastkvdemo.account
 
-import io.fastkv.interfaces.FastEncoder
+import io.fastkv.fastkvdemo.fastkv.kvdelegate.ObjectConvertor
 import io.packable.PackCreator
 import io.packable.PackDecoder
 import io.packable.PackEncoder
@@ -33,17 +33,13 @@ data class AccountInfo(
             )
         }
 
-        val ENCODER = object : FastEncoder<AccountInfo> {
-            override fun tag(): String {
-                return "UserAccount"
-            }
-
+        val CONVERTER = object : ObjectConvertor<AccountInfo> {
             override fun encode(obj: AccountInfo): ByteArray {
                 return PackEncoder.marshal(obj)
             }
 
-            override fun decode(bytes: ByteArray, offset: Int, length: Int): AccountInfo {
-               return PackDecoder.unmarshal(bytes, offset, length, CREATOR)
+            override fun decode(bytes: ByteArray): AccountInfo {
+                return PackDecoder.unmarshal(bytes, CREATOR)
             }
         }
     }

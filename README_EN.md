@@ -48,7 +48,7 @@ FastKV had been published to Maven Central:
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.5.1'
+    implementation 'io.github.billywei01:fastkv:2.6.0'
 }
 ```
 
@@ -66,8 +66,8 @@ It is recommended to set your own thread pool to reuse threads.
 ### 2.3 Basic cases
 - Basic case
 ```java
- // FastKV kv = new FastKV.Builder(path, name).build();
- FastKV kv = new FastKV.Builder(context, name).build();
+ // FastKV kv = new FastKV.Builder(context, name).build();
+ FastKV kv = new FastKV.Builder(path, name).build();
 
  if(!kv.getBoolean("flag")){
      kv.putBoolean("flag" , true);
@@ -102,14 +102,14 @@ You only need to pass in the encoder of the object when building FastKV instance
 The encoder is an object that implements
 [FastEncoder](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastEncoder.java).<br/>
 For example, the code of 'LongListEncoder' like:
-[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt)<br>
+[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/androidTest/java/io/fastkv/LongListEncoder.kt)<br>
 
 Encoding objects needs serialization/deserialization. <br/>
 Here recommend my serialization project: https://github.com/BillyWei01/Packable
 
 ### 2.5 Data encryption
 If you need to encrypt data, just pass in the implementation of
-[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastCipher.java)  when creating a FastKV instance
+[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java)  when creating a FastKV instance
 
 ```
 FastKV kv = FastKV.Builder(path, name)
@@ -128,7 +128,7 @@ It is easy to migrate SharePreferences to FastKV.
 public class SpCase {
    public static final String NAME = "common_store";
    
-   // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+   // public static final SharedPreferences preferences = AppContext.INSTANCE.getContext().getSharedPreferences(NAME, Context.MODE_PRIVATE);
 
    public static final SharedPreferences preferences = FastKV.adapt(AppContext.INSTANCE.getContext(), NAME);
 }
@@ -137,10 +137,10 @@ public class SpCase {
 ### 2.7 Migrate MMKV to FastKV
 Since MMKV does not implement the 'getAll' interface, it cannot be migrated at once like SharePreferences. <br>
 But you can create a KV class, create methods such as 'getInt', 'getString', etc., and do adaptation processing in it.<br>
-Refer to [FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/FooKV.kt)
+Refer to [MMKV2FastKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/MMKV2FastKV.kt)
 
 ### 2.8 Multi-Process
-Multi-Process implement: [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/MPFastKV.java).<br>
+Multi-Process implement: [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java).<br>
 
 Example:
 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt)
@@ -149,7 +149,7 @@ and [TestService](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/ja
 ### 2.9 Kotlin delegation
 Kotlin is compatible with java, so you could directly use FastKV or SharedPreferences APIs in Kotlin.
 In addition, kotlin provides the syntax of delegate, which can be used to improve key-value API.
-Refer to [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/KVData.kt)
+Refer to [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt)
 
 ## 3. Benchmark
 - Data source: Collecting part of the key-value data of SharePreferences in the app (with  confusion) , hundreds of key-values. <br/>
@@ -158,32 +158,28 @@ I make a normally distributed sequence to test the accessing.
 - Test device: Huawei P30 Pro
 - Test code：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
 
+Update:
 
-Write:
-
-|	| 25	| 50	| 100 |	200|	400	| 600
+| | 25| 50| 100| 200| 400| 600
 ---|---|---|---|---|---|---
-SP-commit	|121|	189	|443	|773	|2113	|4801
-DataStore	|94	|226	|524	|1332	|4422	|10066
-SQLiteKV	|161	|333	|663	|1353	|3159	|4299
-FastKV-commit	|107	|150	|338	|601	|1359	|2235
-SP-apply	|2	|10	|37	|109	|279	|519
-MMKV	|3	|3	|6	|6	|11	|15
-FastKV-mmap	|1	|2	|3	|5	|14	|11
-
+SP-commit | 114| 172| 411| 666| 2556| 5344
+DataStore | 231| 625| 1717| 4421| 7629| 13639
+SQLiteKV | 192| 382| 1025| 1565| 4279| 5034
+SP-apply | 3| 9| 35| 118| 344| 516
+MMKV | 4| 8| 5| 8| 10| 9
+FastKV | 3| 6| 4| 6| 8| 10
 ---
 
-Read:
+Query:
 
-|	|25	|50	|100	|200	|400	|600
+| | 25| 50| 100| 200| 400| 600
 ---|---|---|---|---|---|---
-SP-commit	|0	|1	|2	|1	|1	|1
-DataStore	|25	|5	|2	|1	|1	|2
-SQLiteKV	|112	|183	|281	|480	|740	|1051
-FastKV-commit	|0	|1	|1	|2	|3	|2
-SP-apply	|0	|1	|1	|1	|2	|3
-MMKV		|0	|1	|3	|3	|8	|11
-FastKV-mmap	|0	|1	|1	|2	|1	|1
+SP-commit | 1| 3| 2| 1| 2| 3
+DataStore | 57| 76| 115| 117| 170| 216
+SQLiteKV | 96| 161| 265| 417| 767| 1038
+SP-apply | 0| 1| 0| 1| 3| 3
+MMKV | 0| 1| 1| 5| 8| 11
+FastKV | 0| 1| 1| 3| 3| 1
 
 # Java-Version
 There is a project write with only API of JDK, no Android SDK. <br>

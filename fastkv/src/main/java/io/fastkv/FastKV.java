@@ -13,7 +13,6 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
 
 import io.fastkv.Container.BaseContainer;
 import io.fastkv.Container.VarContainer;
@@ -53,8 +52,6 @@ public final class FastKV extends AbsFastKV {
     // Only take effect when mode is not NON_BLOCKING
     boolean autoCommit = true;
 
-    private final Executor applyExecutor = new LimitExecutor();
-
     FastKV(final String path,
            final String name,
            FastEncoder[] encoders,
@@ -76,7 +73,7 @@ public final class FastKV extends AbsFastKV {
     }
 
     private synchronized void loadData() {
-        // we got the object lock, notify the waiter to continue the constructor
+        // Once obtained the object lock, notify the waiter to continue the constructor
         synchronized (data) {
             startLoading = true;
             data.notify();
@@ -267,23 +264,24 @@ public final class FastKV extends AbsFastKV {
         return hadWriteToABFile;
     }
 
-    @SuppressWarnings("resource")
     private boolean writeToABFile(FastBuffer buffer) {
-        int fileLen = buffer.hb.length;
-        File aFile = new File(path, name + A_SUFFIX);
-        File bFile = new File(path, name + B_SUFFIX);
+        RandomAccessFile aAccessFile = null;
+        RandomAccessFile bAccessFile = null;
         try {
+            int fileLen = buffer.hb.length;
+            File aFile = new File(path, name + A_SUFFIX);
+            File bFile = new File(path, name + B_SUFFIX);
             if (!Utils.makeFileIfNotExist(aFile) || !Utils.makeFileIfNotExist(bFile)) {
                 throw new Exception(OPEN_FILE_FAILED);
             }
-            RandomAccessFile aAccessFile = new RandomAccessFile(aFile, "rw");
+            aAccessFile = new RandomAccessFile(aFile, "rw");
             aAccessFile.setLength(fileLen);
             aChannel = aAccessFile.getChannel();
             aBuffer = aChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
             aBuffer.order(ByteOrder.LITTLE_ENDIAN);
             aBuffer.put(buffer.hb, 0, dataEnd);
 
-            RandomAccessFile bAccessFile = new RandomAccessFile(bFile, "rw");
+            bAccessFile = new RandomAccessFile(bFile, "rw");
             bAccessFile.setLength(fileLen);
             bChannel = bAccessFile.getChannel();
             bBuffer = bChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileLen);
@@ -291,6 +289,12 @@ public final class FastKV extends AbsFastKV {
             bBuffer.put(buffer.hb, 0, dataEnd);
             return true;
         } catch (Exception e) {
+            Utils.closeQuietly(aAccessFile);
+            Utils.closeQuietly(bAccessFile);
+            aChannel = null;
+            bChannel = null;
+            aBuffer = null;
+            bBuffer = null;
             error(e);
         }
         return false;
@@ -352,7 +356,7 @@ public final class FastKV extends AbsFastKV {
             removeStart = 0;
             if (oldFileName != null) {
                 if (writingMode == NON_BLOCKING) {
-                    FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
+                    deleteExternalFile(oldFileName);
                 } else {
                     deletedFiles.add(oldFileName);
                 }
@@ -394,7 +398,7 @@ public final class FastKV extends AbsFastKV {
     /**
      * Forces any changes to be written to the storage device containing the mapped file.
      * No need to call this unless what's had written is very import.
-     * The system crash or power off before data syncing to disk might make recently update loss.
+     * The system crash or power off before data syncing to disk might make recently update lost.
      */
     public synchronized void force() {
         if (closed) return;
@@ -451,7 +455,12 @@ public final class FastKV extends AbsFastKV {
     private synchronized boolean writeToCFile() {
         try {
             File tmpFile = new File(path, name + TEMP_SUFFIX);
-            if (Utils.saveBytes(tmpFile, fastBuffer.hb, dataEnd)) {
+            if (Utils.makeFileIfNotExist(tmpFile)) {
+                try (RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw")) {
+                    accessFile.setLength(dataEnd);
+                    accessFile.write(fastBuffer.hb, 0, dataEnd);
+                    accessFile.getFD().sync();
+                }
                 File cFile = new File(path, name + C_SUFFIX);
                 if (Utils.renameFile(tmpFile, cFile)) {
                     clearDeletedFiles();
@@ -469,7 +478,7 @@ public final class FastKV extends AbsFastKV {
     private void clearDeletedFiles() {
         if (!deletedFiles.isEmpty()) {
             for (String oldFileName : deletedFiles) {
-                FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
+                deleteExternalFile(oldFileName);
             }
             deletedFiles.clear();
         }
@@ -637,7 +646,7 @@ public final class FastKV extends AbsFastKV {
 
     protected void removeOldFile(String oldFileName) {
         if (writingMode == NON_BLOCKING) {
-            FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
+            deleteExternalFile(oldFileName);
         } else {
             deletedFiles.add(oldFileName);
         }
@@ -655,7 +664,7 @@ public final class FastKV extends AbsFastKV {
         }
     }
 
-    protected void syncCompatBuffer(int gcStart, int allocate, int gcUpdateSize) {
+    protected void updateBuffer(int gcStart, int allocate, int gcUpdateSize) {
         int newDataSize = dataEnd - DATA_START;
         int packedSize = packSize(newDataSize);
         if (writingMode == NON_BLOCKING) {
@@ -714,9 +723,9 @@ public final class FastKV extends AbsFastKV {
         closed = true;
         if (writingMode == NON_BLOCKING) {
             try {
-                aChannel.force(false);
+                aChannel.force(true);
                 aChannel.close();
-                bChannel.force(false);
+                bChannel.force(true);
                 bChannel.close();
             } catch (Exception e) {
                 error(e);
@@ -780,8 +789,8 @@ public final class FastKV extends AbsFastKV {
          * Assigned writing mode to SYNC_BLOCKING.
          * <p>
          * In non-blocking mode (write data with mmap),
-         * it might loss update if the system crash or power off before flush data to disk.
-         * You could use {@link #force()} to avoid loss update, or use SYNC_BLOCKING mode.
+         * it might lost update if the system crash or power off before flush data to disk.
+         * You could use {@link #force()} to avoid losing update, or use SYNC_BLOCKING mode.
          * <p>
          * In blocking mode, every update will write all data to the file, which is expensive cost.
          * <p>
@@ -846,9 +855,9 @@ public final class FastKV extends AbsFastKV {
         return kv;
     }
 
+    @NonNull
     @Override
-    public synchronized @NonNull
-    String toString() {
+    public String toString() {
         return "FastKV: path:" + path + " name:" + name;
     }
 }

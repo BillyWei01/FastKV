@@ -9,7 +9,7 @@ import java.util.concurrent.Executor;
  * Use for duplicate tasks.
  * Only one task at most can wait to be executed.
  */
-public class LimitExecutor implements Executor {
+class LimitExecutor implements Executor {
     private Runnable mActive;
     private Runnable mWaiting;
 

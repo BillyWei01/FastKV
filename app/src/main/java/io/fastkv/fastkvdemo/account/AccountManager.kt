@@ -3,6 +3,8 @@ package io.fastkv.fastkvdemo.account
 import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.util.Utils
 import io.fastkv.fastkvdemo.data.AppState
+import io.fastkv.fastkvdemo.data.UsageData
+import io.fastkv.fastkvdemo.data.UserInfo
 import java.lang.StringBuilder
 import kotlin.random.Random
 
@@ -18,7 +20,7 @@ object AccountManager {
         // UserInfo.close(AppContext.uid)
 
         AppContext.uid = 0L
-        AppState.user_id = 0L
+        AppState.userId = 0L
         return true
     }
 
@@ -54,9 +56,11 @@ object AccountManager {
         // 因为后面的存储和逻辑可能与uid相关
         AppContext.uid = uid
 
-        // 记录当前登陆的用户ID
-        AppState.user_id = uid
+        // 保存用户ID
+        AppState.userId = uid
 
+        // 记录当前登录ID，以便在登出后再登录时记忆上次登录的账号
+        UsageData.lastLoginUid = uid
 
         // 写入信息，要直接获取uid对应的实例来写入
         // 避免用户ID切换后，异步任务写错到切换后的实例中（串数据）
@@ -69,7 +73,7 @@ object AccountManager {
     private fun fetchUserInfo(uid: Long) {
         UserInfo.get(uid).run {
             isVip = true
-            gender = Gender.CONVERTER.intToType((uid % 10000 % 3).toInt())
+            gender = Gender.parse((uid % 10000 % 3).toInt())
             fansCount = Random.nextInt(10000)
             score = 4.5f
             loginTime = System.currentTimeMillis()
@@ -77,7 +81,9 @@ object AccountManager {
             sign = "The journey of a thousand miles begins with a single step."
             lock = Utils.getMD5Array("12347".toByteArray())
             tags = setOf("travel", "foods", "cats", randomString())
-            favoriteChannels = listOf(1234567, 1234568, 2134569)
+            friendIdList = listOf(1234567, 1234568, 2134569)
+            favorites["Android"] = setOf("A", "B", "C")
+            favorites["iOS"] = setOf("D", "E", "F", "G")
             config.putString("theme", "dark")
             config.putBoolean("notification", true)
         }
@@ -93,7 +99,7 @@ object AccountManager {
     fun formatUserInfo(): String {
         val builder = StringBuilder()
         if (isLogin()) {
-            UserInfo.run {
+            UserInfo.get().run {
                 builder
                     .append("gender: ").append(gender).append('\n')
                     .append("isVip: ").append(isVip).append('\n')
@@ -104,9 +110,12 @@ object AccountManager {
                     .append("sign: ").append(sign).append('\n')
                     .append("lock: ").append(Utils.bytes2Hex(lock)).append('\n')
                     .append("tags: ").append(tags).append('\n')
-                    .append("favoriteChannels: ").append(favoriteChannels).append('\n')
+                    .append("friendIdList: ").append(friendIdList).append('\n')
+                    .append("favorite, Android: ").append(favorites["Android"]).append('\n')
+                    .append("favorite, iOS: ").append(favorites["iOS"]).append('\n')
+                    .append("favorite, PC: ").append(favorites["PC"]).append('\n')
                     .append("theme: ").append(config.getString("theme")).append('\n')
-                    .append("notification: ").append(config.getBoolean("notification"))
+                    .append("notification: ").append(config.getBoolean("notification", false))
             }
         }
         return builder.toString()

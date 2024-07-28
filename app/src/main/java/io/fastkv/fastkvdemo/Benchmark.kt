@@ -43,25 +43,23 @@ import java.util.Random
  *
  */
 object Benchmark {
-    private const val TAG = "Benchmark-2"
+    private const val TAG = "Benchmark"
 
     private const val PREFIX_SP_COMMIT = "sp_commit_"
+    private const val PREFIX_SP_APPLY = "sp_apply_"
     private const val PREFIX_DATASTORE = "data_store_"
     private const val PREFIX_SQLITE = "sqlite_"
-    private const val PREFIX_COMMIT = "fastkv_commit_"
-    private const val PREFIX_SP_APPLY = "sp_apply_"
     private const val PREFIX_MMKV = "mmkv_"
-    private const val PREFIX_MMAP = "fastkv_mmap_"
+    private const val PREFIX_FASTKV = "fastkv_"
 
     private val is16KPageSize = Utils.is16KPageSize()
 
     private lateinit var spCommit: SharedPreferences
+    private lateinit var spApply: SharedPreferences
     private lateinit var dataStore: DataStore<Preferences>
     private lateinit var sqliteKV: SQLiteKV
-    private lateinit var fastkvCommit: FastKV
-    private lateinit var spApply: SharedPreferences
     private lateinit var mmkv: MMKV
-    private lateinit var fastkvMMAP: FastKV
+    private lateinit var fastkv: FastKV
 
     private const val MILLION = 1000000L
     private var hadWarmingUp = false
@@ -82,7 +80,7 @@ object Benchmark {
             UsageData.benchmarkCount = count
             initFiles(count)
 
-            Log.i(TAG, "Start test, spCommit|dataStore| sqlite | fastkvCommit | spApply | MMKV | fastkvMMAP"  )
+            Log.i(TAG, "Start test, SpCommit | DataStore | SQLite | SpApply | MMKV | FastKV"  )
             val kvCountArray = arrayOf(25, 50, 100, 200, 400, 600)
             kvCountArray.forEach { kvCount ->
                 progress(kvCount)
@@ -97,77 +95,128 @@ object Benchmark {
 
     private fun initFiles(count: Int) {
         spCommit = AppContext.context.getSharedPreferences("$PREFIX_SP_COMMIT$count", Context.MODE_PRIVATE)
-        spApply = AppContext.context.getSharedPreferences("$PREFIX_SP_APPLY$count", Context.MODE_PRIVATE)
         dataStore = PreferenceDataStoreFactory.create {
             File(PathManager.filesDir, "$PREFIX_DATASTORE$count.preferences_pb")
         }
+        sqliteKV = SQLiteKV.Builder("$PREFIX_SQLITE$count").build()
+        spApply = AppContext.context.getSharedPreferences("$PREFIX_SP_APPLY$count", Context.MODE_PRIVATE)
+        mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
+        fastkv = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_FASTKV$count").build()
+    }
 
+    // 测试加载时间 (先写入600个key-value，修改代码，重启AP执行此方法）
+    private suspend fun testLoading(count: Int) {
+        val t0 = System.nanoTime()
+        spCommit = AppContext.context.getSharedPreferences("$PREFIX_SP_COMMIT$count", Context.MODE_PRIVATE)
+        // 因为有的KV的数据加载是异步的，所以实例化本身不耗时；
+        // 数据加载期间会加锁，如果此间有其他线程访问put/get接口，会阻塞，直到数据加载完成。
+        // 所以这里查询一个value, 等查询完成，就是基本数据加载完成的时间。
+        spCommit.getInt("", 0)
+        val t1 = System.nanoTime()
+
+        // apply模式和commit模式只影响更新，数据加载是一样的
+//        spApply = AppContext.context.getSharedPreferences("$PREFIX_SP_APPLY$count", Context.MODE_PRIVATE)
+//        spApply.getInt("", 0)
+
+        dataStore = PreferenceDataStoreFactory.create {
+            File(PathManager.filesDir, "$PREFIX_DATASTORE$count.preferences_pb")
+        }
+//        val data = runBlocking {
+//            dataStore.data.first()
+//        }
+//        val value = data[stringPreferencesKey("")]
+        val flow = dataStore.data.map { setting ->
+            setting[stringPreferencesKey("")]
+        }
+        val value = flow.first()
+
+        val t2 = System.nanoTime()
+        sqliteKV = SQLiteKV.Builder("$PREFIX_SQLITE$count").build()
+        // sqlite不是异步加载，所以不查询也没关系
+        // sqliteKV.getInt("", 0)
+
+        val t3 = System.nanoTime()
         if(!is16KPageSize) {
             mmkv = MMKV.mmkvWithID("$PREFIX_MMKV$count")
+            mmkv.getInt("", 0)
         }
-        sqliteKV = SQLiteKV.Builder("$PREFIX_SQLITE$count").build()
-        fastkvCommit = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_COMMIT$count").blocking().build()
-        fastkvMMAP = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_MMAP$count").build()
+
+        val t4 = System.nanoTime()
+
+        fastkv = FastKV.Builder(PathManager.fastKVDir, "$PREFIX_FASTKV$count").build()
+        fastkv.getInt("", 0)
+
+        val t5 = System.nanoTime()
+
+        val msg = StringBuilder()
+            .append(" SharePreferences:").append((t1-t0) / MILLION).append(" ms, ")
+            .append(" DataStore:").append((t2-t1)  / MILLION).append(" ms, ")
+            .append(" SQLite:").append((t3-t2)  / MILLION).append(" ms, ")
+            .append(" MMKV:").append((t4-t3)  / MILLION).append(" ms, ")
+            .append(" FastKV:").append((t5-t4)  / MILLION).append(" ms")
+            .toString()
+        Log.i(TAG, "init time: $msg")
+
+        // key-value 数量 600， P30 Pro 测试结果
+        // init time:  Sp-commit:24 ms,  DataStore:109 ms,  SQLite:6 ms,  Sp-apply:10 ms,  MMKV:0 ms,  FastKV:6 ms
     }
 
     private suspend fun runTest(context: Context, kvCount: Int, testRound: Int) {
         val srcList = generateInputList(loadSourceData(context), kvCount)
 
-        val inputList: List<Pair<String, Any>>
+        val inputList: List<Pair<String, Any>> = ArrayList(srcList)
 
         // Log an empty line
         Log.d(TAG, " ")
 
-        val time = LongArray(7)
+        val time = LongArray(6)
         Arrays.fill(time, 0L)
-        inputList = ArrayList(srcList)
 
         putToSpCommit(inputList)
         putToDataStore(inputList)
         putToSqlite(inputList)
-        putToFastKVCommit(inputList)
         putToSpApply(inputList)
         if(!is16KPageSize) {
             putToMMKV(inputList)
         }
-        putToFastKVMMAP(inputList)
+        putToFastKV(inputList)
 
         Arrays.fill(time, 0L)
 
         val testArray = ArrayList<List<Pair<String, Any>>>()
 
-        val r = Random(1)
+        val r = Random(0)
         for (i in 0 until testRound) {
             testArray.add(getDistributedList(srcList, r))
         }
 
         nap()
 
-        time[0] = test(testRound) { putToSpCommit(testArray[it]) }
-        time[1] = test(testRound) { putToDataStore(testArray[it]) }
-        time[2] = test(testRound) { putToSqlite(testArray[it]) }
-        time[3] = test(testRound) { putToFastKVCommit(testArray[it]) }
-        time[4] = test(testRound) { putToSpApply(testArray[it]) }
+        var i = 0
+        time[i++] = test(testRound) { putToSpCommit(testArray[it]) }
+        time[i++] = test(testRound) { putToDataStore(testArray[it]) }
+        time[i++] = test(testRound) { putToSqlite(testArray[it]) }
+        time[i++] = test(testRound) { putToSpApply(testArray[it]) }
         if(!is16KPageSize) {
-            time[5] = test(testRound) { putToMMKV(testArray[it]) }
+            time[i++] = test(testRound) { putToMMKV(testArray[it]) }
         }
-        time[6] = test(testRound) { putToFastKVMMAP(testArray[it]) }
+        time[i] = test(testRound) { putToFastKV(testArray[it]) }
 
-        Log.i(TAG, "Write, count: $kvCount" + getTimeLog(time))
+        Log.i(TAG, "Write, count: $kvCount, " + getTimeLog(time))
 
         Arrays.fill(time, 0L)
 
-        time[0] = test(testRound) { readFromSpCommit(testArray[it]) }
-        time[1] = test(testRound) { readFromDataStore(testArray[it]) }
-        time[2] = test(testRound) { readFromSqlite(testArray[it]) }
-        time[3] = test(testRound) { readFromFastKVCommit(testArray[it]) }
-        time[4] = test(testRound) { readFromSpApply(testArray[it]) }
+        i = 0
+        time[i++] = test(testRound) { readFromSpCommit(testArray[it]) }
+        time[i++] = test(testRound) { readFromDataStore(testArray[it]) }
+        time[i++] = test(testRound) { readFromSqlite(testArray[it]) }
+        time[i++] = test(testRound) { readFromSpApply(testArray[it]) }
         if(!is16KPageSize) {
-            time[5] = test(testRound) { readFromMMKV(testArray[it]) }
+            time[i++] = test(testRound) { readFromMMKV(testArray[it]) }
         }
-        time[6] = test(testRound) { readFromFastKVMMAP(testArray[it]) }
+        time[i] = test(testRound) { readFromFastKV(testArray[it]) }
 
-        Log.i(TAG, "Read, count: $kvCount" + getTimeLog(time))
+        Log.i(TAG, "Read, count: $kvCount, " + getTimeLog(time))
     }
 
     /**
@@ -187,17 +236,26 @@ object Benchmark {
     }
 
     private fun getTimeLog(time: LongArray): String {
-        val builder = StringBuilder()
-            .append(" Sp-commit:").append(time[0] / MILLION).append(" ms, ")
-            .append(" DataStore:").append(time[1] / MILLION).append(" ms, ")
-            .append(" SQLite:").append(time[2] / MILLION).append(" ms, ")
-            .append(" FastKV-commit:").append(time[3] / MILLION).append(" ms, ")
-            .append(" Sp-apply:").append(time[4] / MILLION).append(" ms, ")
+        var i = 0
+        val builder =  StringBuilder()
+            .append(" Sp-commit:").append(time[i++] / MILLION).append(" ms, ")
+            .append(" DataStore:").append(time[i++] / MILLION).append(" ms, ")
+            .append(" SQLite:").append(time[i++] / MILLION).append(" ms, ")
+            .append(" Sp-apply:").append(time[i++] / MILLION).append(" ms, ")
         if (!is16KPageSize) {
             builder.append(" MMKV:").append(time[5] / MILLION).append(" ms, ")
         }
-        builder.append(" FastKV-mmap:").append(time[6] / MILLION).append(" ms")
+        builder.append(" FastKV:").append(time[i] / MILLION).append(" ms")
         return builder.toString()
+
+//        return StringBuilder()
+//            .append(" | ").append(time[i++] / MILLION)
+//            .append(" | ").append(time[i++] / MILLION)
+//            .append(" | ").append(time[i++] / MILLION)
+//            .append(" | ").append(time[i++] / MILLION)
+//            .append(" | ").append(time[i++] / MILLION)
+//            .append(" | ").append(time[i] / MILLION)
+//            .toString()
     }
 
     private suspend fun test(round: Int, block: suspend (i: Int) -> Unit): Long {
@@ -220,27 +278,25 @@ object Benchmark {
     private suspend fun warmingUp() {
         val r = Random(1)
         val srcList = generateInputList(loadSourceData(AppContext.context), 400)
-        putToSpApply(srcList)
         putToSpCommit(srcList)
         putToDataStore(srcList)
         putToSqlite(srcList)
+        putToSpApply(srcList)
         if(!is16KPageSize) {
             putToMMKV(srcList)
         }
-        putToFastKVCommit(srcList)
-        putToFastKVMMAP(srcList)
+        putToFastKV(srcList)
 
-        for (i in 0 until 2) {
+        for (i in 0 until 1) {
             val inputList = getDistributedList(srcList, r)
-            putToSpApply(inputList)
             putToSpCommit(srcList)
             putToDataStore(inputList)
             putToSqlite(inputList)
+            putToSpApply(inputList)
             if(!is16KPageSize) {
                 putToMMKV(inputList)
             }
-            putToFastKVCommit(inputList)
-            putToFastKVMMAP(inputList)
+            putToFastKV(inputList)
         }
 
         nap()
@@ -267,7 +323,7 @@ object Benchmark {
         val a = Utils.getDistributedArray(srcList.size, 3, r)
         for (index in a) {
             val pair = srcList[index]
-            inputList.add(Pair(pair.first, tuningObject(pair.second, r)))
+            inputList.add(Pair(pair.first, tuningValue(pair.second, r)))
         }
         return inputList
     }
@@ -288,33 +344,41 @@ object Benchmark {
         } else if (newLen > len) {
             str + generateString(newLen - len)
         } else {
-            if (str.isEmpty()) "" else str.substring(0, len - 1) + "a"
+            str
         }
         return newStr
     }
 
-    // 对value进行微调，以使得每次输入的值不同。
-    private fun tuningObject(value: Any, r: Random): Any {
-        val diff = 2 - r.nextInt(4)
-        return if (value is String) {
-            makeNewString(value, diff)
-        } else if (value is Boolean) {
-            diff < 0
-        } else if (value is Int) {
-            value + diff
-        } else if (value is Long) {
-            value + diff
-        } else if (value is Float) {
-            value + diff
-        } else if (value is Set<*>) {
-            val oldValue = value as Set<String>
-            val newValue: MutableSet<String> = LinkedHashSet()
-            for (str in oldValue) {
-                newValue.add(makeNewString(str, diff))
+    // 对value进行微调
+    private fun tuningValue(value: Any, r: Random): Any {
+        val diff = 1 - r.nextInt(3)
+        return when (value) {
+            is String -> {
+                makeNewString(value, diff)
             }
-            newValue
-        } else {
-            value
+            is Boolean -> {
+                diff < 0
+            }
+            is Int -> {
+                value + diff
+            }
+            is Long -> {
+                value + diff
+            }
+            is Float -> {
+                value + diff
+            }
+            is Set<*> -> {
+                val oldValue = value as Set<String>
+                val newValue: MutableSet<String> = LinkedHashSet()
+                for (str in oldValue) {
+                    newValue.add(makeNewString(str, diff))
+                }
+                newValue
+            }
+            else -> {
+                value
+            }
         }
     }
 
@@ -421,8 +485,29 @@ object Benchmark {
     }
 
     private suspend fun readFromDataStore(list: List<Pair<String, Any>>) {
-        val value = dataStore.data.map { setting ->
-            for (pair in list) {
+        for (pair in list) {
+//            val setting = runBlocking {
+//                dataStore.data.first()
+//            }
+//            val key = pair.first
+//            val value = pair.second
+//            if (value is String) {
+//                setting[stringPreferencesKey(key)]
+//            } else if (value is Boolean) {
+//                setting[booleanPreferencesKey(key)]
+//            } else if (value is Int) {
+//                setting[intPreferencesKey(key)]
+//            } else if (value is Long) {
+//                setting[longPreferencesKey(key)]
+//            } else if (value is Float) {
+//                setting[floatPreferencesKey(key)]
+//            } else if (value is Set<*>) {
+//                setting[stringSetPreferencesKey(key)]
+//            } else {
+//                null
+//            }
+
+            val flow = dataStore.data.map { setting ->
                 val key = pair.first
                 val value = pair.second
                 if (value is String) {
@@ -437,10 +522,12 @@ object Benchmark {
                     setting[floatPreferencesKey(key)]
                 } else if (value is Set<*>) {
                     setting[stringSetPreferencesKey(key)]
+                } else {
+                    null
                 }
             }
+            val result = flow.first()
         }
-        val v = value.first()
     }
 
     private fun putToSqlite(list: List<Pair<String, Any>>) {
@@ -462,7 +549,6 @@ object Benchmark {
             }
         }
     }
-
 
     private fun readFromSqlite(list: List<Pair<String, Any>>) {
         for (pair in list) {
@@ -524,82 +610,42 @@ object Benchmark {
         }
     }
 
-    private fun putToFastKVCommit(list: List<Pair<String, Any>>) {
+    private fun putToFastKV(list: List<Pair<String, Any>>) {
         for (pair in list) {
             val key = pair.first
             val value = pair.second
             if (value is String) {
-                fastkvCommit.putString(key, value)
+                fastkv.putString(key, value)
             } else if (value is Boolean) {
-                fastkvCommit.putBoolean(key, value)
+                fastkv.putBoolean(key, value)
             } else if (value is Int) {
-                fastkvCommit.putInt(key, value)
+                fastkv.putInt(key, value)
             } else if (value is Long) {
-                fastkvCommit.putLong(key, value)
+                fastkv.putLong(key, value)
             } else if (value is Float) {
-                fastkvCommit.putFloat(key, value)
+                fastkv.putFloat(key, value)
             } else if (value is Set<*>) {
-                fastkvCommit.putStringSet(key, value as Set<String?>)
+                fastkv.putStringSet(key, value as Set<String?>)
             }
         }
     }
 
-    private fun readFromFastKVCommit(list: List<Pair<String, Any>>) {
+    private fun readFromFastKV(list: List<Pair<String, Any>>) {
         for (pair in list) {
             val key = pair.first
             val value = pair.second
             if (value is String) {
-                fastkvCommit.getString(key, "")
+                fastkv.getString(key, "")
             } else if (value is Boolean) {
-                fastkvCommit.getBoolean(key, false)
+                fastkv.getBoolean(key, false)
             } else if (value is Int) {
-                fastkvCommit.getInt(key, 0)
+                fastkv.getInt(key, 0)
             } else if (value is Long) {
-                fastkvCommit.getLong(key, 0L)
+                fastkv.getLong(key, 0L)
             } else if (value is Float) {
-                fastkvCommit.getFloat(key, 0f)
+                fastkv.getFloat(key, 0f)
             } else if (value is Set<*>) {
-                fastkvCommit.getStringSet(key)
-            }
-        }
-    }
-
-    private fun putToFastKVMMAP(list: List<Pair<String, Any>>) {
-        for (pair in list) {
-            val key = pair.first
-            val value = pair.second
-            if (value is String) {
-                fastkvMMAP.putString(key, value)
-            } else if (value is Boolean) {
-                fastkvMMAP.putBoolean(key, value)
-            } else if (value is Int) {
-                fastkvMMAP.putInt(key, value)
-            } else if (value is Long) {
-                fastkvMMAP.putLong(key, value)
-            } else if (value is Float) {
-                fastkvMMAP.putFloat(key, value)
-            } else if (value is Set<*>) {
-                fastkvMMAP.putStringSet(key, value as Set<String?>)
-            }
-        }
-    }
-
-    private fun readFromFastKVMMAP(list: List<Pair<String, Any>>) {
-        for (pair in list) {
-            val key = pair.first
-            val value = pair.second
-            if (value is String) {
-                fastkvMMAP.getString(key, "")
-            } else if (value is Boolean) {
-                fastkvMMAP.getBoolean(key, false)
-            } else if (value is Int) {
-                fastkvMMAP.getInt(key, 0)
-            } else if (value is Long) {
-                fastkvMMAP.getLong(key, 0L)
-            } else if (value is Float) {
-                fastkvMMAP.getFloat(key, 0f)
-            } else if (value is Set<*>) {
-                fastkvMMAP.getStringSet(key)
+                fastkv.getStringSet(key)
             }
         }
     }
@@ -613,15 +659,7 @@ object Benchmark {
                 deleteMMKV(count)
             }
             deleteDB(count)
-
-            if (this::fastkvCommit.isInitialized) {
-                fastkvCommit.close()
-            }
-            if (this::fastkvMMAP.isInitialized) {
-                fastkvCommit.close()
-            }
-            deleteFastKV(PREFIX_COMMIT, count)
-            deleteFastKV(PREFIX_MMAP, count)
+            deleteFastKV(count)
         }.onFailure { t ->
             Log.e(TAG, "delete failed", t)
         }
@@ -659,9 +697,12 @@ object Benchmark {
         File(dir, "$name.db-journal").delete()
     }
 
-    private fun deleteFastKV(prefix: String, count: Int) {
+    private fun deleteFastKV(count: Int) {
+        if (this::fastkv.isInitialized) {
+            fastkv.close()
+        }
         val dir = PathManager.filesDir + "/fastkv"
-        val name = "$prefix$count"
+        val name = "$PREFIX_FASTKV$count"
         File(dir, "$name.kva").delete()
         File(dir, "$name.kvb").delete()
         File(dir, "$name.kvc").delete()

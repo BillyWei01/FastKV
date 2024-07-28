@@ -66,7 +66,6 @@ public final class MPFastKV extends AbsFastKV {
     private long updateHash;
     private boolean needFullWrite = false;
 
-    private final Executor applyExecutor = new LimitExecutor();
     private final Executor refreshExecutor = new LimitExecutor();
 
     // We need to keep reference to the observer in case of gc recycle it.
@@ -415,7 +414,7 @@ public final class MPFastKV extends AbsFastKV {
                 aBuffer.force();
             }
             if (bChannel != null) {
-                bChannel.force(false);
+                bChannel.force(true);
             }
         } catch (Exception e) {
             error(e);
@@ -504,7 +503,7 @@ public final class MPFastKV extends AbsFastKV {
 
             if (!deletedFiles.isEmpty()) {
                 for (String oldFileName : deletedFiles) {
-                    FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, oldFileName)));
+                    deleteExternalFile(oldFileName);
                 }
             }
 
@@ -529,7 +528,7 @@ public final class MPFastKV extends AbsFastKV {
     }
 
     private void waitExternalWriting() {
-        while (!externalExecutor.isEmpty()) {
+        while (externalExecutor.isNotEmpty()) {
             try {
                 //noinspection BusyWait
                 Thread.sleep(10L);
@@ -794,7 +793,7 @@ public final class MPFastKV extends AbsFastKV {
         }
     }
 
-    protected void syncCompatBuffer(int gcStart, int allocate, int gcUpdateSize) {
+    protected void updateBuffer(int gcStart, int allocate, int gcUpdateSize) {
         int minUpdateStart = gcStart;
         for (int i = 0; i < updateCount; i += 2) {
             int s = updateStartAndSize[i];
@@ -937,9 +936,9 @@ public final class MPFastKV extends AbsFastKV {
         }
     }
 
+    @NonNull
     @Override
-    public synchronized @NonNull
-    String toString() {
+    public String toString() {
         return "MPFastKV: path:" + path + " name:" + name;
     }
 }

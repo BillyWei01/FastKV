@@ -42,7 +42,7 @@ FastKV有以下特点：
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.5.1'
+    implementation 'io.github.billywei01:fastkv:2.6.0'
 }
 ```
 
@@ -88,17 +88,20 @@ Builder的构造可传Context或者path。<br>
     List<Long> list2 = kv.getObject("long_list");
 ```
 
-除了支持基本类型外，FastKV还支持写入对象，只需在构建FastKV实例时传入对象的编码器即可。<br>
-编码器为实现FastEncoder接口的对象。<br>
+除了支持基本类型外，FastKV还支持写入对象。 <br>
+如果要写入自定义对象，需在构建FastKV实例时传入对象的编码器(实现了FastEncoder接口的对象）。<br>
+因为FastKV实例加载时会执行自动反序列化，所以需要在实例创建时注入编码器。<br>
+另外，如果没有注入编码器，调用putObject接口时会抛出异常（提醒使用者给FastKV实例传入编码器）。<br>
+
 上面LongListEncoder就实现了FastEncoder接口，代码实现可参考：
-[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/LongListEncoder.kt)<br>
+[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/androidTest/java/io/fastkv/LongListEncoder.kt)<br>
 
 编码对象涉及序列化/反序列化。<br>
 这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
 
 ### 2.5 数据加密
 如需对数据进行加密，在创建FastKV实例时传入
-[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastCipher.java) 的实现即可。
+[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java) 的实现即可。
 
 ```
 FastKV kv = FastKV.Builder(path, name)
@@ -117,7 +120,7 @@ FastKV实现了SharedPreferences接口，并且提供了迁移SP数据的方法�
 public class SpCase {
    public static final String NAME = "common_store";
    // 原本的获取SP的方法
-   // public static final SharedPreferences preferences = GlobalConfig.appContext.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+   // public static final SharedPreferences preferences = AppContext.INSTANCE.getContext().getSharedPreferences(NAME, Context.MODE_PRIVATE);
    
    // 导入原SP数据
    public static final SharedPreferences preferences = FastKV.adapt(AppContext.INSTANCE.getContext(), NAME);
@@ -127,10 +130,10 @@ public class SpCase {
 ### 2.7 迁移 MMKV 到 FastKV
 由于MMKV没有实现 'getAll' 接口，所以无法像SharePreferences一样一次性迁移。<br>
 但是可以封装一个KV类，创建 'getInt'，'getString' ... 等方法，并在其中做适配处理。
-可参考：[FooKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/data/FooKV.kt)
+可参考：[MMKV2FastKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/data/MMKV2FastKV.kt)
 
 ### 2.8 多进程
-项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/MPFastKV.java)。<br>
+项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java)。<br>
 MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接口，包括支持注册OnSharedPreferenceChangeListener;<br>
 其中一个进程修改了数据，所有的进程都会感知（通过OnSharedPreferenceChangeListener回调）。<br>
 可参考 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt) 
@@ -142,15 +145,14 @@ MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接�
 ### 2.9 Kotlin 委托
 Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。 <br>
 此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。 <br>
-可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/KVData.kt)
+可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt) <br>
 
 ### 2.10 注意事项
 1. 不同版本之间，不要改变路径和名字，否则会打开不同的文件。 <br>
 2. 如果使用了Cipher(加密)，不要更换，否则会打开文件时会解析不了。
    不过从没有使用Cipher到使用Cipher是可以的，FastKV会先解析未加密的数据，然后在重新加密写入<br>
-3. 同一个key, 对应的value需要从一而终。
-   例如，上一个版本是putString，下一个版本切换到putInt，会抛出类型转换异常。 <br>
-   再比如，同一个key, A处putString, B处putInt (不管是否同一个版本)，也会抛出类型转换异常。
+3. 同一个key, 对应的value的操作应保持类型一致。
+   比如，同一个key, A处putString, B处getInt, 则无法返回预期的value。
 
 ## 3. 性能测试
 - 测试数据：搜集APP中的SharePreferences汇总的部份key-value数据（经过随机混淆）得到总共六百多个key-value。<br>
@@ -158,55 +160,34 @@ Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPref
 - 测试机型：华为P30 Pro
 - 测试代码：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
 
-测试结果如下，第一行为kv数量，第一列为读写方式。
+测试结果如下:
 
-写入：
+更新：
 
-|	| 25	| 50	| 100 |	200|	400	| 600
+| | 25| 50| 100| 200| 400| 600
 ---|---|---|---|---|---|---
-SP-commit	|121|	189	|443	|773	|2113	|4801
-DataStore	|94	|226	|524	|1332	|4422	|10066
-SQLiteKV	|161	|333	|663	|1353	|3159	|4299
-FastKV-commit	|107	|150	|338	|601	|1359	|2235
-SP-apply	|2	|10	|37	|109	|279	|519
-MMKV	|3	|3	|6	|6	|11	|15
-FastKV-mmap	|1	|2	|3	|5	|14	|11
-
+SP-commit | 114| 172| 411| 666| 2556| 5344
+DataStore | 231| 625| 1717| 4421| 7629| 13639
+SQLiteKV | 192| 382| 1025| 1565| 4279| 5034
+SP-apply | 3| 9| 35| 118| 344| 516
+MMKV | 4| 8| 5| 8| 10| 9
+FastKV | 3| 6| 4| 6| 8| 10
 
 ----
 
-读取：
+查询：
 
-|	|25	|50	|100	|200	|400	|600
+| | 25| 50| 100| 200| 400| 600
 ---|---|---|---|---|---|---
-SP-commit	|0	|1	|2	|1	|1	|1
-DataStore	|25	|5	|2	|1	|1	|2
-SQLiteKV	|112	|183	|281	|480	|740	|1051
-FastKV-commit	|0	|1	|1	|2	|3	|2
-SP-apply	|0	|1	|1	|1	|2	|3
-MMKV		|0	|1	|3	|3	|8	|11
-FastKV-mmap	|0	|1	|1	|2	|1	|1
+SP-commit | 1| 3| 2| 1| 2| 3
+DataStore | 57| 76| 115| 117| 170| 216
+SQLiteKV | 96| 161| 265| 417| 767| 1038
+SP-apply | 0| 1| 0| 1| 3| 3
+MMKV | 0| 1| 1| 5| 8| 11
+FastKV | 0| 1| 1| 3| 3| 1
 
-关于谁快谁慢就不一一描述了，尽在上面的表格中。
-这里补充一些其他的内容：
-
-- [SQLiteKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/sqlitekv/SQLiteKV.java) 目前没加内存缓存，所以读取比较慢，加个HashMap就和其他的差不多了，但是要加内存缓存的话需要加一些编码来标记存入时的类型。
-- SQLite虽然也是”增量写入“，但是相对其他“轻量级”存储而言，执行路径确实比较长，所以总体也是比较耗时。
-- 前4种写入方式是同步写入，在put方法返回的时候，数据是写入到磁盘了。
-- SP-apply为异步写入，put函数结束时提交了一份数据到队列，并不意味着数据就写入磁盘了。
-- 后两种通过mmap写入，put函数结束后数据就写到内核空间了，除非系统崩溃或者断电，否则数据会在适当时机由系统写入。
-- MMKV在执行写入数据到mmap内存时，如果程序中断，可能会导致文件损坏。
-- FastKV-commit比SP-commit， 快一些，但不多，应该就是快在序列化（FastKV的序列化是增量的）。<br>
-  FastKV-commit也会在每一次put操作时调用`sync`将数据写盘。<br>
-  我尝试过不调用`sync`，速度能快几倍，所以文章前面我说序列化不是SP耗时的主要原因。<br>
-  因为已经提供了高吞吐量的FastKV-mmap模式（默认）了，所以在FastKV-commit的模式中，我选择调用`sync`， 正如前面分析的，“以牺牲系统 I/O 吞吐量作为代价，确保数据落盘”。<br>
-- 当然，FastKV-mmap模式也是基本可靠的：<br>
-   - 一旦put操作完成，除非系统崩溃或者设备异常等发生，否则数据最终会落盘，即使进程退出；
-   - put操作过程中进程退出，也不会导致数据不完整（这一点前面有分析）。
-   - 不过在put操作完成后，数据落盘之前，如果发生系统崩溃的情况，put操作所包含的更新就写不到磁盘了。<br>
-     SP-apply也存在类似的情况，而且其发生的概率更高（并不需要系统崩溃，进程退出就可能发生）。<br>
-- 异步写入，或者非阻塞写入，都可能发生“put操作借结束，但update不生效（在生效之前发生异常）“。<br>
-  所以，如果对数据一致性有较高要求，建议用“同步写入”。
+每次执行Benchmark获取到的结果有所浮动，尤其是APP启动后执行多次，部分KV会变快（JIT优化）。<br>
+以上数据是取APP冷启动后第一次Benchmark的数据。
 
 ## 4. 参考链接
 相关博客： <br>

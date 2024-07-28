@@ -8,7 +8,7 @@ import io.fastkv.FastKVConfig
 import io.fastkv.fastkvdemo.BuildConfig
 import io.fastkv.fastkvdemo.base.AppContext
 import io.fastkv.fastkvdemo.base.IAppContext
-import io.fastkv.fastkvdemo.fastkv.FastKVLogger
+import io.fastkv.fastkvdemo.fastkv.utils.FastKVLogger
 import io.fastkv.fastkvdemo.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
@@ -27,12 +27,13 @@ class AppApplication : Application(), IAppContext {
 
     override fun onCreate() {
         super.onCreate()
+        // 第一件事，先初始APP上下文
         AppContext.init(this)
+
+        appId = ProcessUtil.getProcessName(this)
 
         FastKVConfig.setLogger(FastKVLogger)
         FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
-
-        appId = ProcessUtil.getProcessName(this)
 
         // Avoid files corruption in multi-process environment
         if(isMainProcess && !Utils.is16KPageSize()) {

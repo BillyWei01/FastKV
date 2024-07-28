@@ -1,5 +1,7 @@
 package io.fastkv.fastkvdemo.fastkv.cipher;
 
+import java.util.Arrays;
+
 /**
  * Use encryption operator of AES to encrypt/decrypt number.
  * <br>
@@ -72,7 +74,7 @@ public class NumberCipher {
         if (key == null || key.length != KEY_LEN) {
             throw new IllegalArgumentException("The key must be length of " + KEY_LEN);
         }
-        this.key = key;
+        this.key = Arrays.copyOf(key, key.length);
     }
 
     public long encryptLong(long value) {
@@ -132,8 +134,8 @@ public class NumberCipher {
         }
         for (int i = ROUND - 1; i >= 0; i--) {
             inv_multiply(state, 0);
+            int offset = i << 2;
             for (int j = 0; j < 4; j++) {
-                int offset = i << 2;
                 state[j] = (byte) (INV_S_BOX[state[j] & 0xFF] ^ key[offset + j]);
             }
         }

@@ -1,4 +1,4 @@
-package io.fastkv.fastkvdemo.fastkv
+package io.fastkv.fastkvdemo.fastkv.utils
 
 import android.util.Log
 import io.fastkv.interfaces.FastLogger
@@ -7,10 +7,9 @@ object FastKVLogger : FastLogger {
     private const val tag = "FastKV"
 
     override fun i(name: String, message: String) {
-//        if(message != "gc finish"){
-//            Log.i(tag, "$name $message")
-//        }
-        Log.i(tag, "$name $message")
+        if (message != "gc finish") {
+            Log.i(tag, "$name $message")
+        }
     }
 
     override fun w(name: String, e: Exception) {

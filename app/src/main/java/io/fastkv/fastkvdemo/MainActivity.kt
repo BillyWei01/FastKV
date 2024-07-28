@@ -9,25 +9,23 @@ import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.tencent.mmkv.MMKV
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.account.AccountManager
-import io.fastkv.fastkvdemo.account.UserInfo
+import io.fastkv.fastkvdemo.data.UserInfo
 import io.fastkv.fastkvdemo.base.AppContext
+import io.fastkv.fastkvdemo.data.MMKV2FastKV
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.data.SpCase
 import io.fastkv.fastkvdemo.data.UsageData
-import io.fastkv.fastkvdemo.data.UserSetting
 import io.fastkv.fastkvdemo.util.onClick
-import io.fastkv.fastkvdemo.util.runBlock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
-    companion object {
-        private val serialChannel = Channel<Any>(1)
-        const val TAG = "MainActivity"
+    companion object{
+        private const val TAG = "MainActivity"
     }
 
     var lastUid = 0L
@@ -38,27 +36,22 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         printLaunchTime()
         refreshAccountInfoViews()
+        testMMKV2FastKV()
 
         val switch_account_btn = findViewById<Button>(R.id.switch_account_btn)
         val tips_tv = findViewById<TextView>(R.id.tips_tv)
 
         findViewById<Button>(R.id.login_btn).onClick {
             if (AccountManager.isLogin()) {
-                lastUid = AppContext.uid
                 AccountManager.logout()
                 switch_account_btn.isEnabled = false
-
-                UserSetting.flags["logged"] = false
             } else {
-                if (lastUid == 0L) {
+                if (UsageData.lastLoginUid == 0L) {
                     AccountManager.login(10001L)
                 } else {
-                    AccountManager.login(lastUid)
+                    AccountManager.login(UsageData.lastLoginUid)
                 }
                 switch_account_btn.isEnabled = true
-
-
-                UserSetting.flags["logged"] = true
             }
             refreshAccountInfoViews()
         }
@@ -76,12 +69,6 @@ class MainActivity : AppCompatActivity() {
             refreshAccountInfoViews()
         }
 
-        // Test map
-        val logged = UserSetting.flags["logged"]
-        Log.d(TAG, "logged:$logged")
-
-        // Test 'remove'
-        // UserData.config.remove("notification")
 
         findViewById<Button>(R.id.test_multi_process_btn).onClick {
             val intent = Intent(this, MultiProcessTestActivity::class.java)
@@ -101,7 +88,7 @@ class MainActivity : AppCompatActivity() {
         tips_tv.text = getString(R.string.running_tips)
         tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
         test_performance_btn.isEnabled = false
-        serialChannel.runBlock {
+        CoroutineScope(Dispatchers.Default).launch {
             Benchmark.start { kvCount ->
                 CoroutineScope(Dispatchers.Main).launch {
                     if (kvCount >= 0) {
@@ -126,8 +113,7 @@ class MainActivity : AppCompatActivity() {
             login_btn.text = getString(R.string.logout)
             account_info_tv.visibility = View.VISIBLE
             user_info_tv.visibility = View.VISIBLE
-            UserInfo.userAccount?.run {
-                //val uid = CommonStorage.uid
+            UserInfo.get().userAccount?.run {
                 account_info_tv.text =
                     "uid: $uid\nnickname: $nickname\nphone: $phoneNo\nemail: $email"
             }
@@ -173,5 +159,27 @@ class MainActivity : AppCompatActivity() {
         val t = UsageData.launchCount + 1
         findViewById<TextView>(R.id.tips_tv).text = getString(R.string.main_tips, t)
         UsageData.launchCount = t
+    }
+
+    /**
+     * 测试迁移 MMKV 到 FastKV
+     */
+    private fun testMMKV2FastKV() {
+        // 构造旧数据
+        val name = "foo_kv"
+        val mmkv = MMKV.mmkvWithID(name)
+        if (!mmkv.containsKey("int")) {
+            mmkv.putInt("int", 100)
+            mmkv.putString("string", "hello")
+        }
+
+        // 使用新的API
+        val fastkv = MMKV2FastKV(name)
+        val intValue = fastkv.getInt("int") ?: 0
+        Log.d(TAG, "int value: $intValue")
+        Log.d(TAG, "string value: ${fastkv.getString("string")}")
+
+        fastkv.putInt("int", intValue + 1)
+        Log.d(TAG, "new int value: ${fastkv.getInt("int")}")
     }
 }

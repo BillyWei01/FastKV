@@ -1,17 +1,17 @@
 package io.fastkv.fastkvdemo.data
 
 import io.fastkv.fastkvdemo.base.Env
-import io.fastkv.fastkvdemo.fastkv.GlobalStorage
+import io.fastkv.fastkvdemo.fastkv.kvbase.GlobalKV
 
 /**
- * 本地信息，不需要同步。
+ * APP信息
  */
-object AppState : GlobalStorage("app_state") {
+object AppState : GlobalKV("app_state") {
     // 服务器环境
-    var environment by stringEnum("environment", Env.CONVERTER)
+    var environment by obj("environment", Env.CONVERTER, Env.PPE)
 
     // 用户ID
-    var user_id by long("user_id");
+    var userId by long("user_id")
 
     // 设备ID
     var deviceId by string("device_id")
