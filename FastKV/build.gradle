@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace 'io.github.fastaes'
+    namespace 'io.github.fastkv'
     compileSdk 34
 
     defaultConfig {
