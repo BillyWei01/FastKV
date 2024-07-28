@@ -12,6 +12,8 @@ import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.util.Log
+import android.widget.Button
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import io.fastkv.MPFastKV
 import io.fastkv.fastkvdemo.event.EventManager
@@ -19,9 +21,7 @@ import io.fastkv.fastkvdemo.event.Events
 import io.fastkv.fastkvdemo.event.Observer
 import io.fastkv.fastkvdemo.manager.PathManager.fastKVDir
 import java.lang.Integer.min
-import kotlinx.android.synthetic.main.activity_multi_process_test.client_input_btn
-import kotlinx.android.synthetic.main.activity_multi_process_test.message_tv
-import kotlinx.android.synthetic.main.activity_multi_process_test.server_input_btn
+
 
 
 class MultiProcessTestActivity : AppCompatActivity(), Observer {
@@ -86,11 +86,15 @@ class MultiProcessTestActivity : AppCompatActivity(), Observer {
 
         override fun onServiceDisconnected(name: ComponentName?) {
         }
-    };
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_multi_process_test)
+
+        val client_input_btn = findViewById<Button>(R.id.client_input_btn)
+        val message_tv =  findViewById<TextView>(R.id.message_tv)
+        val server_input_btn = findViewById<TextView>(R.id.server_input_btn)
 
         message_tv.text = getAll()
 
@@ -145,7 +149,7 @@ class MultiProcessTestActivity : AppCompatActivity(), Observer {
 
     override fun onEvent(event: Int, vararg args: Any?) {
         if (event == Events.MP_TEST_KV_CHANGE) {
-            message_tv.text = getAll()
+            findViewById<TextView>(R.id.message_tv).text = getAll()
         }
     }
 

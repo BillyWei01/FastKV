@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.Button
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.account.AccountManager
@@ -17,13 +19,6 @@ import io.fastkv.fastkvdemo.data.UsageData
 import io.fastkv.fastkvdemo.data.UserSetting
 import io.fastkv.fastkvdemo.util.onClick
 import io.fastkv.fastkvdemo.util.runBlock
-import kotlinx.android.synthetic.main.activity_main.account_info_tv
-import kotlinx.android.synthetic.main.activity_main.login_btn
-import kotlinx.android.synthetic.main.activity_main.switch_account_btn
-import kotlinx.android.synthetic.main.activity_main.test_multi_process_btn
-import kotlinx.android.synthetic.main.activity_main.test_performance_btn
-import kotlinx.android.synthetic.main.activity_main.tips_tv
-import kotlinx.android.synthetic.main.activity_main.user_info_tv
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -37,13 +32,17 @@ class MainActivity : AppCompatActivity() {
 
     var lastUid = 0L
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         printLaunchTime()
         refreshAccountInfoViews()
 
-        login_btn.onClick {
+        val switch_account_btn = findViewById<Button>(R.id.switch_account_btn)
+        val tips_tv = findViewById<TextView>(R.id.tips_tv)
+
+        findViewById<Button>(R.id.login_btn).onClick {
             if (AccountManager.isLogin()) {
                 lastUid = AppContext.uid
                 AccountManager.logout()
@@ -64,7 +63,7 @@ class MainActivity : AppCompatActivity() {
             refreshAccountInfoViews()
         }
 
-        switch_account_btn.onClick {
+        findViewById<Button>(R.id.switch_account_btn).onClick {
             if (AppContext.isLogin()) {
                 if (AppContext.uid == 10001L) {
                     AccountManager.switchAccount(10002L)
@@ -84,18 +83,21 @@ class MainActivity : AppCompatActivity() {
         // Test 'remove'
         // UserData.config.remove("notification")
 
-        test_multi_process_btn.onClick {
+        findViewById<Button>(R.id.test_multi_process_btn).onClick {
             val intent = Intent(this, MultiProcessTestActivity::class.java)
             startActivity(intent)
         }
 
-        test_performance_btn.onClick {
+        findViewById<Button>(R.id.test_performance_btn).onClick {
             startBenchMark()
         }
     }
 
     @SuppressLint("SetTextI18n")
     private fun startBenchMark() {
+        val tips_tv = findViewById<TextView>(R.id.tips_tv)
+        val test_performance_btn = findViewById<Button>(R.id.test_performance_btn)
+
         tips_tv.text = getString(R.string.running_tips)
         tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
         test_performance_btn.isEnabled = false
@@ -116,6 +118,10 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun refreshAccountInfoViews() {
+        val account_info_tv = findViewById<TextView>(R.id.account_info_tv)
+        val login_btn = findViewById<TextView>(R.id.login_btn)
+        val user_info_tv = findViewById<TextView>(R.id.user_info_tv)
+
         if (AccountManager.isLogin()) {
             login_btn.text = getString(R.string.logout)
             account_info_tv.visibility = View.VISIBLE
@@ -145,7 +151,7 @@ class MainActivity : AppCompatActivity() {
     fun case1() {
         val preferences = SpCase.preferences
         val t = preferences.getInt(SpCase.LAUNCH_COUNT, 0) + 1
-        tips_tv.text = getString(R.string.main_tips, t)
+        findViewById<TextView>(R.id.tips_tv).text = getString(R.string.main_tips, t)
         preferences.edit().putInt(SpCase.LAUNCH_COUNT, t).apply()
     }
 
@@ -156,7 +162,7 @@ class MainActivity : AppCompatActivity() {
     fun case2() {
         val kv = FastKV.Builder(PathManager.fastKVDir, "common_store").build()
         val t = kv.getInt("launch_count") + 1
-        tips_tv.text = getString(R.string.main_tips, t)
+        findViewById<TextView>(R.id.tips_tv).text = getString(R.string.main_tips, t)
         kv.putInt("launch_count", t)
     }
 
@@ -165,7 +171,7 @@ class MainActivity : AppCompatActivity() {
      */
     fun case3() {
         val t = UsageData.launchCount + 1
-        tips_tv.text = getString(R.string.main_tips, t)
+        findViewById<TextView>(R.id.tips_tv).text = getString(R.string.main_tips, t)
         UsageData.launchCount = t
     }
 }
