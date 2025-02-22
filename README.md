@@ -49,9 +49,11 @@ dependencies {
 ### 2.2 初始化
 ```kotlin
     FastKVConfig.setLogger(FastKVLogger)
-    FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
+    FastKVConfig.setExecutor(Dispatchers.IO.asExecutor())
 ```
 初始化可以按需设置日志接口和Executor。
+如果不传入Executor，FastKV会自己构建一个Executor；
+如果传入用户自己的Executor，需要确保Executor的并发调度，避免没有线程执行数据加载。
 
 
 ### 2.3 基本用法
