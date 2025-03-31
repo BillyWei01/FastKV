@@ -304,7 +304,7 @@ object Benchmark {
 
     @Throws(IOException::class)
     private fun loadSourceData(context: Context): Map<String, *> {
-        val srcName = "sum"
+        val srcName = "jdAndroidClient"
         val spDir = File(context.filesDir.parent, "/shared_prefs")
         val sumFile = File(spDir, "$srcName.xml")
         if (!sumFile.exists()) {

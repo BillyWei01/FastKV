@@ -1,9 +1,12 @@
 package io.fastkv.fastkvdemo
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -18,10 +21,13 @@ import io.fastkv.fastkvdemo.data.MMKV2FastKV
 import io.fastkv.fastkvdemo.manager.PathManager
 import io.fastkv.fastkvdemo.data.SpCase
 import io.fastkv.fastkvdemo.data.UsageData
+import io.fastkv.fastkvdemo.util.IOUtil
 import io.fastkv.fastkvdemo.util.onClick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
     companion object{
@@ -82,24 +88,51 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun startBenchMark() {
-        val tips_tv = findViewById<TextView>(R.id.tips_tv)
-        val test_performance_btn = findViewById<Button>(R.id.test_performance_btn)
+//        val tips_tv = findViewById<TextView>(R.id.tips_tv)
+//        val test_performance_btn = findViewById<Button>(R.id.test_performance_btn)
+//
+//        tips_tv.text = getString(R.string.running_tips)
+//        tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
+//        test_performance_btn.isEnabled = false
+//        CoroutineScope(Dispatchers.Default).launch {
+//            Benchmark.start { kvCount ->
+//                CoroutineScope(Dispatchers.Main).launch {
+//                    if (kvCount >= 0) {
+//                        tips_tv.text = "Testing, kvCount: $kvCount"
+//                    } else {
+//                        tips_tv.text = getString(R.string.test_tips)
+//                        test_performance_btn.isEnabled = true
+//                    }
+//                    tips_tv.setTextColor(Color.parseColor("#FF009900"))
+//                }
+//            }
+//        }
 
-        tips_tv.text = getString(R.string.running_tips)
-        tips_tv.setTextColor(Color.parseColor("#FFFF8247"))
-        test_performance_btn.isEnabled = false
-        CoroutineScope(Dispatchers.Default).launch {
-            Benchmark.start { kvCount ->
-                CoroutineScope(Dispatchers.Main).launch {
-                    if (kvCount >= 0) {
-                        tips_tv.text = "Testing, kvCount: $kvCount"
-                    } else {
-                        tips_tv.text = getString(R.string.test_tips)
-                        test_performance_btn.isEnabled = true
-                    }
-                    tips_tv.setTextColor(Color.parseColor("#FF009900"))
-                }
-            }
+        loadSourceData(this)
+        val name = "testSP";
+        val sp = getSharedPreferences(name, Context.MODE_PRIVATE);
+        val sharedPreferences1 = FastKV.adapt(getApplicationContext(), name);
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+        sharedPreferences1.edit().putString("test_key", sp.getString("test_key", "") + SystemClock.currentThreadTimeMillis()).apply();
+
+    }
+
+    @Throws(IOException::class)
+    private fun loadSourceData(context: Context) {
+        val srcName = "testSP"
+        val spDir = File(context.filesDir.parent, "/shared_prefs")
+        val sumFile = File(spDir, "$srcName.xml")
+        if (!sumFile.exists()) {
+            val bytes = IOUtil.streamToBytes(context.assets.open("$srcName.xml"))
+            IOUtil.bytesToFile(bytes, sumFile)
         }
     }
 
