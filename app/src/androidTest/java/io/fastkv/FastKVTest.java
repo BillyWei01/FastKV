@@ -330,6 +330,21 @@ public class FastKVTest {
         kv1.putString("str2", longStr);
         Assert.assertEquals(longStr, kv2.getString("str"));
         Assert.assertEquals(longStr, kv2.getString("str2"));
+
+        // 测试连续写入不同的大value
+        longStr += "a";
+        kv1.putString("str", longStr);
+        longStr += "a";
+        kv1.putString("str", longStr);
+        Assert.assertEquals(longStr, kv2.getString("str"));
+
+        try {
+            Thread.sleep(100L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        FastKV kv3 = new FastKV.Builder(TestHelper.DIR, name).build();
+        Assert.assertEquals(longStr, kv3.getString("str"));
     }
 
     private void testBigArray(FastKV kv1, String name) {
