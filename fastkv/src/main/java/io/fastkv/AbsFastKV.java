@@ -3,6 +3,7 @@ package io.fastkv;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -95,7 +96,12 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     protected final ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    private final boolean isMPFastKV;
+
     protected AbsFastKV(final String path, final String name, FastEncoder[] encoders, FastCipher cipher) {
+        this(path, name, encoders, cipher, false);
+    }
+    protected AbsFastKV(final String path, final String name, FastEncoder[] encoders, FastCipher cipher, boolean isMPFastKV) {
         this.path = path;
         this.name = name;
         this.cipher = cipher;
@@ -113,6 +119,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
         StringSetEncoder encoder = StringSetEncoder.INSTANCE;
         map.put(encoder.tag(), encoder);
         this.encoderMap = map;
+        this.isMPFastKV = isMPFastKV;
     }
 
     protected final int packSize(int size) {
@@ -1417,7 +1424,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     private void addObject(String key, Object value, byte[] bytes, byte type) {
-        int offset = saveArray(key, bytes, type);
+        int offset = saveArray(key, bytes, type, null);
         if (offset > 0) {
             int size;
             Object v;
@@ -1445,7 +1452,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
     }
 
     private void updateObject(String key, Object value, byte[] bytes, VarContainer c) {
-        int offset = saveArray(key, bytes, c.getType());
+        int offset = saveArray(key, bytes, c.getType(), c.external && !isMPFastKV ? (String) c.value : null);
         if (offset > 0) {
             String oldFileName = c.external ? (String) c.value : null;
             remove(c.getType(), c.start, c.offset + c.valueSize);
@@ -1474,32 +1481,45 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
      * Return offset when saving success;
      * Return 0 when saving failed.
      */
-    private int saveArray(String key, byte[] value, byte type) {
+    private int saveArray(String key, byte[] value, byte type, String oldFileName) {
         tempExternalName = null;
         if (value.length < INTERNAL_LIMIT) {
             return wrapArray(key, value, type);
         } else {
             info("Large value, key: " + key + ", size: " + value.length);
-            String fileName = Utils.randomName();
-            byte[] fileNameBytes = new byte[Utils.NAME_SIZE];
-            //noinspection deprecation
-            fileName.getBytes(0, Utils.NAME_SIZE, fileNameBytes, 0);
-            int offset = wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
-            if (offset > 0) {
-                // The reference of 'value' will not be gc before finishing 'saveBytes',
-                // So before the value saving to disk, we can read it from 'externalCache'.
-                externalCache.put(fileName, value);
-                externalExecutor.execute(fileName, canceled -> {
+            if (TextUtils.isEmpty(oldFileName) || oldFileName.length() != Utils.NAME_SIZE) {
+                String fileName = Utils.randomName();
+                byte[] fileNameBytes = new byte[Utils.NAME_SIZE];
+                //noinspection deprecation
+                fileName.getBytes(0, Utils.NAME_SIZE, fileNameBytes, 0);
+                int offset = wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
+                if (offset > 0) {
+                    // The reference of 'value' will not be gc before finishing 'saveBytes',
+                    // So before the value saving to disk, we can read it from 'externalCache'.
+                    externalCache.put(fileName, value);
+                    externalExecutor.execute(fileName, canceled -> {
+                        if (!canceled.get()) {
+                            File file = new File(path + name, fileName);
+                            if (!Utils.saveBytes(file, value, canceled)) {
+                                info("Write large value with key:" + key + " failed");
+                            }
+                        }
+                    });
+                    tempExternalName = fileName;
+                }
+                return offset;
+            } else {
+                externalCache.put(oldFileName, value);
+                externalExecutor.execute(oldFileName, canceled -> {
                     if (!canceled.get()) {
-                        File file = new File(path + name, fileName);
+                        File file = new File(path + name, oldFileName);
                         if (!Utils.saveBytes(file, value, canceled)) {
                             info("Write large value with key:" + key + " failed");
                         }
                     }
                 });
-                tempExternalName = fileName;
+                return 0;
             }
-            return offset;
         }
     }
 

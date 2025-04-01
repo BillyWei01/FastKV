@@ -78,7 +78,7 @@ public final class MPFastKV extends AbsFastKV {
              FastEncoder[] encoders,
              FastCipher cipher,
              boolean needWatchFileChange) {
-        super(path, name, encoders, cipher);
+        super(path, name, encoders, cipher, true);
         aFile = new File(path, name + A_SUFFIX);
         bFile = new File(path, name + B_SUFFIX);
         this.needWatchFileChange = needWatchFileChange;
