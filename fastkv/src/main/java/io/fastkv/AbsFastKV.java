@@ -1474,6 +1474,8 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
             if (oldFileName != null) {
                 removeOldFile(oldFileName);
             }
+        } else if (offset == -1) {
+            bigValueCache.put(key, value);
         }
     }
 
@@ -1518,7 +1520,7 @@ abstract class AbsFastKV implements SharedPreferences, SharedPreferences.Editor 
                         }
                     }
                 });
-                return 0;
+                return -1;
             }
         }
     }
