@@ -300,46 +300,53 @@ public class FastKVTest {
         Assert.assertEquals("", kv3.getString("empty_str"));
     }
 
+
     @Test
-    public void testBigValue() {
-        String name = "test_big_value";
-
-        FastEncoder<?>[] encoders = new FastEncoder[]{TestObjectEncoder.INSTANCE};
-        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).encoder(encoders).build();
-
-        testBigString(kv1, name);
-        testBigArray(kv1, name);
-        testBigObject(kv1, name);
-    }
-
-    private void testBigString(FastKV kv1, String name) {
+    public void testBigString() {
+        String name = "testBigString";
+        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).build();
         kv1.clear();
         String longStr = TestHelper.makeString(10000);
         kv1.putString("str", longStr);
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
+        Assert.assertEquals(longStr, kv1.getString("str"));
+
+        // 通过 Builder 创建 FastKV 实例，如果名字相同，会获取到相同的实例，
+        // 要想同一个测试用例函数中测试“加载”，可以现关闭当前实例(会移除实例缓存），
+        // 再重新用 Builder 创建，就可以重新创建并加载了。
+        kv1.close();
+
+        try {
+            Thread.sleep(200L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name).build();
         Assert.assertEquals(longStr, kv2.getString("str"));
         Assert.assertEquals(100, kv2.getInt("int"));
 
-        kv1.putString("str", "hello");
+        kv2.putString("str", "hello");
         Assert.assertEquals("hello", kv2.getString("str"));
 
-        kv1.putString("str", longStr);
-        kv1.putString("str2", longStr);
+        longStr += "1";
+        kv2.putString("str", longStr);
+        kv2.putString("str2", longStr);
         Assert.assertEquals(longStr, kv2.getString("str"));
         Assert.assertEquals(longStr, kv2.getString("str2"));
 
         // 测试连续写入不同的大value
         longStr += "a";
-        kv1.putString("str", longStr);
+        kv2.putString("str", longStr);
         longStr += "a";
-        kv1.putString("str", longStr);
+        kv2.putString("str", longStr);
         Assert.assertEquals(longStr, kv2.getString("str"));
 
+        kv2.close();
+
         try {
-            Thread.sleep(100L);
+            Thread.sleep(200L);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -347,26 +354,41 @@ public class FastKVTest {
         Assert.assertEquals(longStr, kv3.getString("str"));
     }
 
-    private void testBigArray(FastKV kv1, String name) {
+    @Test
+    public void testBigArray() {
+        String name = "testBigArray";
+        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).build();
         kv1.clear();
         byte[] longArray = new byte[10000];
         kv1.putArray("array", longArray);
         kv1.putString("a", "a");
         kv1.putInt("int", 100);
 
+        byte[] shortArray = "hello".getBytes(StandardCharsets.UTF_8);
+        kv1.putArray("array", shortArray);
+        Assert.assertArrayEquals(shortArray, kv1.getArray("array"));
+
+        kv1.putArray("array", longArray);
+        Assert.assertArrayEquals(longArray, kv1.getArray("array"));
+
+        kv1.close();
+
+        try {
+            Thread.sleep(200L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name).build();
         Assert.assertArrayEquals(longArray, kv2.getArray("array"));
         Assert.assertEquals(100, kv2.getInt("int"));
-
-        byte[] shortArray = "hello".getBytes(StandardCharsets.UTF_8);
-        kv1.putArray("array", shortArray);
-        Assert.assertArrayEquals(shortArray, kv2.getArray("array"));
-
-        kv1.putArray("array", longArray);
-        Assert.assertArrayEquals(longArray, kv2.getArray("array"));
     }
 
-    private void testBigObject(FastKV kv1, String name) {
+    @Test
+    public void testBigObject() {
+        String name = "testBigObject";
+        FastEncoder<?>[] encoders = new FastEncoder[]{TestObjectEncoder.INSTANCE};
+        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).encoder(encoders).build();
         kv1.clear();
         String longStr = TestHelper.makeString(10000);
         TestObject obj = new TestObject(12345, longStr);
@@ -387,7 +409,6 @@ public class FastKVTest {
         kv1.putObject("obj", obj.copy(), TestObjectEncoder.INSTANCE);
         Assert.assertEquals(obj, kv1.getObject("obj"));
     }
-
 
     private void setValue(String[] values, Random r) {
         String base = TestHelper.makeString(88);
