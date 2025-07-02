@@ -9,13 +9,6 @@
     tools:context=".MainActivity">
 
     <Button
-        android:id="@+id/test_multi_process_btn"
-        android:layout_width="240dp"
-        android:layout_height="50dp"
-        android:layout_marginTop="20dp"
-        android:text="@string/test_multi_process" />
-
-    <Button
         android:id="@+id/test_performance_btn"
         android:layout_width="240dp"
         android:layout_height="50dp"

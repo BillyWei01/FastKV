@@ -28,7 +28,6 @@ public class KeyStoreHelper {
      * <br>
      * The 'KEY' is generated and stored by KeyStore.
      */
-    @RequiresApi(api = Build.VERSION_CODES.M)
     public static byte[] getKey(byte[] seed) {
         try {
             String algorithm = KeyProperties.KEY_ALGORITHM_HMAC_SHA256;

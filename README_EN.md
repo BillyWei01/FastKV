@@ -26,7 +26,7 @@ FastKV is an efficient key-value storage library written with Java.<br/>
    - Support for plugin encryption implementations, performing encryption before data is written to disk.
    
 5. Support multi-process
-   - The project supply an implement to support multi-process (MPFastKV).
+   - Focused on single-process scenarios for optimal performance and simplicity.
    - Support listener for changed values, one process write, all processes known.
 
 6. Easy to use
@@ -140,7 +140,8 @@ But you can create a KV class, create methods such as 'getInt', 'getString', etc
 Refer to [MMKV2FastKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/MMKV2FastKV.kt)
 
 ### 2.8 Multi-Process
-Multi-Process implement: [MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java).<br>
+FastKV is focused on single-process scenarios for optimal performance and code simplicity.<br>
+If your application requires multi-process support, please consider other solutions.<br>
 
 Example:
 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt)

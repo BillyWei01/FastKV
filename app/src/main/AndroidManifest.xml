@@ -17,14 +17,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".MultiProcessTestActivity" />
-
-        <service
-            android:name=".TestService"
-            android:enabled="true"
-            android:exported="false"
-            android:process=":remote">
-        </service>
+        <!-- MultiProcessTestActivity has been removed -->
 
     </application>
 

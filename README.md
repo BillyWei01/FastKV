@@ -24,7 +24,7 @@ FastKV有以下特点：
    - 解密处理发生在数据解析阶段，解析完成后，数据是缓存的（用HashMap缓存)，<br>
      所以加解密会稍微增加写入(put)和解析(loading)的时间，不会增加索引数据(get)的时间。
 5. 支持多进程
-   - 项目提供了支持多进程的存储类（MPFastKV)。
+   - 专注于单进程场景，代码简洁高效。
    - 支持监听文件内容变化，其中一个进程修改文件，所有进程皆可感知。
 6. 方便易用
    - FastKV提供了了丰富的API接口，开箱即用。
@@ -135,14 +135,8 @@ public class SpCase {
 可参考：[MMKV2FastKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/data/MMKV2FastKV.kt)
 
 ### 2.8 多进程
-项目提供了支持多进程的实现：[MPFastKV](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/MPFastKV.java)。<br>
-MPFastKV除了支持多进程读写之外，还实现了SharedPreferences的接口，包括支持注册OnSharedPreferenceChangeListener;<br>
-其中一个进程修改了数据，所有的进程都会感知（通过OnSharedPreferenceChangeListener回调）。<br>
-可参考 [MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt) 
-和 [TestService](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/TestService.kt)
-
-需要提醒的是，由于支持多进程需要维护更多的状态，MPFastKV 的写入要比FastKV慢不少，
-所以在不需要多进程访问的情况下，尽量用 FastKV。
+FastKV专注于单进程场景，提供最佳的性能和最简洁的代码。<br>
+如果您的应用确实需要多进程支持，建议考虑其他解决方案。
 
 ### 2.9 Kotlin 委托
 Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。 <br>

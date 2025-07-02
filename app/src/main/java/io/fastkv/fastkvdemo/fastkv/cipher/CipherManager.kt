@@ -1,6 +1,5 @@
 package io.fastkv.fastkvdemo.fastkv.cipher
 
-import android.os.Build
 import io.fastkv.FastKV
 import io.fastkv.fastkvdemo.manager.PathManager
 
@@ -12,24 +11,17 @@ object CipherManager {
        val cipherSetting = FastKV.Builder(PathManager.fastKVDir, "cipher_setting")
             .blocking()
             .build()
-
-        // In case of the devices upgrade from version lower M to upper M,
-        // saving the option of first time to make app keep using the same cipher key.
-        val overAndroidM = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-        val key = "used_key_store"
-        val usedKeyStore = if (cipherSetting.contains(key)) {
-            cipherSetting.getBoolean(key)
+        var encryptKey: ByteArray
+        // KeyStore 有时候不太稳定，所以通过持久化来确保加密key的稳定性（每次都能获取到相同的key)
+        val key = cipherSetting.getArray("key")
+        if (key == null) {
+            val seed = "1234567890abcdef1234567890ABCDEF".toByteArray()
+            encryptKey = KeyStoreHelper.getKey(seed)
+            cipherSetting.putArray("key", encryptKey)
         } else {
-            cipherSetting.putBoolean(key, overAndroidM)
-            overAndroidM
+            encryptKey = key
         }
         cipherSetting.close()
-
-        val seed = "1234567890abcdef1234567890ABCDEF".toByteArray()
-        return if (usedKeyStore && overAndroidM) {
-            AESCipher(KeyStoreHelper.getKey(seed))
-        } else {
-            AESCipher(seed)
-        }
+        return AESCipher(encryptKey)
     }
 }

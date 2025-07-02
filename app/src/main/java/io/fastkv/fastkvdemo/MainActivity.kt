@@ -70,11 +70,6 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        findViewById<Button>(R.id.test_multi_process_btn).onClick {
-            val intent = Intent(this, MultiProcessTestActivity::class.java)
-            startActivity(intent)
-        }
-
         findViewById<Button>(R.id.test_performance_btn).onClick {
             startBenchMark()
         }
