@@ -27,11 +27,11 @@ public class TestHelper {
     public static FastLogger logger = new FastLogger() {
         @Override
         public void i(@NonNull String name, @NonNull String message) {
-            if (FastKV.GC_FINISH.equals(message)) {
+            if (GCHelper.GC_FINISH.equals(message)) {
                 gcCount.incrementAndGet();
                 //System.out.println("gc count:" + gcCount.get() + ", name: " + name);
             } else {
-                if (FastKV.TRUNCATE_FINISH.equals(message)) {
+                if (GCHelper.TRUNCATE_FINISH.equals(message)) {
                     truncateCount.incrementAndGet();
                 }
                 Log.i(TAG, "info: " + message + ", name: " + name);

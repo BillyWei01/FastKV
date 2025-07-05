@@ -104,9 +104,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     
     private static final String ENCRYPT_FAILED = "Encrypt failed";
 
-    static final String TRUNCATE_FINISH = "truncate finish";
-    static final String GC_FINISH = "gc finish";
-
     static final String A_SUFFIX = ".kva";
     static final String B_SUFFIX = ".kvb";
     static final String C_SUFFIX = ".kvc";

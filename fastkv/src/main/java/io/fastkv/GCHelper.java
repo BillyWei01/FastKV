@@ -53,16 +53,15 @@ import io.fastkv.Container.VarContainer;
  * </ul>
  */
 class GCHelper {
-    
-    /** GC字节阈值：8KB（触发条件是此值的2倍，即16KB无效数据） */
+    static final String TRUNCATE_FINISH = "truncate finish";
+    static final String GC_FINISH = "gc finish";
+
+    private static final int GC_KEYS_THRESHOLD = 100;
+
     private static final int GC_BYTES_THRESHOLD = 8192;
-    
-    /** GC键数量阈值：80个（大数据量时翻倍为160个） */
-    private static final int GC_KEYS_THRESHOLD = 80;
-    
-    /** 键数量阈值分界线：16KB（超过此值时键阈值翻倍） */
-    private static final int KEYS_THRESHOLD_BOUNDARY = 1 << 14;
-    
+
+    private static final int TRUNCATE_THRESHOLD = 32768; // 32KB
+
     /**
      * 合并无效段以加速GC。
      * 将相邻的内存段合并成更大的段，减少GC时的处理复杂度。
@@ -157,7 +156,7 @@ class GCHelper {
 
         updateOffset(kv, gcStart, src, shift);
 
-        LoggerHelper.info(kv, FastKV.GC_FINISH);
+        LoggerHelper.info(kv, GC_FINISH);
     }
 
     /**
@@ -199,7 +198,7 @@ class GCHelper {
         }
 
         int expectedEnd = kv.dataEnd + allocate;
-        if (kv.fastBuffer.hb.length - expectedEnd > getTruncateThreshold()) {
+        if (kv.fastBuffer.hb.length - expectedEnd > TRUNCATE_THRESHOLD) {
             truncate(kv, expectedEnd);
         }
     }
@@ -231,7 +230,7 @@ class GCHelper {
                 kv.bBuffer = newBBuffer;
             }
         }
-        LoggerHelper.info(kv, FastKV.TRUNCATE_FINISH);
+        LoggerHelper.info(kv, TRUNCATE_FINISH);
     }
 
     /**
@@ -275,8 +274,7 @@ class GCHelper {
      * @param kv FastKV实例
      */
     static void checkGC(FastKV kv) {
-        int keysThreshold = kv.dataEnd < KEYS_THRESHOLD_BOUNDARY ? GC_KEYS_THRESHOLD : GC_KEYS_THRESHOLD << 1;
-        if (kv.invalidBytes >= (GC_BYTES_THRESHOLD << 1) || kv.invalids.size() >= keysThreshold) {
+        if (kv.invalidBytes >= GC_BYTES_THRESHOLD  || kv.invalids.size() >= GC_KEYS_THRESHOLD) {
             gc(kv, 0);
         }
     }
