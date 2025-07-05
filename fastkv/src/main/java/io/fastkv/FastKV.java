@@ -191,27 +191,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
-    private void copyToMainFile(FastKV tempKV) {
-        FastBuffer buffer = tempKV.fastBuffer;
-        if (writingMode == NON_BLOCKING) {
-            int capacity = buffer.hb.length;
-            if (aBuffer != null && aBuffer.capacity() == capacity
-                    && bBuffer != null && bBuffer.capacity() == capacity) {
-                aBuffer.position(0);
-                aBuffer.put(buffer.hb, 0, dataEnd);
-                bBuffer.position(0);
-                bBuffer.put(buffer.hb, 0, dataEnd);
-            } else {
-                if (!writeToABFile(buffer)) {
-                    writingMode = ASYNC_BLOCKING;
-                }
-            }
-        }
-        if (writingMode != NON_BLOCKING) {
-            writeToCFile();
-        }
-    }
-
     // Utility methods from AbsFastKV
     private int packSize(int size) {
         return cipher == null ? size : size | CIPHER_MASK;
@@ -249,7 +228,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
         // Here we use FastKV with blocking mode and close 'autoCommit',
         // to make data only keep on memory.
-        FastKV tempKV = new FastKV(path, tempName, encoders, cipher, 2/*SYNC_BLOCKING*/);
+        FastKV tempKV = new FastKV(path, tempName, encoders, cipher, SYNC_BLOCKING);
         tempKV.autoCommit = false;
 
         List<String> oldExternalFiles = new ArrayList<>();
@@ -340,6 +319,28 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
         needRewrite = false;
     }
+
+    private void copyToMainFile(FastKV tempKV) {
+        FastBuffer buffer = tempKV.fastBuffer;
+        if (writingMode == NON_BLOCKING) {
+            int capacity = buffer.hb.length;
+            if (aBuffer != null && aBuffer.capacity() == capacity
+                    && bBuffer != null && bBuffer.capacity() == capacity) {
+                aBuffer.position(0);
+                aBuffer.put(buffer.hb, 0, dataEnd);
+                bBuffer.position(0);
+                bBuffer.put(buffer.hb, 0, dataEnd);
+            } else {
+                if (!writeToABFile(buffer)) {
+                    writingMode = ASYNC_BLOCKING;
+                }
+            }
+        }
+        if (writingMode != NON_BLOCKING) {
+            writeToCFile();
+        }
+    }
+
 
     @SuppressWarnings("resource")
     private void loadFromABFile() {
@@ -993,7 +994,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         info(TRUNCATE_FINISH);
     }
 
-    // Methods from AbsFastKV that are needed
     private boolean loadWithBlockingIO(@NonNull File srcFile) throws IOException {
         long fileLen = srcFile.length();
         if (fileLen == 0 || fileLen >= DATA_SIZE_LIMIT) {
@@ -1173,12 +1173,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
-    private void checkKeySize(int keySize) {
-        if (keySize > 0xFF) {
-            throw new IllegalArgumentException("key's length must less than 256");
-        }
-    }
-
     static class Segment implements Comparable<Segment> {
         int start;
         int end;
@@ -1307,17 +1301,13 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void resetMemory() {
-        resetData();
-        resetBuffer();
-    }
-
-    private void resetData() {
         dataEnd = DATA_START;
         checksum = 0L;
         data.clear();
         bigValueCache.clear();
         externalCache.clear();
         clearInvalid();
+        resetBuffer();
     }
 
     private void resetBuffer() {
@@ -1801,19 +1791,13 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             if (c != null && !c.external && value.equals(c.value)) {
                 return this;
             }
-            if (cipher == null && value.length() * 3 < INTERNAL_LIMIT) {
-                // 'putString' 是比较常用的API
-                // 所以这里我们用一些而外的策略来加速'putString'
-                fastPutString(key, value, c);
-            } else {
-                byte[] bytes = value.isEmpty() ? EMPTY_ARRAY : value.getBytes(StandardCharsets.UTF_8);
-                byte[] newBytes = cipher != null ? cipher.encrypt(bytes) : bytes;
-                if (newBytes == null) {
-                    error(new Exception(ENCRYPT_FAILED));
-                    return this;
-                }
-                addOrUpdate(key, value, newBytes, c, DataType.STRING);
+            byte[] bytes = value.isEmpty() ? EMPTY_ARRAY : value.getBytes(StandardCharsets.UTF_8);
+            byte[] newBytes = cipher != null ? cipher.encrypt(bytes) : bytes;
+            if (newBytes == null) {
+                error(new Exception(ENCRYPT_FAILED));
+                return this;
             }
+            addOrUpdate(key, value, newBytes, c, DataType.STRING);
             handleChange(key);
         }
         return this;
@@ -1909,8 +1893,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         return this;
     }
 
-
-
     // Helper methods for put operations
     private void preparePutBytes() {
         ensureSize(updateSize);
@@ -1945,7 +1927,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void prepareHeaderInfo(int keySize, int valueSize, byte type) {
-        checkKeySize(keySize);
+        if (keySize > 0xFF) {
+            throw new IllegalArgumentException("key's length must less than 256");
+        }
         updateSize = 2 + keySize + valueSize;
         preparePutBytes();
         fastBuffer.put(type);
@@ -1959,83 +1943,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             fastBuffer.position += keySize;
         } else {
             fastBuffer.putString(key);
-        }
-    }
-
-    /**
-     * 如果String对象的UFT-8长度和UTF-16长度一样，
-     * 则可以用'getBytes(int srcBegin, int srcEnd, byte dst[], int dstBegin)'来获取字符串到buffer,
-     * 效率比'getBytes("UFT-8")'更高。
-     */
-    private void fastPutString(String key, String value, StringContainer c) {
-        int stringLen = FastBuffer.getStringSize(value);
-        if (c == null) {
-            int keyLen = FastBuffer.getStringSize(key);
-            checkKeySize(keyLen);
-            // 4 bytes = type:1, keyLen: 1, stringLen:2
-            // preSize include size of [type|keyLen|key|stringLen], which is "4+lengthOf(key)"
-            int preSize = 4 + keyLen;
-            updateSize = preSize + stringLen;
-            preparePutBytes();
-            fastBuffer.put(DataType.STRING);
-            wrapKey(key, keyLen);
-            wrapStringValue(value, stringLen);
-            data.put(key, new StringContainer(updateStart, updateStart + preSize, value, stringLen, false));
-            updateChange();
-        } else {
-            final String oldFileName;
-            boolean needCheckGC = false;
-            // preSize: bytes count from start to value offset
-            int preSize = c.offset - c.start;
-            if (c.valueSize == stringLen) {
-                checksum ^= fastBuffer.getChecksum(c.offset, c.valueSize);
-                if (stringLen == value.length()) {
-                    //noinspection deprecation
-                    value.getBytes(0, stringLen, fastBuffer.hb, c.offset);
-                } else {
-                    fastBuffer.position = c.offset;
-                    fastBuffer.putString(value);
-                }
-                updateStart = c.offset;
-                updateSize = stringLen;
-                oldFileName = null;
-            } else {
-                updateSize = preSize + stringLen;
-                preparePutBytes();
-                fastBuffer.put(DataType.STRING);
-                int keyBytes = preSize - 3;
-                System.arraycopy(fastBuffer.hb, c.start + 1, fastBuffer.hb, fastBuffer.position, keyBytes);
-                fastBuffer.position += keyBytes;
-                wrapStringValue(value, stringLen);
-
-                remove(DataType.STRING, c.start, c.offset + c.valueSize);
-                needCheckGC = true;
-                oldFileName = c.external ? (String) c.value : null;
-
-                c.external = false;
-                c.start = updateStart;
-                c.offset = updateStart + preSize;
-                c.valueSize = stringLen;
-            }
-            c.value = value;
-            updateChange();
-            if (needCheckGC) {
-                checkGC();
-            }
-            if (oldFileName != null) {
-                removeOldFile(oldFileName);
-            }
-        }
-    }
-
-    private void wrapStringValue(String value, int valueSize) {
-        fastBuffer.putShort((short) valueSize);
-        if (valueSize == value.length()) {
-            // 快速获取String到buffer
-            // noinspection deprecation
-            value.getBytes(0, valueSize, fastBuffer.hb, fastBuffer.position);
-        } else {
-            fastBuffer.putString(value);
         }
     }
 
