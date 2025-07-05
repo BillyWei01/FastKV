@@ -13,7 +13,7 @@ import io.fastkv.interfaces.FastEncoder;
  * <li><b>变长类型</b> (string/array/object): [type|keyLen|keyData|valueLen|value]</li>
  * <li><b>大长度变长类型</b> (string_large/array_large/object_large): [type|keyLen|keyData|valueLen(4字节)|value]</li>
  * </ul>
- * 
+ *
  * <h3>字段说明</h3>
  * <ul>
  * <li>type: 1字节，数据类型标识</li>
@@ -409,8 +409,8 @@ class Container {
                 return Double.parseDouble(str.trim());
             } catch (NumberFormatException e) {
                 return 0.0;
-            }
         }
+    }
     }
 
     /** 

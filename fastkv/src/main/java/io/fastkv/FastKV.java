@@ -121,7 +121,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     static final int PAGE_SIZE = Utils.getPageSize();
 
-
     // ==================== 实例字段 ====================
     
     final String path;
@@ -175,7 +174,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     boolean autoCommit = true;
 
     // ==================== 构造函数和初始化 ====================
-    
+
     FastKV(final String path,
            final String name,
            FastEncoder[] encoders,
@@ -338,12 +337,12 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             if (bytes == null || bytes.length == 0) {
                 remove(key);
                 return defValue;
-            } else {
+                        } else {
                 c.value = bytes;
                 c.external = false;
                 return bytes;
-            }
-        } else {
+                    }
+                } else {
             return (byte[]) c.value;
         }
     }
@@ -434,7 +433,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     // ==================== 数据写入和删除方法 (Put/Remove Methods) ====================
-    
+
     public synchronized Editor remove(String key) {
         if (closed) return this;
         BaseContainer container = data.get(key);
@@ -768,7 +767,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         checkKey(key);
         if (value == null) {
             remove(key);
-        } else {
+                } else {
             BaseContainer container = data.get(key);
             if (container != null && container.getType() != DataType.STRING) {
                 remove(key);
@@ -841,7 +840,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         byte[] objBytes = null;
         try {
             objBytes = encoder.encode(value);
-        } catch (Exception e) {
+            } catch (Exception e) {
             LoggerHelper.error(this, e);
         }
         if (objBytes == null) {
@@ -874,7 +873,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         if (closed) return this;
         if (set == null) {
             remove(key);
-        } else {
+            } else {
             putObject(key, set, StringSetEncoder.INSTANCE);
         }
         return this;

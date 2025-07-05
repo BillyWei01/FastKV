@@ -4,7 +4,6 @@ package io.fastkv;
  * 日志辅助类 - 统一管理FastKV的日志输出
  */
 class LoggerHelper {
-    
     /**
      * 记录错误信息
      */

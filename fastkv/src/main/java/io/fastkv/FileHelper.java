@@ -17,7 +17,6 @@ import io.fastkv.interfaces.FastEncoder;
 
 /**
  * 文件I/O辅助类，使用扩展方法模式处理FastKV的文件操作。
- * 类似Kotlin的扩展方法，第一个参数总是FastKV实例。
  */
 class FileHelper {
     static final String BOTH_FILES_ERROR = "both files error";
@@ -25,7 +24,7 @@ class FileHelper {
     static final String MAP_FAILED = "map failed";
 
     /**
-     * 加载A/B文件 - 扩展方法模式
+     * 加载A/B文件
      * 
      * @param kv FastKV实例
      */
@@ -78,12 +77,12 @@ class FileHelper {
     private static void processExistingFiles(FastKV kv, long aFileLen, long bFileLen) {
         int aSize = kv.aBuffer.getInt();
         int aDataSize = BufferHelper.unpackSize(aSize);
-        boolean aHadEncrypted = BufferHelper.isCipher(aSize, FastKV.CIPHER_MASK);
+        boolean aHadEncrypted = BufferHelper.isCipher(aSize);
         long aCheckSum = kv.aBuffer.getLong();
 
         int bSize = kv.bBuffer.getInt();
         int bDataSize = BufferHelper.unpackSize(bSize);
-        boolean bHadEncrypted = BufferHelper.isCipher(bSize, FastKV.CIPHER_MASK);
+        boolean bHadEncrypted = BufferHelper.isCipher(bSize);
         long bCheckSum = kv.bBuffer.getLong();
 
         boolean isAValid = false;
@@ -134,7 +133,7 @@ class FileHelper {
     }
 
     /**
-     * 写入数据到A/B文件 - 扩展方法模式
+     * 写入数据到A/B文件
      * 
      * @param kv FastKV实例
      * @param buffer 数据缓冲区
@@ -177,7 +176,7 @@ class FileHelper {
     }
     
     /**
-     * 检查A/B文件是否相等 - 扩展方法模式
+     * 检查A/B文件是否相等
      */
     static boolean isABFileEqual(FastKV kv) {
         FastBuffer tempBuffer = new FastBuffer(kv.dataEnd);
@@ -194,7 +193,7 @@ class FileHelper {
     }
 
     /**
-     * 复制缓冲区数据 - 扩展方法模式
+     * 复制缓冲区数据
      * 
      * @param kv FastKV实例
      * @param src 源缓冲区
@@ -238,7 +237,7 @@ class FileHelper {
     }
     
     /**
-     * 写入数据到C文件 - 扩展方法模式
+     * 写入数据到C文件
      * 
      * @param kv FastKV实例
      * @return 是否成功
@@ -267,7 +266,7 @@ class FileHelper {
     }
 
     /**
-     * 强制同步 - 扩展方法模式
+     * 强制同步
      * 
      * @param kv FastKV实例
      */
@@ -280,7 +279,7 @@ class FileHelper {
     }
 
     /**
-     * 关闭文件 - 扩展方法模式
+     * 关闭文件
      * 
      * @param kv FastKV实例
      */
@@ -410,7 +409,7 @@ class FileHelper {
             return false;
         }
         int dataSize = BufferHelper.unpackSize(size);
-        boolean hadEncrypted = BufferHelper.isCipher(size, FastKV.CIPHER_MASK);
+        boolean hadEncrypted = BufferHelper.isCipher(size);
         long sum = buffer.getLong();
         kv.dataEnd = FastKV.DATA_START + dataSize;
         if (dataSize >= 0 && (dataSize <= fileSize - FastKV.DATA_START)
@@ -472,7 +471,7 @@ class FileHelper {
     }
 
     /**
-     * 重写数据：从未加密到加密 - 扩展方法模式
+     * 重写数据：从未加密到加密
      * 
      * @param kv FastKV实例
      */
@@ -568,7 +567,7 @@ class FileHelper {
     }
 
     /**
-     * 复制数据到主文件 - 扩展方法模式
+     * 复制数据到主文件
      * 
      * @param kv FastKV实例
      * @param tempKV 临时FastKV实例
@@ -595,7 +594,7 @@ class FileHelper {
     }
 
     /**
-     * 删除C文件 - 扩展方法模式
+     * 删除C文件
      * 
      * @param kv FastKV实例
      */
@@ -609,7 +608,7 @@ class FileHelper {
     }
 
     /**
-     * 从外部文件读取字符串 - 扩展方法模式
+     * 从外部文件读取字符串
      * 
      * @param kv FastKV实例
      * @param c 字符串容器
@@ -632,7 +631,7 @@ class FileHelper {
     }
 
     /**
-     * 从外部文件读取字节数组 - 扩展方法模式
+     * 从外部文件读取字节数组
      * 
      * @param kv FastKV实例
      * @param c 数组容器
@@ -654,7 +653,7 @@ class FileHelper {
     }
 
     /**
-     * 从外部文件读取对象 - 扩展方法模式
+     * 从外部文件读取对象
      * 
      * @param kv FastKV实例
      * @param c 对象容器

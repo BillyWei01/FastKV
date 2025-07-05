@@ -7,15 +7,8 @@ import io.fastkv.interfaces.FastLogger;
 public final class FastKVConfig {
     static FastLogger sLogger = new DefaultLogger();
     static volatile Executor sExecutor;
-    static int internalLimit = 4096;
 
     private FastKVConfig() {
-    }
-
-    public static void setInternalLimit(int limit) {
-        if (limit >= 2048 && limit <= 0xFFFF) {
-            internalLimit = limit;
-        }
     }
 
     public static void setLogger(FastLogger logger) {

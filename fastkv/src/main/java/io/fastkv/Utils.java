@@ -5,39 +5,14 @@ import android.annotation.SuppressLint;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.security.SecureRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.fastkv.interfaces.FastLogger;
 
 class Utils {
-    private static class Holder {
-        static final SecureRandom random = new SecureRandom();
-        static final char[] digits = {
-                '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-                'a', 'b', 'c', 'd', 'e', 'f'};
-    }
-
     static final int NAME_SIZE = 32;
     private static final int DEFAULT_PAGE_SIZE = 16 * 1024;
 
-
-    /**
-     * 类似 UUID.randomUUID().toString()，但不包含 '-'。
-     */
-    static String randomName() {
-        int len = NAME_SIZE >> 1;
-        byte[] bytes = new byte[len];
-        Holder.random.nextBytes(bytes);
-        char[] buf = new char[NAME_SIZE];
-        for (int i = 0; i < len; i++) {
-            int b = bytes[i];
-            int index = i << 1;
-            buf[index] = Holder.digits[(b >> 4) & 0xF];
-            buf[index + 1] = Holder.digits[b & 0xF];
-        }
-        return new String(buf);
-    }
 
     @SuppressWarnings({"rawtypes", "unchecked", "ConstantConditions"})
     @SuppressLint("DiscouragedPrivateApi")
@@ -90,27 +65,27 @@ class Utils {
         }
     }
 
-    static boolean saveBytes(File dstFile, byte[] bytes, AtomicBoolean canceled) {
+    static void saveBytes(File dstFile, byte[] bytes, AtomicBoolean canceled) {
         File tmpFile = null;
         try {
             int len = bytes.length;
             tmpFile = new File(dstFile.getParent(), dstFile.getName() + ".tmp");
             if (!makeFileIfNotExist(tmpFile)) {
                 logError(new Exception("create file failed"));
-                return false;
+                return;
             }
             if (canceled != null && canceled.get()) {
-                return false;
+                return;
             }
             try (RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw")) {
                 accessFile.setLength(len);
                 accessFile.write(bytes, 0, len);
                 if (canceled != null && canceled.get()) {
-                    return false;
+                    return;
                 }
                 accessFile.getFD().sync();
             }
-            return renameFile(tmpFile, dstFile);
+            renameFile(tmpFile, dstFile);
         } catch (Exception e) {
             logError(new Exception("save bytes failed", e));
         } finally {
@@ -119,9 +94,7 @@ class Utils {
                 deleteFile(dstFile);
             }
         }
-        return false;
     }
-
 
     static boolean renameFile(File srcFile, File dstFile) {
         if (srcFile.renameTo(dstFile)) {

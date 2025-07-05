@@ -23,9 +23,6 @@ class Segment implements Comparable<Segment> {
     @NonNull
     @Override
     public String toString() {
-        return "Segment{" +
-                "start=" + start +
-                ", end=" + end +
-                '}';
+        return "Segment{" + "start=" + start + ", end=" + end + '}';
     }
 } 

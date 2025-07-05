@@ -1,15 +1,11 @@
 package io.fastkv;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
-
 import io.fastkv.Container.*;
 import io.fastkv.interfaces.FastCipher;
 import io.fastkv.interfaces.FastEncoder;
 
 /**
  * 数据解析器，使用扩展方法模式处理FastKV的数据解析。
- * 类似Kotlin的扩展方法，第一个参数总是FastKV实例。
  */
 class DataParser {
     
@@ -144,16 +140,16 @@ class DataParser {
             String fileName = buffer.getString(size);
             kv.data.put(key, new ObjectContainer(start, pos + lengthSize, fileName, size, true));
         } else {
-            parseInternalObject(kv, buffer, dataCipher, key, pos, start, size);
+            parseObject(kv, dataCipher, key, pos, start, size);
             buffer.position = pos + lengthSize + size;
         }
     }
     
     /**
-     * 解析内部对象数据
+     * 解析对象数据
      */
-    private static void parseInternalObject(FastKV kv, FastBuffer buffer, FastCipher dataCipher, 
-                                           String key, int pos, int start, int size) throws Exception {
+    private static void parseObject(FastKV kv, FastCipher dataCipher, 
+                                   String key, int pos, int start, int size) throws Exception {
         FastBuffer objectBuffer;
         int dataLen;
         if (dataCipher == null) {

@@ -10,9 +10,58 @@ import io.fastkv.Container.VarContainer;
 
 /**
  * 垃圾回收辅助类，使用扩展方法模式处理FastKV的内存管理和垃圾回收。
- * 类似Kotlin的扩展方法，第一个参数总是FastKV实例。
+ *
+ * <h2>GC执行策略</h2>
+ * 
+ * <h3>触发条件（双重阈值机制）</h3>
+ * FastKV使用双重阈值来决定何时触发垃圾回收：
+ * <ul>
+ * <li><b>字节阈值</b>：当无效数据达到16KB时触发（基础阈值8KB的2倍）</li>
+ * <li><b>键数量阈值</b>：当无效键数量达到阈值时触发
+ *     <ul>
+ *     <li>小数据量（&lt;16KB）：80个无效键</li>
+ *     <li>大数据量（≥16KB）：160个无效键</li>
+ *     </ul>
+ * </li>
+ * </ul>
+ * 满足任一条件即触发GC，确保在数据碎片化严重时及时清理。
+ * 
+ * <h3>GC执行流程</h3>
+ * <ol>
+ * <li><b>合并无效段</b>：将相邻的无效内存段合并，减少后续处理复杂度</li>
+ * <li><b>数据压缩</b>：将有效数据向前移动，填补无效数据留下的空隙</li>
+ * <li><b>偏移量更新</b>：更新所有Container对象的内存偏移量</li>
+ * <li><b>校验和重算</b>：根据压缩范围选择增量或全量重算校验和</li>
+ * <li><b>缓冲区同步</b>：将压缩后的数据同步到A/B文件（非阻塞模式）</li>
+ * <li><b>缓冲区截断</b>：如果空闲空间过大，截断缓冲区以节省内存</li>
+ * </ol>
+ * 
+ * <h3>内存管理策略</h3>
+ * <ul>
+ * <li><b>预防式GC</b>：在空间不足时，优先尝试GC而非直接扩容</li>
+ * <li><b>智能扩容</b>：只有在GC后仍空间不足时才扩容缓冲区</li>
+ * <li><b>自适应截断</b>：GC后如果空闲空间超过32KB则截断缓冲区</li>
+ * <li><b>分级阈值</b>：根据数据量大小动态调整键数量阈值</li>
+ * </ul>
+ * 
+ * <h3>性能优化</h3>
+ * <ul>
+ * <li><b>段合并优化</b>：减少内存拷贝次数和处理复杂度</li>
+ * <li><b>增量校验和</b>：避免不必要的全量校验和计算</li>
+ * <li><b>批量偏移更新</b>：使用数组记录偏移映射，批量更新</li>
+ * <li><b>原地压缩</b>：在同一缓冲区内完成数据移动，避免额外内存分配</li>
+ * </ul>
  */
 class GCHelper {
+    
+    /** GC字节阈值：8KB（触发条件是此值的2倍，即16KB无效数据） */
+    private static final int GC_BYTES_THRESHOLD = 8192;
+    
+    /** GC键数量阈值：80个（大数据量时翻倍为160个） */
+    private static final int GC_KEYS_THRESHOLD = 80;
+    
+    /** 键数量阈值分界线：16KB（超过此值时键阈值翻倍） */
+    private static final int KEYS_THRESHOLD_BOUNDARY = 1 << 14;
     
     /**
      * 合并无效段以加速GC。
@@ -53,7 +102,7 @@ class GCHelper {
     }
     
     /**
-     * 执行垃圾回收 - 扩展方法模式
+     * 执行垃圾回收 
      * 
      * @param kv FastKV实例
      * @param allocate 需要分配的空间大小
@@ -150,9 +199,13 @@ class GCHelper {
         }
 
         int expectedEnd = kv.dataEnd + allocate;
-        if (kv.fastBuffer.hb.length - expectedEnd > BufferHelper.getTruncateThreshold()) {
+        if (kv.fastBuffer.hb.length - expectedEnd > getTruncateThreshold()) {
             truncate(kv, expectedEnd);
         }
+    }
+
+    static int getTruncateThreshold() {
+        return Math.max(FastKV.PAGE_SIZE, 1 << 15);
     }
 
     /**
@@ -182,7 +235,7 @@ class GCHelper {
     }
 
     /**
-     * 确保缓冲区大小 - 扩展方法模式
+     * 确保缓冲区大小 
      * 
      * @param kv FastKV实例
      * @param allocate 需要分配的空间大小
@@ -191,7 +244,7 @@ class GCHelper {
         int capacity = kv.fastBuffer.hb.length;
         int expected = kv.dataEnd + allocate;
         if (expected >= capacity) {
-            if (kv.invalidBytes > allocate && kv.invalidBytes > BufferHelper.calculateBytesThreshold(kv.dataEnd, 8192)) {
+            if (kv.invalidBytes > allocate && kv.invalidBytes > GC_BYTES_THRESHOLD) {
                 gc(kv, allocate);
             } else {
                 int newCapacity = FileHelper.getNewCapacity(capacity, expected);
@@ -217,14 +270,13 @@ class GCHelper {
     }
 
     /**
-     * 检查是否需要垃圾回收 - 扩展方法模式
+     * 检查是否需要垃圾回收 
      * 
      * @param kv FastKV实例
      */
     static void checkGC(FastKV kv) {
-        int bytesThreshold = BufferHelper.calculateBytesThreshold(kv.dataEnd, 8192);
-        int keysThreshold = kv.dataEnd < (1 << 14) ? 80 : 80 << 1;
-        if (kv.invalidBytes >= (bytesThreshold << 1) || kv.invalids.size() >= keysThreshold) {
+        int keysThreshold = kv.dataEnd < KEYS_THRESHOLD_BOUNDARY ? GC_KEYS_THRESHOLD : GC_KEYS_THRESHOLD << 1;
+        if (kv.invalidBytes >= (GC_BYTES_THRESHOLD << 1) || kv.invalids.size() >= keysThreshold) {
             gc(kv, 0);
         }
     }
