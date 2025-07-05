@@ -317,12 +317,6 @@ public class FastKVTest {
         // 再重新用 Builder 创建，就可以重新创建并加载了。
         kv1.close();
 
-        try {
-            Thread.sleep(200L);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
         FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name).build();
         Assert.assertEquals(longStr, kv2.getString("str"));
         Assert.assertEquals(100, kv2.getInt("int"));
@@ -345,11 +339,6 @@ public class FastKVTest {
 
         kv2.close();
 
-        try {
-            Thread.sleep(200L);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
         FastKV kv3 = new FastKV.Builder(TestHelper.DIR, name).build();
         Assert.assertEquals(longStr, kv3.getString("str"));
     }
@@ -372,12 +361,6 @@ public class FastKVTest {
         Assert.assertArrayEquals(longArray, kv1.getArray("array"));
 
         kv1.close();
-
-        try {
-            Thread.sleep(200L);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
 
         FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name).build();
         Assert.assertArrayEquals(longArray, kv2.getArray("array"));
@@ -934,12 +917,6 @@ public class FastKVTest {
 
         kv1.close();
 
-        try {
-            Thread.sleep(300);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
         FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name)
                 .cipher(TestHelper.cipher)
                 .encoder(encoders)
@@ -980,13 +957,6 @@ public class FastKVTest {
         kv1.putDouble("double", d1);
 
         kv1.close();
-
-        try {
-            // Waiting kv1 to finish saving big value.
-            Thread.sleep(300L);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
 
         // encrypt
         FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name)

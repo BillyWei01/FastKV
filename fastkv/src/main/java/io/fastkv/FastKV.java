@@ -64,7 +64,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     private static final byte[] EMPTY_ARRAY = new byte[0];
     private static final int[] TYPE_SIZE = {0, 1, 4, 4, 8, 8};
     private static final int DATA_START = 12;
-    private final int INTERNAL_LIMIT = FastKVConfig.internalLimit;
 
     private static final int PAGE_SIZE = Utils.getPageSize();
     private static final int TRUNCATE_THRESHOLD = Math.max(PAGE_SIZE, 1 << 15);
@@ -96,11 +95,8 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     private boolean closed = false;
 
-    private String tempExternalName;
-    private final WeakCache externalCache = new WeakCache();
     private final WeakCache bigValueCache = new WeakCache();
 
-    private final ExternalExecutor externalExecutor = new ExternalExecutor();
     private final Executor applyExecutor = new LimitExecutor();
 
     private int invalidBytes;
@@ -298,15 +294,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         data.putAll(tempKV.data);
 
         copyToMainFile(tempKV);
-
-        // Waiting for moving external files
-        while (tempKV.externalExecutor.isNotEmpty()) {
-            try {
-                //noinspection BusyWait
-                Thread.sleep(10L);
-            } catch (Exception ignore) {
-            }
-        }
 
         // Move external files
         File tempDir = new File(path, tempName);
@@ -555,7 +542,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             final String oldFileName;
             data.remove(key);
             bigValueCache.remove(key);
-            externalCache.remove(key);
             byte type = container.getType();
             if (type <= DataType.DOUBLE) {
                 int keySize = FastBuffer.getStringSize(key);
@@ -1028,11 +1014,8 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void deleteExternalFile(String fileName) {
-        FastKVConfig.getExecutor().execute(() -> {
-            if (!externalExecutor.cancelTask(fileName)) {
-                Utils.deleteFile(new File(path + name, fileName));
-            }
-        });
+        // 直接删除外部文件，用于向前兼容清理
+        FastKVConfig.getExecutor().execute(() -> Utils.deleteFile(new File(path + name, fileName)));
     }
 
     private void deleteCFiles() {
@@ -1305,7 +1288,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         checksum = 0L;
         data.clear();
         bigValueCache.clear();
-        externalCache.clear();
         clearInvalid();
         resetBuffer();
     }
@@ -1446,9 +1428,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     private String getStringFromFile(StringContainer c, FastCipher fastCipher) {
         String fileName = (String) c.value;
-        byte[] cache = (byte[]) externalCache.get(fileName);
         try {
-            byte[] bytes = (cache != null) ? cache : Utils.getBytes(new File(path + name, fileName));
+            // 向前兼容：仍然支持读取已存在的外部文件
+            byte[] bytes = Utils.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 bytes = fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
                 return bytes != null ? new String(bytes, StandardCharsets.UTF_8) : null;
@@ -1489,9 +1471,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     private byte[] getArrayFromFile(ArrayContainer c, FastCipher fastCipher) {
         String fileName = (String) c.value;
-        byte[] cache = (byte[]) externalCache.get(fileName);
         try {
-            byte[] bytes = cache != null ? cache : Utils.getBytes(new File(path + name, fileName));
+            // 向前兼容：仍然支持读取已存在的外部文件
+            byte[] bytes = Utils.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 return fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
             }
@@ -1528,9 +1510,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     private Object getObjectFromFile(ObjectContainer c, FastCipher fastCipher) {
         String fileName = (String) c.value;
-        byte[] cache = (byte[]) externalCache.get(fileName);
         try {
-            byte[] bytes = cache != null ? cache : Utils.getBytes(new File(path + name, fileName));
+            // 向前兼容：仍然支持读取已存在的外部文件
+            byte[] bytes = Utils.getBytes(new File(path + name, fileName));
             if (bytes != null) {
                 bytes = fastCipher != null ? fastCipher.decrypt(bytes) : bytes;
                 int tagSize = bytes[0] & 0xFF;
@@ -1962,25 +1944,14 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     private void addObject(String key, Object value, byte[] bytes, byte type) {
         int offset = saveArray(key, bytes, type);
         if (offset > 0) {
-            int size;
-            Object v;
-            boolean external = tempExternalName != null;
-            if (external) {
-                bigValueCache.put(key, value);
-                size = Utils.NAME_SIZE;
-                v = tempExternalName;
-                tempExternalName = null;
-            } else {
-                size = bytes.length;
-                v = value;
-            }
+            int size = bytes.length;
             BaseContainer c;
             if (type == DataType.STRING) {
-                c = new StringContainer(updateStart, offset, (String) v, size, external);
+                c = new StringContainer(updateStart, offset, (String) value, size, false);
             } else if (type == DataType.ARRAY) {
-                c = new ArrayContainer(updateStart, offset, v, size, external);
+                c = new ArrayContainer(updateStart, offset, value, size, false);
             } else {
-                c = new ObjectContainer(updateStart, offset, v, size, external);
+                c = new ObjectContainer(updateStart, offset, value, size, false);
             }
             data.put(key, c);
             updateChange();
@@ -1992,19 +1963,11 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         if (offset > 0) {
             String oldFileName = c.external ? (String) c.value : null;
             remove(c.getType(), c.start, c.offset + c.valueSize);
-            boolean external = tempExternalName != null;
             c.start = updateStart;
             c.offset = offset;
-            c.external = external;
-            if (external) {
-                bigValueCache.put(key, value);
-                c.value = tempExternalName;
-                c.valueSize = Utils.NAME_SIZE;
-                tempExternalName = null;
-            } else {
-                c.value = value;
-                c.valueSize = bytes.length;
-            }
+            c.external = false;
+            c.value = value;
+            c.valueSize = bytes.length;
             updateChange();
             checkGC();
             if (oldFileName != null) {
@@ -2018,32 +1981,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
      * Return 0 when saving failed.
      */
     private int saveArray(String key, byte[] value, byte type) {
-        tempExternalName = null;
-        if (value.length < INTERNAL_LIMIT) {
-            return wrapArray(key, value, type);
-        } else {
-            info("Large value, key: " + key + ", size: " + value.length);
-            String fileName = Utils.randomName();
-            byte[] fileNameBytes = new byte[Utils.NAME_SIZE];
-            //noinspection deprecation
-            fileName.getBytes(0, Utils.NAME_SIZE, fileNameBytes, 0);
-            int offset = wrapArray(key, fileNameBytes, (byte) (type | DataType.EXTERNAL_MASK));
-            if (offset > 0) {
-                // The reference of 'value' will not be gc before finishing 'saveBytes',
-                // So before the value saving to disk, we can read it from 'externalCache'.
-                externalCache.put(fileName, value);
-                externalExecutor.execute(fileName, canceled -> {
-                    if (!canceled.get()) {
-                        File file = new File(path + name, fileName);
-                        if (!Utils.saveBytes(file, value, canceled)) {
-                            info("Write large value with key:" + key + " failed");
-                        }
-                    }
-                });
-                tempExternalName = fileName;
-            }
-            return offset;
-        }
+        return wrapArray(key, value, type);
     }
 
     private int wrapArray(String key, byte[] value, byte type) {

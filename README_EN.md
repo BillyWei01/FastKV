@@ -9,8 +9,6 @@ FastKV is an efficient key-value storage library written with Java.<br/>
     - Incremental update: FastKV records the offset of each key-value relative to the file head,
       updating can be written directly at the right location.
     - By default, data is recorded with mmap . When updating data, it can be written directly to memory without IO blocking.
-    - For a value which length is larger than the threshold, it will be written to another file separately,  
-      only it's file name will be cached. In that way, it will not slow down accessing of other key-value.
 
 2. Support different writing modes
    - In addition to the non-blocking IO (with mmap), 
