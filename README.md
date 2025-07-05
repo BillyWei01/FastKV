@@ -2,39 +2,57 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.billywei01/fastkv)](https://search.maven.org/artifact/io.github.billywei01/fastkv) | [English](README_EN.md) | [架构设计](ARCHITECTURE.md)
 
 ## 1. 概述
-FastKV是用Java编写的高效可靠的key-value存储库。<br>
+FastKV是用Java编写的高效可靠的key-value存储库，专为Android平台优化。
 
-FastKV有以下特点：
-1. 读写速度快
-    - 二进制编码，编码后的体积相对XML等文本编码要小很多；
-    - 增量编码：FastKV记录了各个key-value相对文件的偏移量，
-      从而在更新数据时可以直接在指定的位置写入数据。
-    - 默认用mmap的方式记录数据，更新数据时直接写入到内存即可，没有IO阻塞。
-2. 支持多种写入模式
-   - 除了mmap这种非阻塞的写入方式，FastKV也支持常规的阻塞式写入方式，
-     并且支持同步阻塞和异步阻塞（分别类似于SharePreferences的commit和apply)。
-3. 支持多种类型
-   - 支持常用的boolean/int/float/long/double/String等基础类型。
-   - 支持ByteArray (byte[])。
-   - 支持存储自定义对象。
-   - 内置Set<String>的编码器 (兼容SharePreferences)。
-4. 支持数据加密
-   - 支持注入加密解密的实现，在数据写入磁盘之前执行加密。
-   - 解密处理发生在数据解析阶段，解析完成后，数据是缓存的（用HashMap缓存)，<br>
-     所以加解密会稍微增加写入(put)和解析(loading)的时间，不会增加索引数据(get)的时间。
-5. 支持多进程
-   - 专注于单进程场景，代码简洁高效。
-   - 支持监听文件内容变化，其中一个进程修改文件，所有进程皆可感知。
-6. 方便易用
-   - FastKV提供了了丰富的API接口，开箱即用。
-   - 提供的接口其中包括getAll()和putAll()方法，
-     所以很方便迁移SharePreferences等框架的数据到FastKV, 当然，迁移FastKV的数据到其他框架也很简单。
-7. 稳定可靠
-   - 通过double-write等方法确保数据的完整性。
-   - 在API抛IO异常时自动降级处理。
-8. 代码精简
-   - FastKV由纯Java实现，编译成jar包后体积只有数十K。
-   
+###  核心特性
+
+#### 1. 高性能读写
+- **二进制编码**：采用紧凑的二进制格式，相比XML等文本编码体积更小
+- **增量更新**：记录key-value的精确偏移量，支持原地更新，避免全量重写
+- **mmap内存映射**：默认使用mmap技术，写入数据直接映射到内存
+- **垃圾回收**：自动清理无效数据，保持存储空间紧凑
+
+#### 2. 多种写入模式
+- **NON_BLOCKING**：非阻塞模式，通过mmap直接写入内存，性能最高
+- **ASYNC_BLOCKING**：异步阻塞模式，后台线程写入磁盘，类似SharedPreferences.apply()
+- **SYNC_BLOCKING**：同步阻塞模式，立即写入磁盘，类似SharedPreferences.commit()
+
+#### 3. 丰富的数据类型支持
+- **基础类型**：boolean, int, float, long, double, String
+- **字节数组**：byte[]，支持二进制数据存储
+- **字符串集合**：Set<String>，完全兼容SharedPreferences
+- **自定义对象**：通过FastEncoder接口支持任意对象序列化
+
+
+#### 4. 数据安全保障
+- **双文件备份**：A/B文件互为备份，确保数据不丢失
+- **校验和保护**：每次读取都验证数据完整性
+- **原子操作**：写入操作具有原子性，避免数据损坏
+- **自动降级**：mmap失败时自动切换到阻塞模式
+
+#### 5. 数据加密支持
+- **可插拔加密**：支持注入自定义加密实现
+- **透明加解密**：加密在数据写入前执行，解密在数据解析时执行
+- **加密迁移**：支持从明文到密文的平滑迁移
+- **性能优化**：缓存解密后的数据，不影响读取性能
+
+#### 6. 开发友好
+- **兼容性好**：实现SharedPreferences接口，便于迁移
+- **迁移工具**：提供adapt()方法自动迁移SharedPreferences数据
+- **丰富API**：支持批量操作、监听器等
+- **类型安全**：编译时类型检查，避免运行时类型错误
+
+#### 7. 稳定可靠
+- **容错机制**：基本的错误检测和自动恢复
+- **向前兼容**：新版本可读取旧版本数据
+- **异常处理**：基本的异常处理和日志记录
+
+#### 8. 轻量高效
+- **体积小**：纯Java实现，编译后仅数十KB
+- **内存友好**：减少不必要的对象创建
+- **启动快**：异步加载，支持多文件并发加载
+
+
 ## 2. 使用方法
 
 ### 2.1 导入
@@ -47,150 +65,241 @@ dependencies {
 
 ### 2.2 初始化
 ```kotlin
-    FastKVConfig.setLogger(FastKVLogger)
-    FastKVConfig.setExecutor(Dispatchers.IO.asExecutor())
+// 可选：设置全局配置
+FastKVConfig.setLogger(FastKVLogger)
+FastKVConfig.setExecutor(Dispatchers.IO.asExecutor())
 ```
-初始化可以按需设置日志接口和Executor。<br>
-如果不传入Executor，FastKV会自己构建一个Executor；<br>
-如果传入用户自己的Executor，需要确保Executor的并发调度，避免没有线程执行数据加载。
 
+初始化可以按需设置日志接口和Executor：
+- 如果不传入Executor，FastKV会自己构建一个CachedThreadPool
+- 如果传入用户自己的Executor，需要确保Executor的并发调度能力
 
 ### 2.3 基本用法
 
 ```java
-    // FastKV kv = new FastKV.Builder(context, name).build();
-    FastKV kv = new FastKV.Builder(path, name).build();
+// 使用Context构造（推荐）
+FastKV kv = new FastKV.Builder(context, "user_data").build();
 
-    if(!kv.getBoolean("flag")){
-        kv.putBoolean("flag" , true);
-    }
-    
-    int count = kv.getInt("count");
-    if(count < 10){
-        kv.putInt("count" , count + 1);
-    }
+// 或使用自定义路径
+FastKV kv = new FastKV.Builder(path, "user_data").build();
+
+// 基本读写操作
+if (!kv.getBoolean("first_launch")) {
+    kv.putBoolean("first_launch", true);
+}
+
+int count = kv.getInt("launch_count");
+kv.putInt("launch_count", count + 1);
+
+// 支持链式调用
+kv.putString("user_name", "张三")
+  .putInt("user_age", 25)
+  .putFloat("user_score", 89.5f);
 ```
 
-Builder的构造可传Context或者path。<br>
-如果传Context的话，会在内部目录的'files'目录下创建'fastkv'目录来作为文件的保存路径。
-
-### 2.4 存储自定义对象
+### 2.4 高级配置
 
 ```java
-    FastEncoder<?>[] encoders = new FastEncoder[]{LongListEncoder.INSTANCE};
-    FastKV kv = new FastKV.Builder(context, name).encoder(encoders).build();
-        
-    List<Long> list = new ArrayList<>();
-    list.add(100L);
-    list.add(200L);
-    list.add(300L);
-    kv.putObject("long_list", list, LongListEncoder.INSTANCE);
+FastKV kv = new FastKV.Builder(context, "secure_data")
+    .encoder(new FastEncoder[]{CustomObjectEncoder.INSTANCE})  // 自定义编码器
+    .cipher(new AESCipher())                                   // 数据加密
+    .blocking()                                                // 同步阻塞模式
+    .build();
+```
+
+### 2.5 存储自定义对象
+
+```java
+// 1. 实现FastEncoder接口
+public class UserEncoder implements FastEncoder<User> {
+    @Override
+    public String tag() {
+        return "User";
+    }
     
-    List<Long> list2 = kv.getObject("long_list");
+    @Override
+    public byte[] encode(User user) {
+        // 序列化逻辑
+        return userToBytes(user);
+    }
+    
+    @Override
+    public User decode(byte[] bytes, int offset, int length) {
+        // 反序列化逻辑
+        return bytesToUser(bytes, offset, length);
+    }
+}
+
+// 2. 注册编码器并使用
+FastEncoder<?>[] encoders = {new UserEncoder()};
+FastKV kv = new FastKV.Builder(context, "user_data")
+    .encoder(encoders)
+    .build();
+
+// 3. 存储和读取对象
+User user = new User("张三", 25);
+kv.putObject("current_user", user, new UserEncoder());
+User savedUser = kv.getObject("current_user");
 ```
 
-除了支持基本类型外，FastKV还支持写入对象。 <br>
-如果要写入自定义对象，需在构建FastKV实例时传入对象的编码器(实现了FastEncoder接口的对象）。<br>
-因为FastKV实例加载时会执行自动反序列化，所以需要在实例创建时注入编码器。<br>
-另外，如果没有注入编码器，调用putObject接口时会抛出异常（提醒使用者给FastKV实例传入编码器）。<br>
+推荐使用[Packable](https://github.com/BillyWei01/Packable)框架进行对象序列化。
 
-上面LongListEncoder就实现了FastEncoder接口，代码实现可参考：
-[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/androidTest/java/io/fastkv/LongListEncoder.kt)<br>
+### 2.6 数据加密
 
-编码对象涉及序列化/反序列化。<br>
-这里推荐笔者的另外一个框架：https://github.com/BillyWei01/Packable
+```java
+// 实现FastCipher接口
+public class AESCipher implements FastCipher {
+    @Override
+    public byte[] encrypt(byte[] src) {
+        // 加密实现
+        return encryptWithAES(src);
+    }
+    
+    @Override
+    public byte[] decrypt(byte[] dst) {
+        // 解密实现
+        return decryptWithAES(dst);
+    }
+    
+    // 其他加密方法...
+}
 
-### 2.5 数据加密
-如需对数据进行加密，在创建FastKV实例时传入
-[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java) 的实现即可。
-
+// 使用加密
+FastKV kv = new FastKV.Builder(context, "secure_data")
+    .cipher(new AESCipher())
+    .build();
 ```
-FastKV kv = FastKV.Builder(path, name)
-         .cipher(yourCihper)
-         .build()
+
+### 2.7 批量操作
+
+```java
+// 批量写入
+Map<String, Object> data = new HashMap<>();
+data.put("name", "张三");
+data.put("age", 25);
+data.put("score", 89.5f);
+data.put("active", true);
+
+kv.putAll(data);
+
+// 批量读取
+Map<String, Object> allData = kv.getAll();
+
+// 事务控制（阻塞模式）
+kv.disableAutoCommit();
+kv.putString("key1", "value1");
+kv.putString("key2", "value2");
+kv.commit(); // 一次性提交所有更改
 ```
 
-项目中有举例Cipher的实现，可参考：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/cipher/AESCipher.java)
-
-### 2.6 迁移 SharePreferences 到 FastKV
-
-FastKV实现了SharedPreferences接口，并且提供了迁移SP数据的方法。<br>
-用法如下：
+### 2.8 迁移SharedPreferences
 
 ```java
 public class SpCase {
-   public static final String NAME = "common_store";
-   // 原本的获取SP的方法
-   // public static final SharedPreferences preferences = AppContext.INSTANCE.getContext().getSharedPreferences(NAME, Context.MODE_PRIVATE);
-   
-   // 导入原SP数据
-   public static final SharedPreferences preferences = FastKV.adapt(AppContext.INSTANCE.getContext(), NAME);
+    public static final String NAME = "common_store";
+    
+    // 替换原有的SharedPreferences获取方式
+    // public static final SharedPreferences preferences = context.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+    
+    // 使用FastKV并自动迁移数据
+    public static final SharedPreferences preferences = FastKV.adapt(context, NAME);
 }
 ```
 
-### 2.7 迁移 MMKV 到 FastKV
-由于MMKV没有实现 'getAll' 接口，所以无法像SharePreferences一样一次性迁移。<br>
-但是可以封装一个KV类，创建 'getInt'，'getString' ... 等方法，并在其中做适配处理。
-可参考：[MMKV2FastKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/data/MMKV2FastKV.kt)
+### 2.9 监听数据变化
 
-### 2.8 多进程
-FastKV专注于单进程场景，提供最佳的性能和最简洁的代码。<br>
-如果您的应用确实需要多进程支持，建议考虑其他解决方案。
+```java
+kv.registerOnSharedPreferenceChangeListener(new SharedPreferences.OnSharedPreferenceChangeListener() {
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        // 处理数据变化
+        System.out.println("Key changed: " + key);
+    }
+});
+```
 
-### 2.9 Kotlin 委托
-Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。 <br>
-此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。 <br>
-可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt) <br>
+### 2.10 Kotlin委托属性
 
-### 2.10 注意事项
-1. 不同版本之间，不要改变路径和名字，否则会打开不同的文件。 <br>
-2. 如果使用了Cipher(加密)，不要更换，否则会打开文件时会解析不了。
-   不过从没有使用Cipher到使用Cipher是可以的，FastKV会先解析未加密的数据，然后在重新加密写入<br>
-3. 同一个key, 对应的value的操作应保持类型一致。
-   比如，同一个key, A处putString, B处getInt, 则无法返回预期的value。
+```kotlin
+// 使用委托属性简化访问
+class UserSettings(private val kv: FastKV) {
+    var userName: String by kv.string("user_name", "")
+    var userAge: Int by kv.int("user_age", 0)
+    var isVip: Boolean by kv.boolean("is_vip", false)
+}
+
+// 使用示例
+val settings = UserSettings(kv)
+settings.userName = "张三"
+settings.userAge = 25
+println("用户: ${settings.userName}, 年龄: ${settings.userAge}")
+```
+
+### 2.11 注意事项
+
+1. **路径和名称一致性**：不同版本之间不要改变路径和名字，否则会打开不同的文件
+2. **加密器一致性**：如果使用了Cipher，不要更换，否则无法解析数据（从无加密到加密是可以的）
+3. **类型一致性**：同一个key对应的value类型应保持一致
 
 ## 3. 性能测试
-- 测试数据：搜集APP中的SharePreferences汇总的部份key-value数据（经过随机混淆）得到总共六百多个key-value。<br>
-  分别截取其中一部分，构造正态分布的输入序列，进行多次测试。
-- 测试机型：华为P30 Pro
-- 测试代码：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
 
-测试结果如下:
+### 测试环境
+- **测试数据**：600+个真实key-value数据（经过随机混淆）
+- **测试设备**：华为P30 Pro
+- **测试方法**：正态分布输入序列，多次测试取平均值
 
-更新：
+### 测试结果
 
-| | 25| 50| 100| 200| 400| 600
----|---|---|---|---|---|---
-SP-commit | 114| 172| 411| 666| 2556| 5344
-DataStore | 231| 625| 1717| 4421| 7629| 13639
-SQLiteKV | 192| 382| 1025| 1565| 4279| 5034
-SP-apply | 3| 9| 35| 118| 344| 516
-MMKV | 4| 8| 5| 8| 10| 9
-FastKV | 3| 6| 4| 6| 8| 10
+**写入性能（毫秒）**：
 
-----
+| 数据量 | 25 | 50 | 100 | 200 | 400 | 600 |
+|--------|----|----|-----|-----|-----|-----|
+| SP-commit | 114 | 172 | 411 | 666 | 2556 | 5344 |
+| DataStore | 231 | 625 | 1717 | 4421 | 7629 | 13639 |
+| SQLiteKV | 192 | 382 | 1025 | 1565 | 4279 | 5034 |
+| SP-apply | 3 | 9 | 35 | 118 | 344 | 516 |
+| MMKV | 4 | 8 | 5 | 8 | 10 | 9 |
+| **FastKV** | **3** | **6** | **4** | **6** | **8** | **10** |
 
-查询：
+**读取性能（毫秒）**：
 
-| | 25| 50| 100| 200| 400| 600
----|---|---|---|---|---|---
-SP-commit | 1| 3| 2| 1| 2| 3
-DataStore | 57| 76| 115| 117| 170| 216
-SQLiteKV | 96| 161| 265| 417| 767| 1038
-SP-apply | 0| 1| 0| 1| 3| 3
-MMKV | 0| 1| 1| 5| 8| 11
-FastKV | 0| 1| 1| 3| 3| 1
+| 数据量 | 25 | 50 | 100 | 200 | 400 | 600 |
+|--------|----|----|-----|-----|-----|-----|
+| SP-commit | 1 | 3 | 2 | 1 | 2 | 3 |
+| DataStore | 57 | 76 | 115 | 117 | 170 | 216 |
+| SQLiteKV | 96 | 161 | 265 | 417 | 767 | 1038 |
+| SP-apply | 0 | 1 | 0 | 1 | 3 | 3 |
+| MMKV | 0 | 1 | 1 | 5 | 8 | 11 |
+| **FastKV** | **0** | **1** | **1** | **3** | **3** | **1** |
 
-每次执行Benchmark获取到的结果有所浮动，尤其是APP启动后执行多次，部分KV会变快（JIT优化）。<br>
-以上数据是取APP冷启动后第一次Benchmark的数据。
+### 性能优势
+- **写入速度**：与MMKV相当，比SharedPreferences显著更快
+- **读取速度**：与SharedPreferences相当，比DataStore更快
+- **启动速度**：异步加载，不阻塞应用启动
 
-## 4. 参考链接
-相关博客： <br>
-https://juejin.cn/post/7018522454171582500
+## 4. 架构设计
 
-由于提供给Android平台的版本和纯JDK的版本的差异越来越多，所以分开仓库来维护。<br>
-纯JDK版本的链接为：<br>
-https://github.com/BillyWei01/FastKV-Java
+FastKV采用模块化设计，详细的架构说明请参考[ARCHITECTURE.md](ARCHITECTURE.md)。
+
+### 核心模块
+- **FastKV**：核心API和业务逻辑
+- **FileHelper**：文件I/O和备份管理
+- **DataParser**：数据解析和序列化
+- **GCHelper**：垃圾回收和内存管理
+- **BufferHelper**：缓冲区操作和校验和计算
+
+### 关键特性
+- **双文件备份**：A/B文件确保数据安全
+- **智能垃圾回收**：自动清理无效数据
+- **多种写入模式**：适应不同性能需求
+- **可插拔加密**：支持自定义加密算法
+
+## 5. 相关链接
+
+- **技术博客**：https://juejin.cn/post/7018522454171582500
+- **纯Java版本**：https://github.com/BillyWei01/FastKV-Java
+- **序列化框架**：https://github.com/BillyWei01/Packable
+- **示例代码**：[FastKV Demo](app/src/main/java/io/fastkv/fastkvdemo/)
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.

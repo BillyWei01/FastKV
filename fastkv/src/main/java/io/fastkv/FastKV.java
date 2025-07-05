@@ -140,8 +140,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     final List<String> deletedFiles = new ArrayList<>();
 
-    // 如果 kv 之前没有加密，而这次需要加密，
-    // 则必须重写数据。
+    // 如果之前没有加密，而这次打开需要加密，则需要重写数据。
     boolean needRewrite = false;
 
     boolean closed = false;

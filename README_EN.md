@@ -1,48 +1,60 @@
 # FastKV 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.billywei01/fastkv)](https://search.maven.org/artifact/io.github.billywei01/fastkv)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.billywei01/fastkv)](https://search.maven.org/artifact/io.github.billywei01/fastkv) | [中文文档](README.md) | [Architecture](ARCHITECTURE.md)
 
-FastKV is an efficient key-value storage library written with Java.<br/>
+## 1. Overview
+FastKV is an efficient and reliable key-value storage library written in Java, optimized for Android platforms.
 
-## 1. Features
-1. Efficient
-    - Binary coding: the size after coding is much smaller than text coding such as XML;
-    - Incremental update: FastKV records the offset of each key-value relative to the file head,
-      updating can be written directly at the right location.
-    - By default, data is recorded with mmap . When updating data, it can be written directly to memory without IO blocking.
+###  Core Features
 
-2. Support different writing modes
-   - In addition to the non-blocking IO (with mmap), 
-   FastKV also supports synchronous blocking and asynchronous blocking IO (similar to commit and apply of SharePreferences).
+#### 1. High-Performance Read/Write
+- **Binary Encoding**: Compact binary format, smaller than XML and other text encodings
+- **Incremental Updates**: Records precise offsets of key-value pairs, supports in-place updates, avoids full rewrites
+- **mmap Memory Mapping**: Uses mmap technology by default, writes data directly to memory
+- **Garbage Collection**: Automatically cleans up invalid data, maintains compact storage space
 
-3. Support various types
-    - Support primitive types such as Boolean / int / float / long / double / string;
-    - Support ByteArray (byte []);
-    - Support storage objects.
-    - Built in StringSet encoder(for compatibility with SharePreferences).
+#### 2. Multiple Writing Modes
+- **NON_BLOCKING**: Non-blocking mode, writes directly to memory via mmap, highest performance
+- **ASYNC_BLOCKING**: Async blocking mode, writes to disk in background thread, similar to SharedPreferences.apply()
+- **SYNC_BLOCKING**: Sync blocking mode, writes to disk immediately, similar to SharedPreferences.commit()
 
-4. Support data encryption
-   - Support for plugin encryption implementations, performing encryption before data is written to disk.
-   
-5. Support multi-process
-   - Focused on single-process scenarios for optimal performance and simplicity.
-   - Support listener for changed values, one process write, all processes known.
+#### 3. Rich Data Type Support
+- **Primitive Types**: boolean, int, float, long, double, String
+- **Byte Arrays**: byte[], supports binary data storage
+- **String Sets**: Set<String>, fully compatible with SharedPreferences
+- **Custom Objects**: Supports arbitrary object serialization through FastEncoder interface
+- **Large Value Support**: Automatically handles large data over 64KB using 4-byte length encoding
 
-6. Easy to use
-    - FastKV provides rich API interfaces, including getAll() and putAll() methods, it is convenient to migrate the data of frameworks such as SharePreferences to FastKV. 
+#### 4. Data Security Assurance
+- **Dual File Backup**: A/B files serve as mutual backups, ensuring no data loss
+- **Checksum Protection**: Verifies data integrity on every read/write
+- **Atomic Operations**: Write operations are atomic, preventing data corruption
+- **Auto Degradation**: Automatically switches to blocking mode when mmap fails
 
-7. Stable and reliable
-    - When FastKV writes data in non-blocking way (mmap), it writes two files one by one,  to ensure that at least one file is integrate at any time;
-    - FastKV checks the integrity of the files when loading, if one file is not integrate, it will be restored with another file which is integrated.
-    - If mmap API fails, it will be degraded to the blocking I/O; 
-     and it will try to restore to mmap mode when reloading.
+#### 5. Data Encryption Support
+- **Pluggable Encryption**: Supports injecting custom encryption implementations
+- **Transparent Encryption/Decryption**: Encryption occurs before data write, decryption during data parsing
+- **Encryption Migration**: Supports smooth migration from plaintext to encrypted data
+- **Performance Optimization**: Caches decrypted data, doesn't affect read performance
 
-8. Simple code
-    - FastKV is implemented in pure Java and size of jar is just tens of KB.
-   
-## 2. How to use
+#### 6. Developer Friendly
+- **Good Compatibility**: Implements SharedPreferences interface for easy migration
+- **Migration Tool**: Provides adapt() method for automatic SharedPreferences data migration
+- **Rich APIs**: Supports batch operations, transaction control, listeners, etc.
+- **Type Safety**: Compile-time type checking prevents runtime type errors
+
+#### 7. Stable and Reliable
+- **Fault Tolerance**: Basic error detection and automatic recovery
+- **Forward Compatibility**: New versions can read old version data
+- **Exception Handling**: Basic exception handling and logging
+
+#### 8. Lightweight and Efficient
+- **Small Size**: Pure Java implementation, only tens of KB after compilation
+- **Memory Friendly**: Reduces unnecessary object creation
+- **Fast Startup**: Asynchronous loading
+
+## 2. Usage
 
 ### 2.1 Import
-FastKV had been published to Maven Central:
 
 ```gradle
 dependencies {
@@ -52,137 +64,244 @@ dependencies {
 
 ### 2.2 Initialization
 ```kotlin
- FastKVConfig.setLogger(FastKVLogger)
- FastKVConfig.setExecutor(Dispatchers.Default.asExecutor())
+// Optional: Set global configuration
+FastKVConfig.setLogger(FastKVLogger)
+FastKVConfig.setExecutor(Dispatchers.IO.asExecutor())
 ```
 
-Initialization is optional.<br/>
-You could set log callback and executor.<br/>
-It is recommended to set your own thread pool to reuse threads.
+Initialization allows optional configuration of logger and executor:
+- If no executor is provided, FastKV will create its own CachedThreadPool
+- If you provide your own executor, ensure it has concurrent scheduling capability
 
+### 2.3 Basic Usage
 
-### 2.3 Basic cases
-- Basic case
 ```java
- // FastKV kv = new FastKV.Builder(context, name).build();
- FastKV kv = new FastKV.Builder(path, name).build();
+// Using Context (recommended)
+FastKV kv = new FastKV.Builder(context, "user_data").build();
 
- if(!kv.getBoolean("flag")){
-     kv.putBoolean("flag" , true);
- }
- 
- int count = kv.getInt("count");
- if(count < 10){
-     kv.putInt("count" , count + 1);
- }
+// Or using custom path
+FastKV kv = new FastKV.Builder(path, "user_data").build();
+
+// Basic read/write operations
+if (!kv.getBoolean("first_launch")) {
+    kv.putBoolean("first_launch", true);
+}
+
+int count = kv.getInt("launch_count");
+kv.putInt("launch_count", count + 1);
+
+// Supports method chaining
+kv.putString("user_name", "John")
+  .putInt("user_age", 25)
+  .putFloat("user_score", 89.5f);
 ```
 
-The constructor of Builder can pass Context or path. <br>
-If the Context is passed, 
-the 'fastkv' directory will be created under the 'files' directory of the internal directory.
+### 2.4 Advanced Configuration
 
-### 2.4 Sava custom object
 ```java
- FastEncoder] encoders = new FastEncoder[]{LongListEncoder.INSTANCE};
- FastKV kv = new FastKV.Builder(path, name).encoder(encoders).build();
-     
- List<Long> list = new ArrayList<>();
- list.add(100L);
- list.add(200L);
- list.add(300L);
- kv.putObject("long_list", list, LongListEncoder.INSTANCE);
-
- List<Long> list2 = kv.getObject("long_list");
+FastKV kv = new FastKV.Builder(context, "secure_data")
+    .encoder(new FastEncoder[]{CustomObjectEncoder.INSTANCE})  // Custom encoders
+    .cipher(new AESCipher())                                   // Data encryption
+    .blocking()                                                // Sync blocking mode
+    .build();
 ```
 
-In addition to supporting basic types, FastKV also supports writing objects. <br/>
-You only need to pass in the encoder of the object when building FastKV instances.<br/>
-The encoder is an object that implements
-[FastEncoder](https://github.com/BillyWei01/FastKV/blob/main/FastKV/src/main/java/io/fastkv/interfaces/FastEncoder.java).<br/>
-For example, the code of 'LongListEncoder' like:
-[LongListEncoder](https://github.com/BillyWei01/FastKV/blob/main/app/src/androidTest/java/io/fastkv/LongListEncoder.kt)<br>
+### 2.5 Store Custom Objects
 
-Encoding objects needs serialization/deserialization. <br/>
-Here recommend my serialization project: https://github.com/BillyWei01/Packable
+```java
+// 1. Implement FastEncoder interface
+public class UserEncoder implements FastEncoder<User> {
+    @Override
+    public String tag() {
+        return "User";
+    }
+    
+    @Override
+    public byte[] encode(User user) {
+        // Serialization logic
+        return userToBytes(user);
+    }
+    
+    @Override
+    public User decode(byte[] bytes, int offset, int length) {
+        // Deserialization logic
+        return bytesToUser(bytes, offset, length);
+    }
+}
 
-### 2.5 Data encryption
-If you need to encrypt data, just pass in the implementation of
-[FastCipher](https://github.com/BillyWei01/FastKV/blob/main/fastkv/src/main/java/io/fastkv/interfaces/FastCipher.java)  when creating a FastKV instance
+// 2. Register encoder and use
+FastEncoder<?>[] encoders = {new UserEncoder()};
+FastKV kv = new FastKV.Builder(context, "user_data")
+    .encoder(encoders)
+    .build();
 
+// 3. Store and retrieve objects
+User user = new User("John", 25);
+kv.putObject("current_user", user, new UserEncoder());
+User savedUser = kv.getObject("current_user");
 ```
-FastKV kv = FastKV.Builder(path, name)
-         .cipher(yourCihper)
-         .build()
+
+We recommend using the [Packable](https://github.com/BillyWei01/Packable) framework for object serialization.
+
+### 2.6 Data Encryption
+
+```java
+// Implement FastCipher interface
+public class AESCipher implements FastCipher {
+    @Override
+    public byte[] encrypt(byte[] src) {
+        // Encryption implementation
+        return encryptWithAES(src);
+    }
+    
+    @Override
+    public byte[] decrypt(byte[] dst) {
+        // Decryption implementation
+        return decryptWithAES(dst);
+    }
+    
+    // Other encryption methods...
+}
+
+// Use encryption
+FastKV kv = new FastKV.Builder(context, "secure_data")
+    .cipher(new AESCipher())
+    .build();
 ```
 
-There are examples of Cipher implementations in the project, 
-refer to：[AESCipher](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/cipher/AESCipher.java)
+### 2.7 Batch Operations
 
-### 2.6 Migrate SharePreferences to FastKV
+```java
+// Batch write
+Map<String, Object> data = new HashMap<>();
+data.put("name", "John");
+data.put("age", 25);
+data.put("score", 89.5f);
+data.put("active", true);
 
-It is easy to migrate SharePreferences to FastKV.
+kv.putAll(data);
+
+// Batch read
+Map<String, Object> allData = kv.getAll();
+
+// Transaction control (blocking mode)
+kv.disableAutoCommit();
+kv.putString("key1", "value1");
+kv.putString("key2", "value2");
+kv.commit(); // Commit all changes at once
+```
+
+### 2.8 Migrate SharedPreferences
 
 ```java
 public class SpCase {
-   public static final String NAME = "common_store";
-   
-   // public static final SharedPreferences preferences = AppContext.INSTANCE.getContext().getSharedPreferences(NAME, Context.MODE_PRIVATE);
-
-   public static final SharedPreferences preferences = FastKV.adapt(AppContext.INSTANCE.getContext(), NAME);
+    public static final String NAME = "common_store";
+    
+    // Replace original SharedPreferences access
+    // public static final SharedPreferences preferences = context.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+    
+    // Use FastKV with automatic data migration
+    public static final SharedPreferences preferences = FastKV.adapt(context, NAME);
 }
 ```
 
-### 2.7 Migrate MMKV to FastKV
-Since MMKV does not implement the 'getAll' interface, it cannot be migrated at once like SharePreferences. <br>
-But you can create a KV class, create methods such as 'getInt', 'getString', etc., and do adaptation processing in it.<br>
-Refer to [MMKV2FastKV](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/storage/MMKV2FastKV.kt)
+### 2.9 Listen for Data Changes
 
-### 2.8 Multi-Process
-FastKV is focused on single-process scenarios for optimal performance and code simplicity.<br>
-If your application requires multi-process support, please consider other solutions.<br>
+```java
+kv.registerOnSharedPreferenceChangeListener(new SharedPreferences.OnSharedPreferenceChangeListener() {
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        // Handle data changes
+        System.out.println("Key changed: " + key);
+    }
+});
+```
 
-Example:
-[MultiProcessTestActivity](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/MultiProcessTestActivity.kt)
-and [TestService](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/TestService.kt)
+### 2.10 Kotlin Delegate Properties
 
-### 2.9 Kotlin delegation
-Kotlin is compatible with java, so you could directly use FastKV or SharedPreferences APIs in Kotlin.
-In addition, kotlin provides the syntax of delegate, which can be used to improve key-value API.
-Refer to [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt)
+```kotlin
+// Use delegate properties to simplify access
+class UserSettings(private val kv: FastKV) {
+    var userName: String by kv.string("user_name", "")
+    var userAge: Int by kv.int("user_age", 0)
+    var isVip: Boolean by kv.boolean("is_vip", false)
+}
 
-## 3. Benchmark
-- Data source: Collecting part of the key-value data of SharePreferences in the app (with  confusion) , hundreds of key-values. <br/>
-Because some key values are accessed more and others accessed less in normally, <br>
-I make a normally distributed sequence to test the accessing.
-- Test device: Huawei P30 Pro
-- Test code：[Benchmark](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/Benchmark.kt)
+// Usage example
+val settings = UserSettings(kv)
+settings.userName = "John"
+settings.userAge = 25
+println("User: ${settings.userName}, Age: ${settings.userAge}")
+```
 
-Update:
+### 2.11 Important Notes
 
-| | 25| 50| 100| 200| 400| 600
----|---|---|---|---|---|---
-SP-commit | 114| 172| 411| 666| 2556| 5344
-DataStore | 231| 625| 1717| 4421| 7629| 13639
-SQLiteKV | 192| 382| 1025| 1565| 4279| 5034
-SP-apply | 3| 9| 35| 118| 344| 516
-MMKV | 4| 8| 5| 8| 10| 9
-FastKV | 3| 6| 4| 6| 8| 10
----
+1. **Path and Name Consistency**: Don't change path and name between versions, or different files will be opened
+2. **Cipher Consistency**: If using Cipher, don't change it, or data cannot be parsed (migrating from no encryption to encryption is supported)
+3. **Type Consistency**: Value types for the same key should remain consistent
+4. **Lifecycle Management**: Call close() method to release resources when no longer needed
+5. **Exception Handling**: Properly handle potential exceptions in critical paths
 
-Query:
+## 3. Performance Benchmark
 
-| | 25| 50| 100| 200| 400| 600
----|---|---|---|---|---|---
-SP-commit | 1| 3| 2| 1| 2| 3
-DataStore | 57| 76| 115| 117| 170| 216
-SQLiteKV | 96| 161| 265| 417| 767| 1038
-SP-apply | 0| 1| 0| 1| 3| 3
-MMKV | 0| 1| 1| 5| 8| 11
-FastKV | 0| 1| 1| 3| 3| 1
+### Test Environment
+- **Test Data**: 600+ real key-value pairs (randomly obfuscated)
+- **Test Device**: Huawei P30 Pro
+- **Test Method**: Normal distribution input sequence, multiple tests averaged
 
-# Java-Version
-There is a project write with only API of JDK, no Android SDK. <br>
-link: https://github.com/BillyWei01/FastKV-Java
+### Test Results
+
+**Write Performance (milliseconds)**:
+
+| Data Size | 25 | 50 | 100 | 200 | 400 | 600 |
+|-----------|----|----|-----|-----|-----|-----|
+| SP-commit | 114 | 172 | 411 | 666 | 2556 | 5344 |
+| DataStore | 231 | 625 | 1717 | 4421 | 7629 | 13639 |
+| SQLiteKV | 192 | 382 | 1025 | 1565 | 4279 | 5034 |
+| SP-apply | 3 | 9 | 35 | 118 | 344 | 516 |
+| MMKV | 4 | 8 | 5 | 8 | 10 | 9 |
+| **FastKV** | **3** | **6** | **4** | **6** | **8** | **10** |
+
+**Read Performance (milliseconds)**:
+
+| Data Size | 25 | 50 | 100 | 200 | 400 | 600 |
+|-----------|----|----|-----|-----|-----|-----|
+| SP-commit | 1 | 3 | 2 | 1 | 2 | 3 |
+| DataStore | 57 | 76 | 115 | 117 | 170 | 216 |
+| SQLiteKV | 96 | 161 | 265 | 417 | 767 | 1038 |
+| SP-apply | 0 | 1 | 0 | 1 | 3 | 3 |
+| MMKV | 0 | 1 | 1 | 5 | 8 | 11 |
+| **FastKV** | **0** | **1** | **1** | **3** | **3** | **1** |
+
+### Performance Advantages
+- **Write Speed**: Comparable to MMKV, significantly faster than SharedPreferences
+- **Read Speed**: Comparable to SharedPreferences, faster than DataStore
+- **Startup Speed**: Asynchronous loading, doesn't block app startup
+- **Memory Usage**: Compact binary format, less memory consumption
+
+## 4. Architecture Design
+
+FastKV adopts a modular design. For detailed architecture documentation, please refer to [ARCHITECTURE.md](ARCHITECTURE.md).
+
+### Core Modules
+- **FastKV**: Core API and business logic
+- **FileHelper**: File I/O and backup management
+- **DataParser**: Data parsing and serialization
+- **GCHelper**: Garbage collection and memory management
+- **BufferHelper**: Buffer operations and checksum calculation
+
+### Key Features
+- **Dual File Backup**: A/B files ensure data safety
+- **Garbage Collection**: Automatic cleanup of invalid data
+- **Multiple Writing Modes**: Adapt to different performance requirements
+- **Pluggable Encryption**: Support for custom encryption algorithms
+
+## 5. Related Links
+
+- **Technical Blog**: https://juejin.cn/post/7018522454171582500
+- **Pure Java Version**: https://github.com/BillyWei01/FastKV-Java
+- **Serialization Framework**: https://github.com/BillyWei01/Packable
+- **Sample Code**: [FastKV Demo](app/src/main/java/io/fastkv/fastkvdemo/)
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.
