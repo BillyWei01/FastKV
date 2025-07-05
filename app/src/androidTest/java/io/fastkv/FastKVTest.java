@@ -675,7 +675,7 @@ public class FastKVTest {
         kv1.putLong("time", newTime);
         kv1.force();
 
-        File aFile = new File(TestHelper.DIR, name + ".kva");
+        File aFile = new File(TestHelper.DIR, name + FileHelper.A_SUFFIX);
         RandomAccessFile accessFile = new RandomAccessFile(aFile, "r");
         ByteBuffer buffer = ByteBuffer.allocate(26);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -691,7 +691,7 @@ public class FastKVTest {
             FileChannel channel = accessFile.getChannel();
             MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, FastKV.PAGE_SIZE);
             int index = (int) (System.currentTimeMillis() % 30);
-            String name = fileName.endsWith(".kva") ? "A" : "B";
+            String name = fileName.endsWith(FileHelper.A_SUFFIX) ? "A" : "B";
             System.out.println("Damage " + name + " file's byte at index:" + index);
             buffer.put(index, (byte) (~buffer.get(index)));
         }
@@ -713,14 +713,14 @@ public class FastKVTest {
 
         int e1 = TestHelper.fileErrorCount.get();
 
-        damageFastKVFile(name + ".kva");
+        damageFastKVFile(name + FileHelper.A_SUFFIX);
 
         FastKV kv2 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
         Assert.assertEquals("hello", kv2.getString("flag"));
         int e2 = TestHelper.fileErrorCount.get();
         Assert.assertEquals(1, e2 - e1);
 
-        damageFastKVFile(name + ".kvb");
+        damageFastKVFile(name + FileHelper.B_SUFFIX);
 
         FastKV kv3 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
         Assert.assertEquals("hello", kv3.getString("flag"));
@@ -733,8 +733,8 @@ public class FastKVTest {
         int e4 = TestHelper.fileErrorCount.get();
         Assert.assertEquals(0, e4 - e3);
 
-        damageFastKVFile(name + ".kva");
-        damageFastKVFile(name + ".kvb");
+        damageFastKVFile(name + FileHelper.A_SUFFIX);
+        damageFastKVFile(name + FileHelper.B_SUFFIX);
 
         FastKV kv5 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
         Assert.assertEquals(0, kv5.getAll().size());
@@ -750,7 +750,7 @@ public class FastKVTest {
     @Test
     public void testSync() throws Exception {
         String name = "test_sync";
-        File cFile = new File(TestHelper.DIR, name + ".kvc");
+        File cFile = new File(TestHelper.DIR, name + FileHelper.C_SUFFIX);
         if (cFile.exists()) {
             cFile.delete();
         }
@@ -763,7 +763,7 @@ public class FastKVTest {
         long newTime = System.currentTimeMillis() ^ System.nanoTime();
         kv1.putLong("time", newTime);
 
-        File aFile = new File(TestHelper.DIR, name + ".kvc");
+        File aFile = new File(TestHelper.DIR, name + FileHelper.C_SUFFIX);
         RandomAccessFile accessFile = new RandomAccessFile(aFile, "r");
         ByteBuffer buffer = ByteBuffer.allocate(26);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -831,7 +831,7 @@ public class FastKVTest {
         kv1.putLong("time", newTime);
         Thread.sleep(50L);
 
-        File aFile = new File(TestHelper.DIR, name + ".kvc");
+        File aFile = new File(TestHelper.DIR, name + FileHelper.C_SUFFIX);
         RandomAccessFile accessFile = new RandomAccessFile(aFile, "r");
         ByteBuffer buffer = ByteBuffer.allocate(26);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -871,7 +871,7 @@ public class FastKVTest {
         FastKV kv3 = new FastKV(TestHelper.DIR, name, null, null, FastKV.SYNC_BLOCKING);
         Assert.assertEquals(100, kv3.getInt("int"));
 
-        File aFile = new File(TestHelper.DIR, name + ".kvc");
+        File aFile = new File(TestHelper.DIR, name + FileHelper.C_SUFFIX);
         RandomAccessFile accessFile = new RandomAccessFile(aFile, "r");
         ByteBuffer buffer = ByteBuffer.allocate(26);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -895,10 +895,10 @@ public class FastKVTest {
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
     private void clearFile(String name) {
-        new File(TestHelper.DIR, name + ".kva").delete();
-        new File(TestHelper.DIR, name + ".kvb").delete();
-        new File(TestHelper.DIR, name + ".kvc").delete();
-        new File(TestHelper.DIR, name + ".tmp").delete();
+        new File(TestHelper.DIR, name + FileHelper.A_SUFFIX).delete();
+        new File(TestHelper.DIR, name + FileHelper.B_SUFFIX).delete();
+        new File(TestHelper.DIR, name + FileHelper.C_SUFFIX).delete();
+        new File(TestHelper.DIR, name + FileHelper.TEMP_SUFFIX).delete();
         new File(TestHelper.DIR, name).delete();
     }
 

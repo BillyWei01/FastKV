@@ -16,13 +16,8 @@ import io.fastkv.Container.VarContainer;
  * <h3>触发条件（双重阈值机制）</h3>
  * FastKV使用双重阈值来决定何时触发垃圾回收：
  * <ul>
- * <li><b>字节阈值</b>：当无效数据达到16KB时触发（基础阈值8KB的2倍）</li>
- * <li><b>键数量阈值</b>：当无效键数量达到阈值时触发
- *     <ul>
- *     <li>小数据量（&lt;16KB）：80个无效键</li>
- *     <li>大数据量（≥16KB）：160个无效键</li>
- *     </ul>
- * </li>
+ * <li><b>字节阈值</b>：当无效数据达到8KB时触发</li>
+ * <li><b>键数量阈值</b>：当无效键数量达到100个时触发</li>
  * </ul>
  * 满足任一条件即触发GC，确保在数据碎片化严重时及时清理。
  * 
@@ -41,7 +36,7 @@ import io.fastkv.Container.VarContainer;
  * <li><b>预防式GC</b>：在空间不足时，优先尝试GC而非直接扩容</li>
  * <li><b>智能扩容</b>：只有在GC后仍空间不足时才扩容缓冲区</li>
  * <li><b>自适应截断</b>：GC后如果空闲空间超过32KB则截断缓冲区</li>
- * <li><b>分级阈值</b>：根据数据量大小动态调整键数量阈值</li>
+ * <li><b>统一阈值</b>：使用统一的100个键作为触发阈值</li>
  * </ul>
  * 
  * <h3>性能优化</h3>
@@ -53,14 +48,18 @@ import io.fastkv.Container.VarContainer;
  * </ul>
  */
 class GCHelper {
-    static final String TRUNCATE_FINISH = "truncate finish";
     static final String GC_FINISH = "gc finish";
 
+    static final String TRUNCATE_FINISH = "truncate finish";
+
+    // 当无效key数量超过此阈值时触发GC
     private static final int GC_KEYS_THRESHOLD = 100;
 
+    // 当无效字节数超过此阈值时触发GC
     private static final int GC_BYTES_THRESHOLD = 8192;
 
-    private static final int TRUNCATE_THRESHOLD = 32768; // 32KB
+    // 当缓冲区空闲空间超过此阈值时进行截断
+    private static final int TRUNCATE_THRESHOLD = 32 * 1024;
 
     /**
      * 合并无效段以加速GC。
@@ -203,10 +202,6 @@ class GCHelper {
         }
     }
 
-    static int getTruncateThreshold() {
-        return Math.max(FastKV.PAGE_SIZE, 1 << 15);
-    }
-
     /**
      * 截断缓冲区
      */
@@ -234,8 +229,8 @@ class GCHelper {
     }
 
     /**
-     * 确保缓冲区大小 
-     * 
+     * 确保缓冲区大小
+     *
      * @param kv FastKV实例
      * @param allocate 需要分配的空间大小
      */
@@ -269,8 +264,8 @@ class GCHelper {
     }
 
     /**
-     * 检查是否需要垃圾回收 
-     * 
+     * 检查是否需要垃圾回收
+     *
      * @param kv FastKV实例
      */
     static void checkGC(FastKV kv) {

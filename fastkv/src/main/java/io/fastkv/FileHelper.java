@@ -23,6 +23,13 @@ class FileHelper {
     private static final String OPEN_FILE_FAILED = "open file failed";
     static final String MAP_FAILED = "map failed";
 
+    static final String A_SUFFIX = ".kva";
+    static final String B_SUFFIX = ".kvb";
+    static final String C_SUFFIX = ".kvc";
+    static final String TEMP_SUFFIX = ".tmp";
+
+    private static final int DATA_SIZE_LIMIT = 1 << 28; // 256M
+
     /**
      * 加载A/B文件
      * 
@@ -30,8 +37,8 @@ class FileHelper {
      */
     @SuppressWarnings("resource")
     static void loadFromABFile(FastKV kv) {
-        File aFile = new File(kv.path, kv.name + ".kva");
-        File bFile = new File(kv.path, kv.name + ".kvb");
+        File aFile = new File(kv.path, kv.name + A_SUFFIX);
+        File bFile = new File(kv.path, kv.name + B_SUFFIX);
         try {
             if (!Utils.makeFileIfNotExist(aFile) || !Utils.makeFileIfNotExist(bFile)) {
                 LoggerHelper.error(kv, new Exception(OPEN_FILE_FAILED));
@@ -144,8 +151,8 @@ class FileHelper {
         RandomAccessFile bAccessFile = null;
         try {
             int fileLen = buffer.hb.length;
-            File aFile = new File(kv.path, kv.name + ".kva");
-            File bFile = new File(kv.path, kv.name + ".kvb");
+            File aFile = new File(kv.path, kv.name + A_SUFFIX);
+            File bFile = new File(kv.path, kv.name + B_SUFFIX);
             if (!Utils.makeFileIfNotExist(aFile) || !Utils.makeFileIfNotExist(bFile)) {
                 throw new Exception(OPEN_FILE_FAILED);
             }
@@ -244,14 +251,14 @@ class FileHelper {
      */
     static boolean writeToCFile(FastKV kv) {
         try {
-            File tmpFile = new File(kv.path, kv.name + ".tmp");
+            File tmpFile = new File(kv.path, kv.name + TEMP_SUFFIX);
             if (Utils.makeFileIfNotExist(tmpFile)) {
                 try (RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw")) {
                     accessFile.setLength(kv.dataEnd);
                     accessFile.write(kv.fastBuffer.hb, 0, kv.dataEnd);
                     accessFile.getFD().sync();
                 }
-                File cFile = new File(kv.path, kv.name + ".kvc");
+                File cFile = new File(kv.path, kv.name + C_SUFFIX);
                 if (Utils.renameFile(tmpFile, cFile)) {
                     clearDeletedFiles(kv);
                     return true;
@@ -390,7 +397,7 @@ class FileHelper {
      */
     static boolean loadWithBlockingIO(FastKV kv, File srcFile) throws IOException {
         long fileLen = srcFile.length();
-        if (fileLen == 0 || fileLen >= FastKV.DATA_SIZE_LIMIT) {
+        if (fileLen == 0 || fileLen >= DATA_SIZE_LIMIT) {
             return false;
         }
         int fileSize = (int) fileLen;
@@ -429,8 +436,8 @@ class FileHelper {
      */
     static boolean loadFromCFile(FastKV kv) {
         boolean hadWriteToABFile = false;
-        File cFile = new File(kv.path, kv.name + FastKV.C_SUFFIX);
-        File tmpFile = new File(kv.path, kv.name + FastKV.TEMP_SUFFIX);
+        File cFile = new File(kv.path, kv.name + C_SUFFIX);
+        File tmpFile = new File(kv.path, kv.name + TEMP_SUFFIX);
         try {
             File srcFile = null;
             if (cFile.exists()) {
@@ -457,8 +464,8 @@ class FileHelper {
                 // 处理以下情况：
                 // 用户首先以非阻塞模式打开，然后在后续更改为阻塞模式。
                 if (kv.writingMode != FastKV.NON_BLOCKING) {
-                    File aFile = new File(kv.path, kv.name + FastKV.A_SUFFIX);
-                    File bFile = new File(kv.path, kv.name + FastKV.B_SUFFIX);
+                    File aFile = new File(kv.path, kv.name + A_SUFFIX);
+                    File bFile = new File(kv.path, kv.name + B_SUFFIX);
                     if (aFile.exists() && bFile.exists()) {
                         tryBlockingIO(kv, aFile, bFile);
                     }
@@ -600,8 +607,8 @@ class FileHelper {
      */
     static void deleteCFiles(FastKV kv) {
         try {
-            Utils.deleteFile(new File(kv.path, kv.name + FastKV.C_SUFFIX));
-            Utils.deleteFile(new File(kv.path, kv.name + FastKV.TEMP_SUFFIX));
+            Utils.deleteFile(new File(kv.path, kv.name + C_SUFFIX));
+            Utils.deleteFile(new File(kv.path, kv.name + TEMP_SUFFIX));
         } catch (Exception e) {
             LoggerHelper.error(kv, e);
         }
@@ -688,7 +695,7 @@ class FileHelper {
     }
 
     static int getNewCapacity(int capacity, int expected) {
-        if (expected >= FastKV.DATA_SIZE_LIMIT) {
+        if (expected >= DATA_SIZE_LIMIT) {
             throw new IllegalStateException("data size out of limit");
         }
         if (expected <= FastKV.PAGE_SIZE) {

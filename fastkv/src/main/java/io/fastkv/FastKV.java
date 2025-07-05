@@ -21,7 +21,6 @@ import java.util.concurrent.Executor;
 
 import io.fastkv.interfaces.FastCipher;
 import io.fastkv.interfaces.FastEncoder;
-import io.fastkv.interfaces.FastLogger;
 
 import io.fastkv.Container.*;
 
@@ -99,18 +98,7 @@ import io.fastkv.Container.*;
  */
 @SuppressWarnings("rawtypes")
 public final class FastKV implements SharedPreferences, SharedPreferences.Editor {
-
-    // ==================== 常量定义 ====================
-    
     private static final String ENCRYPT_FAILED = "Encrypt failed";
-
-    static final String A_SUFFIX = ".kva";
-    static final String B_SUFFIX = ".kvb";
-    static final String C_SUFFIX = ".kvc";
-    static final String TEMP_SUFFIX = ".tmp";
-
-    static final int DATA_SIZE_LIMIT = 1 << 28; // 256M
-    static final int CIPHER_MASK = 1 << 30;
 
     private static final byte[] EMPTY_ARRAY = new byte[0];
     static final int[] TYPE_SIZE = {0, 1, 4, 4, 8, 8};
@@ -118,12 +106,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     static final int PAGE_SIZE = Utils.getPageSize();
 
-    // ==================== 实例字段 ====================
-    
     final String path;
     final String name;
     final Map<String, FastEncoder> encoderMap;
-    final FastLogger logger = FastKVConfig.sLogger;
     final FastCipher cipher;
 
     int dataEnd;
@@ -142,7 +127,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     boolean closed = false;
 
-    final Executor applyExecutor = new LimitExecutor();
+    private final Executor applyExecutor = new LimitExecutor();
 
     int invalidBytes;
     final ArrayList<Segment> invalids = new ArrayList<>();
@@ -169,7 +154,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     // 仅在模式不是 NON_BLOCKING 时生效
     boolean autoCommit = true;
 
-    // ==================== 构造函数和初始化 ====================
 
     FastKV(final String path,
            final String name,
@@ -214,7 +198,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             startLoading = true;
             data.notify();
         }
+
         long start = System.nanoTime();
+
         if (!FileHelper.loadFromCFile(this) && writingMode == NON_BLOCKING) {
             FileHelper.loadFromABFile(this);
         }
@@ -228,16 +214,14 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             FileHelper.rewrite(this);
             LoggerHelper.info(this, "rewrite data");
         }
-        if (logger != null) {
-            long t = (System.nanoTime() - start) / 1000000;
-            LoggerHelper.info(this, "loading finish, data len:" + dataEnd + ", get keys:" + data.size() + ", use time:" + t + " ms");
-        }
+
+        long t = (System.nanoTime() - start) / 1000000;
+        LoggerHelper.info(this, "loading finish, data len:" + dataEnd + ", get keys:" + data.size() + ", use time:" + t + " ms");
     }
 
     private int packSize(int size) {
         return BufferHelper.packSize(size, cipher != null);
     }
-
 
     // SharedPreferences 接口方法
     public synchronized boolean contains(String key) {
@@ -428,7 +412,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         return result;
     }
 
-    // ==================== 数据写入和删除方法 (Put/Remove Methods) ====================
 
     public synchronized Editor remove(String key) {
         if (closed) return this;
@@ -875,8 +858,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         return this;
     }
 
-    // ==================== Put操作辅助方法 ====================
-    
+
     private void preparePutBytes() {
         GCHelper.ensureSize(this, updateSize);
         updateStart = dataEnd;
@@ -1151,8 +1133,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             throw new IllegalArgumentException("key is empty");
         }
     }
-
-    // ==================== Builder模式和静态方法 ====================
 
     public static final class Builder {
         static final Map<String, FastKV> INSTANCE_MAP = new ConcurrentHashMap<>();

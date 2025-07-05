@@ -4,6 +4,8 @@ package io.fastkv;
  * 缓冲区辅助类，提供数据处理相关的工具方法。
  */
 class BufferHelper {
+    private static final int CIPHER_MASK = 1 << 30;
+
     /**
      * 计算校验和的位移
      * 
@@ -24,7 +26,7 @@ class BufferHelper {
      * @return 打包后的大小
      */
     static int packSize(int size, boolean hasCipher) {
-        return hasCipher ? size | FastKV.CIPHER_MASK : size;
+        return hasCipher ? size | CIPHER_MASK : size;
     }
     
     /**
@@ -34,7 +36,7 @@ class BufferHelper {
      * @return 原始大小
      */
     static int unpackSize(int size) {
-        return size & (~FastKV.CIPHER_MASK);
+        return size & (~CIPHER_MASK);
     }
     
     /**
@@ -44,6 +46,6 @@ class BufferHelper {
      * @return 是否加密
      */
     static boolean isCipher(int size) {
-        return (size & FastKV.CIPHER_MASK) != 0;
+        return (size & CIPHER_MASK) != 0;
     }
 } 
