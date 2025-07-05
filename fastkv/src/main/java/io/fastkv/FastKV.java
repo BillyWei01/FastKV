@@ -26,22 +26,76 @@ import io.fastkv.interfaces.FastLogger;
 import io.fastkv.Container.*;
 
 /**
- * FastKV 有三种写入模式: <br>
- * non-blocking: 通过 mmap 写入部分数据。<br>
- * async-block: 异步使用阻塞 I/O 将所有数据写入磁盘，类似 SharePreferences 的 'apply'。<br>
- * sync-block: 同样写入所有数据，但类似 SharePreferences 的 'commit'。<br>
- * <br>
- * 注意: <br>
- * 1. 一旦创建后不要更改文件名。<br>
- * 2. 一旦创建后不要更改加密器。
- *    但从无加密状态应用加密器是可以的。<br>
- * 3. 不要为同一个 key 更改值类型。<br>
- * <br>
- * 关于外部文件支持的说明: <br>
- * 当前版本已移除大值外部文件的写入功能，所有数据都写入主文件中。<br>
- * 但为了向前兼容，仍保留读取已存在外部文件的逻辑。<br>
- * 读取外部文件后会自动将数据迁移到内存中，并更新容器状态。<br>
- * 因此代码中保留的 external 相关逻辑主要用于兼容性处理。<br>
+ * FastKV - 高性能键值存储库
+ * 
+ * <h2>架构组成（静态结构）</h2>
+ * FastKV采用模块化设计，主要由以下组件构成：
+ * <ul>
+ * <li><b>FastKV核心类</b>：主要负责API接口、数据管理和业务逻辑协调</li>
+ * <li><b>FileHelper</b>：文件I/O操作模块，处理A/B/C文件的读写、重写、备份恢复等</li>
+ * <li><b>DataParser</b>：数据解析模块，负责二进制数据的编码解码和容器创建</li>
+ * <li><b>GCHelper</b>：垃圾回收模块，处理内存整理、缓冲区扩容和无效数据清理</li>
+ * <li><b>BufferHelper</b>：缓冲区工具模块，提供数据打包、校验和计算等底层操作</li>
+ * <li><b>LoggerHelper</b>：日志管理模块，统一处理各模块的日志输出</li>
+ * <li><b>Container系列</b>：数据容器，包装不同类型的值并记录元数据</li>
+ * </ul>
+ * 
+ * <h2>文件存储结构</h2>
+ * <ul>
+ * <li><b>.kva/.kvb文件</b>：双备份主数据文件，使用mmap内存映射技术</li>
+ * <li><b>.kvc文件</b>：阻塞模式下的完整数据文件</li>
+ * <li><b>.tmp文件</b>：临时文件，用于原子性写入操作</li>
+ * </ul>
+ * 
+ * <h2>运作模式（动态行为）</h2>
+ * 
+ * <h3>三种写入模式</h3>
+ * <ul>
+ * <li><b>NON_BLOCKING</b>：通过mmap写入部分数据，高性能但可能在系统崩溃时丢失最新更新</li>
+ * <li><b>ASYNC_BLOCKING</b>：异步使用阻塞I/O将所有数据写入磁盘，类似SharedPreferences的apply()</li>
+ * <li><b>SYNC_BLOCKING</b>：同步写入所有数据，类似SharedPreferences的commit()，最安全但性能较低</li>
+ * </ul>
+ * 
+ * <h3>数据加载流程</h3>
+ * <ol>
+ * <li>优先尝试从C文件加载（阻塞模式数据）</li>
+ * <li>如果C文件不存在且为非阻塞模式，则从A/B文件加载</li>
+ * <li>验证数据完整性（校验和验证）</li>
+ * <li>解析二进制数据并创建对应的Container对象</li>
+ * <li>如需要加密重写，则执行数据迁移</li>
+ * </ol>
+ * 
+ * <h3>数据写入流程</h3>
+ * <ol>
+ * <li>数据编码：将值序列化为二进制格式</li>
+ * <li>缓冲区管理：检查空间，必要时进行GC或扩容</li>
+ * <li>内存更新：更新FastBuffer和Container对象</li>
+ * <li>持久化：根据写入模式同步到文件</li>
+ * <li>校验和更新：维护数据完整性</li>
+ * </ol>
+ * 
+ * <h3>垃圾回收机制</h3>
+ * <ul>
+ * <li>跟踪无效数据段，当无效数据超过阈值时触发GC</li>
+ * <li>整理内存布局，移除无效数据，压缩存储空间</li>
+ * <li>支持缓冲区扩容和收缩以适应数据量变化</li>
+ * </ul>
+ * 
+ * <h3>容错和恢复</h3>
+ * <ul>
+ * <li>双文件备份机制（A/B文件）确保数据安全</li>
+ * <li>校验和验证检测数据损坏</li>
+ * <li>自动降级：mmap失败时转为阻塞模式</li>
+ * <li>向前兼容：支持读取旧版本外部文件并自动迁移</li>
+ * </ul>
+ * 
+ * <h2>使用注意事项</h2>
+ * <ul>
+ * <li>一旦创建后不要更改文件名</li>
+ * <li>一旦创建后不要更改加密器（但从无加密状态应用加密器是可以的）</li>
+ * <li>不要为同一个key更改值类型</li>
+ * <li>当前版本已移除大值外部文件的写入功能，但保留读取逻辑以确保向前兼容</li>
+ * </ul>
  */
 @SuppressWarnings("rawtypes")
 public final class FastKV implements SharedPreferences, SharedPreferences.Editor {

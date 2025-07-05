@@ -1,5 +1,5 @@
 # FastKV
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.billywei01/fastkv)](https://search.maven.org/artifact/io.github.billywei01/fastkv) | [English](README_EN.md)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.billywei01/fastkv)](https://search.maven.org/artifact/io.github.billywei01/fastkv) | [English](README_EN.md) | [架构设计](ARCHITECTURE.md)
 
 ## 1. 概述
 FastKV是用Java编写的高效可靠的key-value存储库。<br>
