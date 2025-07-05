@@ -36,7 +36,7 @@ class DataParser {
                 int start = buffer.position;
                 byte info = buffer.get();
                 byte type = (byte) (info & DataType.TYPE_MASK);
-                if (type < DataType.BOOLEAN || type > DataType.OBJECT) {
+                if (type < DataType.BOOLEAN || type > DataType.OBJECT_LARGE) {
                     throw new Exception(PARSE_DATA_FAILED);
                 }
                 int keySize = buffer.get() & 0xFF;
@@ -45,7 +45,14 @@ class DataParser {
                 }
                 if (info < 0) {
                     buffer.position += keySize;
-                    int valueSize = (type <= DataType.DOUBLE) ? FastKV.TYPE_SIZE[type] : buffer.getShort() & 0xFFFF;
+                    int valueSize;
+                    if (type <= DataType.DOUBLE) {
+                        valueSize = FastKV.TYPE_SIZE[type];
+                    } else if (isLargeType(type)) {
+                        valueSize = buffer.getInt();
+                    } else {
+                        valueSize = buffer.getShort() & 0xFFFF;
+                    }
                     buffer.position += valueSize;
                     GCHelper.countInvalid(kv, start, buffer.position);
                     continue;
@@ -99,22 +106,31 @@ class DataParser {
      */
     private static void parseComplexType(FastKV kv, FastBuffer buffer, FastCipher dataCipher, 
                                         byte type, String key, int pos, int start, byte info) throws Exception {
-        int size = buffer.getShort() & 0xFFFF;
+        // 根据类型选择长度读取方式
+        boolean isLarge = isLargeType(type);
+        int size = isLarge ? buffer.getInt() : (buffer.getShort() & 0xFFFF);
+        int lengthSize = isLarge ? 4 : 2;
+
+        // 目前不再往写大value到external文件了，但是为了兼容之前的版本，读取时还是判断一下。
         boolean external = (info & DataType.EXTERNAL_MASK) != 0;
         if (external && size != Utils.NAME_SIZE) {
             throw new IllegalStateException("name size not match");
         }
-        switch (type) {
+        
+        // 将大长度类型映射回普通类型进行处理
+        byte normalType = getNormalType(type);
+        
+        switch (normalType) {
             case DataType.STRING:
                 String str = external ? buffer.getString(size) : buffer.getString(dataCipher, size);
-                kv.data.put(key, new StringContainer(start, pos + 2, str, size, external));
+                kv.data.put(key, new StringContainer(start, pos + lengthSize, str, size, external));
                 break;
             case DataType.ARRAY:
                 Object value = external ? buffer.getString(size) : buffer.getBytes(dataCipher, size);
-                kv.data.put(key, new ArrayContainer(start, pos + 2, value, size, external));
+                kv.data.put(key, new ArrayContainer(start, pos + lengthSize, value, size, external));
                 break;
             default:
-                parseObjectType(kv, buffer, dataCipher, key, pos, start, size, external);
+                parseObjectType(kv, buffer, dataCipher, key, pos, start, size, external, lengthSize);
                 break;
         }
     }
@@ -123,13 +139,13 @@ class DataParser {
      * 解析对象类型数据
      */
     private static void parseObjectType(FastKV kv, FastBuffer buffer, FastCipher dataCipher, 
-                                       String key, int pos, int start, int size, boolean external) throws Exception {
+                                       String key, int pos, int start, int size, boolean external, int lengthSize) throws Exception {
         if (external) {
             String fileName = buffer.getString(size);
-            kv.data.put(key, new ObjectContainer(start, pos + 2, fileName, size, true));
+            kv.data.put(key, new ObjectContainer(start, pos + lengthSize, fileName, size, true));
         } else {
             parseInternalObject(kv, buffer, dataCipher, key, pos, start, size);
-            buffer.position = pos + 2 + size;
+            buffer.position = pos + lengthSize + size;
         }
     }
     
@@ -171,6 +187,25 @@ class DataParser {
             }
         } else {
             LoggerHelper.error(kv, "object with tag: " + tag + " without encoder");
+        }
+    }
+    
+    /**
+     * 判断是否为大长度类型
+     */
+    private static boolean isLargeType(byte type) {
+        return type == DataType.STRING_LARGE || type == DataType.ARRAY_LARGE || type == DataType.OBJECT_LARGE;
+    }
+    
+    /**
+     * 将大长度类型映射回普通类型
+     */
+    private static byte getNormalType(byte type) {
+        switch (type) {
+            case DataType.STRING_LARGE: return DataType.STRING;
+            case DataType.ARRAY_LARGE: return DataType.ARRAY;
+            case DataType.OBJECT_LARGE: return DataType.OBJECT;
+            default: return type;
         }
     }
 } 

@@ -1034,4 +1034,71 @@ public class FastKVTest {
         FastKV kv1 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
         Assert.assertEquals(testSet, kv1.getStringSet(key));
     }
+
+    @Test
+    public void testLargeTypes() {
+        String name = "test_large_types";
+        clearFile(name);
+
+        FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name).build();
+        
+        // 测试大字符串（超过64KB）
+        StringBuilder largeStringBuilder = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            largeStringBuilder.append("a");
+        }
+        String largeString = largeStringBuilder.toString();
+        kv1.putString("large_string", largeString);
+        
+        // 测试大数组（超过64KB）
+        byte[] largeArray = new byte[70000];
+        for (int i = 0; i < largeArray.length; i++) {
+            largeArray[i] = (byte) (i % 256);
+        }
+        kv1.putArray("large_array", largeArray);
+        
+        // 测试小字符串和小数组（确保向后兼容）
+        String smallString = "small";
+        byte[] smallArray = new byte[100];
+        for (int i = 0; i < smallArray.length; i++) {
+            smallArray[i] = (byte) i;
+        }
+        kv1.putString("small_string", smallString);
+        kv1.putArray("small_array", smallArray);
+        
+        // 重新打开文件进行验证
+        FastKV kv2 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
+        
+        // 验证大字符串
+        String retrievedLargeString = kv2.getString("large_string");
+        Assert.assertEquals(largeString.length(), retrievedLargeString.length());
+        Assert.assertEquals(largeString, retrievedLargeString);
+        
+        // 验证大数组
+        byte[] retrievedLargeArray = kv2.getArray("large_array");
+        Assert.assertArrayEquals(largeArray, retrievedLargeArray);
+        
+        // 验证小字符串和小数组（确保向后兼容性）
+        Assert.assertEquals(smallString, kv2.getString("small_string"));
+        Assert.assertArrayEquals(smallArray, kv2.getArray("small_array"));
+        
+        // 测试边界情况：恰好64KB-1
+        byte[] boundaryArray = new byte[65534]; // 64KB - 1
+        for (int i = 0; i < boundaryArray.length; i++) {
+            boundaryArray[i] = (byte) (i % 256);
+        }
+        kv1.putArray("boundary_array", boundaryArray);
+        
+        // 测试边界情况：恰好64KB
+        byte[] largeBoundaryArray = new byte[65535]; // 64KB
+        for (int i = 0; i < largeBoundaryArray.length; i++) {
+            largeBoundaryArray[i] = (byte) (i % 256);
+        }
+        kv1.putArray("large_boundary_array", largeBoundaryArray);
+        
+        // 重新打开验证边界情况
+        FastKV kv3 = new FastKV(TestHelper.DIR, name, null, null, FastKV.NON_BLOCKING);
+        Assert.assertArrayEquals(boundaryArray, kv3.getArray("boundary_array"));
+        Assert.assertArrayEquals(largeBoundaryArray, kv3.getArray("large_boundary_array"));
+    }
 }

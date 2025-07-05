@@ -946,7 +946,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void addObject(String key, Object value, byte[] bytes, byte type) {
-        int offset = saveArray(key, bytes, type);
+        int offset = wrapArray(key, bytes, type);
         if (offset > 0) {
             int size = bytes.length;
             BaseContainer c;
@@ -963,7 +963,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void updateObject(String key, Object value, byte[] bytes, VarContainer c) {
-        int offset = saveArray(key, bytes, c.getType());
+        int offset = wrapArray(key, bytes, c.getType());
         if (offset > 0) {
             String oldFileName = c.external ? (String) c.value : null;
             remove(c.getType(), c.start, c.offset + c.valueSize);
@@ -980,22 +980,39 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
+
     /**
      * 保存成功时返回偏移量；
-     * 保存失败时返回 0。
+     * 保存失败时返回 0 (仅加密失败时会返回0）
      */
-    private int saveArray(String key, byte[] value, byte type) {
-        return wrapArray(key, value, type);
-    }
-
     private int wrapArray(String key, byte[] value, byte type) {
-        if (!wrapHeader(key, type, 2 + value.length)) {
+        // 根据数据大小选择合适的类型和长度编码方式
+        boolean isLarge = value.length >= 0xFFFF;
+        byte actualType = isLarge ? getLargeType(type) : type;
+        int lengthSize = isLarge ? 4 : 2;
+        
+        if (!wrapHeader(key, actualType, lengthSize + value.length)) {
             return 0;
         }
-        fastBuffer.putShort((short) value.length);
+        
+        if (isLarge) {
+            fastBuffer.putInt(value.length);
+        } else {
+            fastBuffer.putShort((short) value.length);
+        }
+        
         int offset = fastBuffer.position;
         fastBuffer.putBytes(value);
         return offset;
+    }
+    
+    private byte getLargeType(byte type) {
+        switch (type) {
+            case DataType.STRING: return DataType.STRING_LARGE;
+            case DataType.ARRAY: return DataType.ARRAY_LARGE;
+            case DataType.OBJECT: return DataType.OBJECT_LARGE;
+            default: return type;
+        }
     }
 
     private int getNewFloatValue(float value) {
@@ -1025,7 +1042,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         int packedSize = packSize(dataEnd - DATA_START);
         if (writingMode == NON_BLOCKING) {
         // 当更改数据的大小超过 8 字节时，
-        // 校验和可能在小概率下无法检查完整性。
+        // checksum 可能在小概率下无法检查完整性。
         // 所以我们将 dataLen 设置为负数，
         // 如果在向 mmap 内存写入数据时发生崩溃，
         // 我们可以知道写入没有完成。
