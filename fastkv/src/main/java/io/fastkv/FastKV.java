@@ -240,7 +240,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private int packSize(int size) {
-        return BufferHelper.packSize(size, cipher != null, CIPHER_MASK);
+        return BufferHelper.packSize(size, cipher != null);
     }
 
 
@@ -255,7 +255,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     public synchronized boolean getBoolean(String key, boolean defValue) {
         BaseContainer c = data.get(key);
-        return c == null || c.getType() != DataType.BOOLEAN ? defValue : ((BooleanContainer) c).value;
+        return c == null ? defValue : c.toBoolean();
     }
 
     public int getInt(String key) {
@@ -264,7 +264,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     public synchronized int getInt(String key, int defValue) {
         BaseContainer c = data.get(key);
-        return c == null || c.getType() != DataType.INT ? defValue : ((IntContainer) c).value;
+        return c == null ? defValue : c.toInt();
     }
 
     public float getFloat(String key) {
@@ -273,7 +273,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     public synchronized float getFloat(String key, float defValue) {
         BaseContainer c = data.get(key);
-        return c == null || c.getType() != DataType.FLOAT ? defValue : ((FloatContainer) c).value;
+        return c == null ? defValue : c.toFloat();
     }
 
     public long getLong(String key) {
@@ -282,7 +282,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     public synchronized long getLong(String key, long defValue) {
         BaseContainer c = data.get(key);
-        return c == null || c.getType() != DataType.LONG ? defValue : ((LongContainer) c).value;
+        return c == null ? defValue : c.toLong();
     }
 
     public double getDouble(String key) {
@@ -291,7 +291,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     public synchronized double getDouble(String key, double defValue) {
         BaseContainer c = data.get(key);
-        return c == null || c.getType() != DataType.DOUBLE ? defValue : ((DoubleContainer) c).value;
+        return c == null ? defValue : c.toDouble();
     }
 
     public String getString(String key) {
@@ -300,26 +300,28 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     public synchronized String getString(String key, String defValue) {
         BaseContainer container = data.get(key);
-        if (container == null || container.getType() != DataType.STRING) {
+        if (container == null) {
             return defValue;
         }
-        StringContainer c = (StringContainer) container;
-        if (c.external) {
-            String str = FileHelper.getStringFromFile(this, c, cipher);
-            if (str == null || str.isEmpty()) {
-                remove(key);
-                return defValue;
-            } else {
-                c.value = str;
-                c.external = false;
-                return str;
+        
+        // 对于STRING类型且为外部文件，需要特殊处理
+        if (container.getType() == DataType.STRING) {
+            StringContainer c = (StringContainer) container;
+            if (c.external) {
+                String str = FileHelper.getStringFromFile(this, c, cipher);
+                if (str == null || str.isEmpty()) {
+                    remove(key);
+                    return defValue;
+                } else {
+                    c.value = str;
+                    c.external = false;
+                    return str;
+                }
             }
-        } else {
-            return (String) c.value;
         }
+        
+        return container.toStringValue();
     }
-
-
 
     public byte[] getArray(String key) {
         return getArray(key, EMPTY_ARRAY);
@@ -484,7 +486,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * 批量放置对象。
+     * 批量保存。
      * 仅支持 [boolean, int, long, float, double, String, byte[], Set of String] 类型和带编码器的对象。
      *
      * @param values   键值映射
@@ -559,9 +561,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * 当您使用 SYNC_BLOCKING 或 ASYNC_BLOCKING 模式打开文件时，
-     * 默认情况下会在每次放置或移除后自动提交。
-     * 如果您需要批量更新多个键值，可以先调用此方法，
+     * 当使用 SYNC_BLOCKING 或 ASYNC_BLOCKING 模式打开文件时，
+     * 默认情况下会在每次 put 或 remove 后自动提交。
+     * 如果需要批量更新多个键值，可以先调用此方法，
      * 然后在更新后调用 {@link #commit()}，该方法将再次将 {@link #autoCommit} 恢复为 'true'。
      */
     public synchronized void disableAutoCommit() {
@@ -812,10 +814,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * @param key     要修改的数据名称
+     * @param key     key
      * @param value   新值
-     * @param encoder 将值编码为 byte[] 的编码器，编码器必须在 Builder.encoder() 中注册，
-     *                用于在下次加载时将 byte[] 解码为对象。
+     * @param encoder 将 value encode 为 byte[] 的编码器。
+     *                编码器必须在 Builder.encoder() 中注册，以便在下次加载时将 byte[] decode 为对象。
      * @param <T>     值的类型
      */
     public synchronized <T> void putObject(String key, T value, FastEncoder<T> encoder) {
@@ -980,7 +982,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
-
     /**
      * 保存成功时返回偏移量；
      * 保存失败时返回 0 (仅加密失败时会返回0）
@@ -1028,7 +1029,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     /**
      * 关闭 kv 实例。<br>
      * 如果 kv 已关闭，它将不接受任何更新。<br>
-     * 如果 kv 被缓存，调用此方法后不要忘记将其从缓存中移除。
+     * 如果 kv 被缓存，调用此方法后, 请记得将其从缓存中移除。
      */
     public synchronized void close() {
         FileHelper.close(this);
@@ -1041,18 +1042,16 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         checksum ^= fastBuffer.getChecksum(updateStart, updateSize);
         int packedSize = packSize(dataEnd - DATA_START);
         if (writingMode == NON_BLOCKING) {
-        // 当更改数据的大小超过 8 字节时，
-        // checksum 可能在小概率下无法检查完整性。
-        // 所以我们将 dataLen 设置为负数，
-        // 如果在向 mmap 内存写入数据时发生崩溃，
-        // 我们可以知道写入没有完成。
+            // 当更改数据的大小超过 8 字节时,checksum 可能在小概率下无法检查完整性。
+            // 因此，我们在写入数据之前，将 dataLen 设置为负数；
+            // 如果在向 mmap 内存写入数据时发生崩溃，我们可以根据dataLen为负数知道写入没有完成。
             aBuffer.putInt(0, -1);
             syncToABBuffer(aBuffer);
             aBuffer.putInt(0, packedSize);
 
             // bBuffer 不需要在写入字节之前标记 dataLen 部分，
-            // 因为 aBuffer 已经完全写入了。
-            // 我们只需要在任何时候至少有一个文件是完整的。
+            // 因为此时 aBuffer 已经完全写入了。
+            // 我们只需在任何时候至少有一个文件是完整的即可。
             bBuffer.putInt(0, packedSize);
             syncToABBuffer(bBuffer);
         } else {
@@ -1214,7 +1213,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
          * <p>
          * 在非阻塞模式下（使用 mmap 写入数据），
          * 如果系统在将数据刷新到磁盘之前崩溃或断电，可能会丢失更新。
-         * 您可以使用 {@link #force()} 避免丢失更新，或使用 SYNC_BLOCKING 模式。
+         * 可使用 {@link #force()} 避免丢失更新，或使用 SYNC_BLOCKING 模式。
          * <p>
          * 在阻塞模式下，每次更新都会将所有数据写入文件，这是昂贵的成本。
          * <p>

@@ -77,12 +77,12 @@ class FileHelper {
      */
     private static void processExistingFiles(FastKV kv, long aFileLen, long bFileLen) {
         int aSize = kv.aBuffer.getInt();
-        int aDataSize = BufferHelper.unpackSize(aSize, FastKV.CIPHER_MASK);
+        int aDataSize = BufferHelper.unpackSize(aSize);
         boolean aHadEncrypted = BufferHelper.isCipher(aSize, FastKV.CIPHER_MASK);
         long aCheckSum = kv.aBuffer.getLong();
 
         int bSize = kv.bBuffer.getInt();
-        int bDataSize = BufferHelper.unpackSize(bSize, FastKV.CIPHER_MASK);
+        int bDataSize = BufferHelper.unpackSize(bSize);
         boolean bHadEncrypted = BufferHelper.isCipher(bSize, FastKV.CIPHER_MASK);
         long bCheckSum = kv.bBuffer.getLong();
 
@@ -409,7 +409,7 @@ class FileHelper {
         if (size < 0) {
             return false;
         }
-        int dataSize = BufferHelper.unpackSize(size, FastKV.CIPHER_MASK);
+        int dataSize = BufferHelper.unpackSize(size);
         boolean hadEncrypted = BufferHelper.isCipher(size, FastKV.CIPHER_MASK);
         long sum = buffer.getLong();
         kv.dataEnd = FastKV.DATA_START + dataSize;
@@ -729,7 +729,7 @@ class FileHelper {
             }
             buffer = newBuffer;
         }
-        buffer.putInt(0, BufferHelper.packSize(0, kv.cipher != null, FastKV.CIPHER_MASK));
+        buffer.putInt(0, BufferHelper.packSize(0, kv.cipher != null));
         buffer.putLong(4, 0L);
     }
 
@@ -756,6 +756,6 @@ class FileHelper {
         } else {
             kv.fastBuffer.putLong(4, 0L);
         }
-        kv.fastBuffer.putInt(0, BufferHelper.packSize(0, kv.cipher != null, FastKV.CIPHER_MASK));
+        kv.fastBuffer.putInt(0, BufferHelper.packSize(0, kv.cipher != null));
     }
 }

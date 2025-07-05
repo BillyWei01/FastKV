@@ -133,7 +133,7 @@ class GCHelper {
      */
     private static void updateBuffer(FastKV kv, int gcStart, int allocate, int gcUpdateSize) {
         int newDataSize = kv.dataEnd - FastKV.DATA_START;
-        int packedSize = BufferHelper.packSize(newDataSize, kv.cipher != null, FastKV.CIPHER_MASK);
+        int packedSize = BufferHelper.packSize(newDataSize, kv.cipher != null);
         if (kv.writingMode == FastKV.NON_BLOCKING) {
             kv.aBuffer.putInt(0, -1);
             kv.aBuffer.putLong(4, kv.checksum);
@@ -203,7 +203,7 @@ class GCHelper {
                     MappedByteBuffer newBBuffer = FileHelper.remapBuffer(kv.bChannel, newCapacity);
                     if (newABuffer == null || newBBuffer == null) {
                         LoggerHelper.error(kv, new Exception(FileHelper.MAP_FAILED));
-                        int packedSize = BufferHelper.packSize(kv.dataEnd - FastKV.DATA_START, kv.cipher != null, FastKV.CIPHER_MASK);
+                        int packedSize = BufferHelper.packSize(kv.dataEnd - FastKV.DATA_START, kv.cipher != null);
                         kv.fastBuffer.putInt(0, packedSize);
                         kv.fastBuffer.putLong(4, kv.checksum);
                         FileHelper.toBlockingMode(kv);

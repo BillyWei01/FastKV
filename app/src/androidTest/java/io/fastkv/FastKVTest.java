@@ -973,7 +973,7 @@ public class FastKVTest {
 
     /**
      * 保存一个key-value, 调用其他类型的get方法：
-     * 验证不会崩溃， 并且返回默认值。
+     * 验证不会崩溃，并且支持类型转换。
      */
     @Test
     public void testGetDifferentType() {
@@ -983,14 +983,15 @@ public class FastKVTest {
         String key = "test";
         kv.putBoolean(key, true);
 
+        // 现在支持类型转换
         Assert.assertEquals(true, kv.getBoolean(key));
-        Assert.assertEquals(0, kv.getInt(key));
-        Assert.assertTrue(0f == kv.getFloat(key));
-        Assert.assertEquals(0L, kv.getLong(key));
-        Assert.assertTrue(0D == kv.getDouble(key));
-        Assert.assertEquals("", kv.getString(key));
-        Assert.assertArrayEquals(new byte[0], kv.getArray(key));
-        Assert.assertTrue(null == kv.getObject(key));
+        Assert.assertEquals(1, kv.getInt(key));        // boolean true -> int 1
+        Assert.assertTrue(1f == kv.getFloat(key));     // boolean true -> float 1.0f
+        Assert.assertEquals(1L, kv.getLong(key));      // boolean true -> long 1L
+        Assert.assertTrue(1D == kv.getDouble(key));    // boolean true -> double 1.0
+        Assert.assertEquals("true", kv.getString(key)); // boolean true -> string "true"
+        Assert.assertArrayEquals(new byte[0], kv.getArray(key)); // Array类型使用默认实现
+        Assert.assertTrue(null == kv.getObject(key));   // Object类型使用默认实现
     }
 
     /**

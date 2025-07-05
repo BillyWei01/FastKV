@@ -34,25 +34,23 @@ class BufferHelper {
     
     /**
      * 打包数据大小（添加加密标记）
-     * 
-     * @param size 原始大小
+     *
+     * @param size      原始大小
      * @param hasCipher 是否加密
-     * @param cipherMask 加密掩码
      * @return 打包后的大小
      */
-    static int packSize(int size, boolean hasCipher, int cipherMask) {
-        return hasCipher ? size | cipherMask : size;
+    static int packSize(int size, boolean hasCipher) {
+        return hasCipher ? size | FastKV.CIPHER_MASK : size;
     }
     
     /**
      * 解包数据大小（移除加密标记）
-     * 
+     *
      * @param size 打包的大小
-     * @param cipherMask 加密掩码
      * @return 原始大小
      */
-    static int unpackSize(int size, int cipherMask) {
-        return size & (~cipherMask);
+    static int unpackSize(int size) {
+        return size & (~FastKV.CIPHER_MASK);
     }
     
     /**
