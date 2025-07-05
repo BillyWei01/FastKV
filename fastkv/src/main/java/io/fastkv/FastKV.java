@@ -39,6 +39,12 @@ import io.fastkv.interfaces.*;
  * 2. 一旦创建后不要更改加密器。
  *    但从无加密状态应用加密器是可以的。<br>
  * 3. 不要为同一个 key 更改值类型。<br>
+ * <br>
+ * 关于外部文件支持的说明: <br>
+ * 当前版本已移除大值外部文件的写入功能，所有数据都写入主文件中。<br>
+ * 但为了向前兼容，仍保留读取已存在外部文件的逻辑。<br>
+ * 读取外部文件后会自动将数据迁移到内存中，并更新容器状态。<br>
+ * 因此代码中保留的 external 相关逻辑主要用于兼容性处理。<br>
  */
 @SuppressWarnings("rawtypes")
 public final class FastKV implements SharedPreferences, SharedPreferences.Editor {
