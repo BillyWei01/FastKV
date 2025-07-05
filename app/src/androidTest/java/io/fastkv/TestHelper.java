@@ -52,7 +52,7 @@ public class TestHelper {
         @Override
         public void e(@NonNull String name, @NonNull Exception e) {
             Log.e(TAG, "error: " + e.getMessage() + ", name: " + name);
-            if (!"both files error".equals(e.getMessage())) {
+            if (!FileHelper.BOTH_FILES_ERROR.equals(e.getMessage())) {
                 Log.e(TAG, e.getMessage(), e);
             }
         }
