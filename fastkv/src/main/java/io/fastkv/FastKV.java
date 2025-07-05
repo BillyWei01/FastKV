@@ -93,7 +93,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     private boolean closed = false;
 
-    private final WeakCache bigValueCache = new WeakCache();
+
 
     private final Executor applyExecutor = new LimitExecutor();
 
@@ -538,7 +538,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         if (container != null) {
             final String oldFileName;
             data.remove(key);
-            bigValueCache.remove(key);
             byte type = container.getType();
             if (type <= DataType.DOUBLE) {
                 int keySize = FastBuffer.getStringSize(key);
@@ -1284,7 +1283,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         dataEnd = DATA_START;
         checksum = 0L;
         data.clear();
-        bigValueCache.clear();
         clearInvalid();
         resetBuffer();
     }
@@ -1406,16 +1404,13 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
         StringContainer c = (StringContainer) container;
         if (c.external) {
-            Object value = bigValueCache.get(key);
-            if (value instanceof String) {
-                return (String) value;
-            }
             String str = getStringFromFile(c, cipher);
             if (str == null || str.isEmpty()) {
                 remove(key);
                 return defValue;
             } else {
-                bigValueCache.put(key, str);
+                c.value = str;
+                c.external = false;
                 return str;
             }
         } else {
@@ -1449,16 +1444,13 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
         ArrayContainer c = (ArrayContainer) container;
         if (c.external) {
-            Object value = bigValueCache.get(key);
-            if (value instanceof byte[]) {
-                return (byte[]) value;
-            }
             byte[] bytes = getArrayFromFile(c, cipher);
             if (bytes == null || bytes.length == 0) {
                 remove(key);
                 return defValue;
             } else {
-                bigValueCache.put(key, bytes);
+                c.value = bytes;
+                c.external = false;
                 return bytes;
             }
         } else {
@@ -1488,16 +1480,13 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
         ObjectContainer c = (ObjectContainer) container;
         if (c.external) {
-            Object value = bigValueCache.get(key);
-            if (value != null) {
-                return (T) value;
-            }
             Object obj = getObjectFromFile(c, cipher);
             if (obj == null) {
                 remove(key);
                 return null;
             } else {
-                bigValueCache.put(key, obj);
+                c.value = obj;
+                c.external = false;
                 return (T) obj;
             }
         } else {
