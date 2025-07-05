@@ -6,21 +6,21 @@ import java.util.Objects;
 import io.fastkv.interfaces.FastEncoder;
 
 /**
- * struct of primary type (boolean/int/float/long/double):
+ * 基本类型的结构 (boolean/int/float/long/double):
  * [type|keyLen|keyData|value]
  *
  * <p>
- * struct of variable type (string/array/object):
+ * 变长类型的结构 (string/array/object):
  * [type|keyLen|keyData|valueLen|value]
  *
  * <p>
- * type: 1 byte,
- * keyLen: 1 byte,
- * valueLen: 2 bytes.
+ * type: 1 字节,
+ * keyLen: 1 字节,
+ * valueLen: 2 字节。
  */
 class Container {
     static abstract class BaseContainer {
-        // Note: This is the offset of value, not offset of key-value.
+        // 注意：这是值的偏移量，不是键值对的偏移量。
         int offset;
 
         abstract byte getType();

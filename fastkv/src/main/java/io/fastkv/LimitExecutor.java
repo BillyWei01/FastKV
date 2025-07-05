@@ -6,8 +6,8 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.Executor;
 
 /**
- * Use for duplicate tasks.
- * Only one task at most can wait to be executed.
+ * 用于重复任务。
+ * 最多只能有一个任务等待执行。
  */
 class LimitExecutor implements Executor {
     private Runnable mActive;

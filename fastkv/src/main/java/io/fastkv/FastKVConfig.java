@@ -23,9 +23,9 @@ public final class FastKVConfig {
     }
 
     /**
-     * It's highly recommended to set your own Executor for reusing threads in common thread pool.
+     * 强烈建议设置您自己的 Executor 以在公共线程池中重用线程。
      *
-     * @param executor The executor for loading or writing.
+     * @param executor 用于加载或写入的执行器。
      */
     public static void setExecutor(Executor executor) {
         if (executor != null) {

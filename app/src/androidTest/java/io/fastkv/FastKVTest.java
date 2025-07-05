@@ -26,11 +26,11 @@ import io.fastkv.fastkvdemo.base.AppContext;
 import io.fastkv.interfaces.FastEncoder;
 
 /*
- * Normally we have to create FastKV instance by FastKV.Builder,
- * But for reproducing the situation of "reopen and loading", we make the test in the same package path to FastKV,
- * so we can create FastKV instance by constructor, to test loading in one execution process.
- * And the later opening file just do the reading (writing in two instance may damage the data).
- * Note: Use FastKV.Builder to create instance in normally.
+ * 通常我们必须通过 FastKV.Builder 创建 FastKV 实例，
+ * 但为了重现"重新打开和加载"的情况，我们将测试放在与 FastKV 相同的包路径中，
+ * 这样我们就可以通过构造函数创建 FastKV 实例，在一个执行过程中测试加载。
+ * 而后续的打开文件只是进行读取（在两个实例中写入可能会损坏数据）。
+ * 注意：正常情况下使用 FastKV.Builder 创建实例。
  */
 @SuppressWarnings("SimplifiableJUnitAssertion")
 public class FastKVTest {
@@ -934,7 +934,7 @@ public class FastKVTest {
 
         FastEncoder<?>[] encoders = new FastEncoder[]{TestObjectEncoder.INSTANCE};
 
-        // not encrypted
+        // 未加密
         FastKV kv1 = new FastKV.Builder(TestHelper.DIR, name)
                 .encoder(encoders)
                 .build();
@@ -958,7 +958,7 @@ public class FastKVTest {
 
         kv1.close();
 
-        // encrypt
+        // 加密
         FastKV kv2 = new FastKV.Builder(TestHelper.DIR, name)
                 .cipher(TestHelper.cipher)
                 .encoder(encoders)

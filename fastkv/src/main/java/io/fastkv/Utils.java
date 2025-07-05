@@ -23,7 +23,7 @@ class Utils {
 
 
     /**
-     * Like UUID.randomUUID().toString(), but without '-'.
+     * 类似 UUID.randomUUID().toString()，但不包含 '-'。
      */
     static String randomName() {
         int len = NAME_SIZE >> 1;

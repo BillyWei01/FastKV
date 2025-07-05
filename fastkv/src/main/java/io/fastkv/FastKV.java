@@ -29,20 +29,19 @@ import io.fastkv.Container.*;
 import io.fastkv.interfaces.*;
 
 /**
- * FastKV has three writing mode: <br>
- * non-blocking: write partial data with mmap). <br>
- * async-block: write all data to disk with blocking I/O asynchronously, likes 'apply' of  SharePreferences.<br>
- * sync-block: write all data too, but it likes 'commit' of  SharePreferences.<br>
+ * FastKV 有三种写入模式: <br>
+ * non-blocking: 通过 mmap 写入部分数据。<br>
+ * async-block: 异步使用阻塞 I/O 将所有数据写入磁盘，类似 SharePreferences 的 'apply'。<br>
+ * sync-block: 同样写入所有数据，但类似 SharePreferences 的 'commit'。<br>
  * <br>
- * Note: <br>
- * 1. Do not change file name once create. <br>
- * 2. Do not change cipher once create.
- *    But it's okay to apply cipher from the state of no cipher.<br>
- * 3. Do not change value type for one key.<br>
+ * 注意: <br>
+ * 1. 一旦创建后不要更改文件名。<br>
+ * 2. 一旦创建后不要更改加密器。
+ *    但从无加密状态应用加密器是可以的。<br>
+ * 3. 不要为同一个 key 更改值类型。<br>
  */
 @SuppressWarnings("rawtypes")
 public final class FastKV implements SharedPreferences, SharedPreferences.Editor {
-    // Constants from AbsFastKV
     private static final String BOTH_FILES_ERROR = "both files error";
     private static final String PARSE_DATA_FAILED = "parse dara failed";
     private static final String OPEN_FILE_FAILED = "open file failed";
@@ -71,7 +70,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     private static final int BASE_GC_BYTES_THRESHOLD = 8192;
     private static final int BASE_GC_KEYS_THRESHOLD = 80;
 
-    // Fields from AbsFastKV
     private final String path;
     private final String name;
     private final Map<String, FastEncoder> encoderMap;
@@ -89,8 +87,8 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     private final List<String> deletedFiles = new ArrayList<>();
 
-    // If the kv had not encrypted before, and need to encrypt this time,
-    // It has to rewrite the data.
+    // 如果 kv 之前没有加密，而这次需要加密，
+    // 则必须重写数据。
     private boolean needRewrite = false;
 
     private boolean closed = false;
@@ -105,7 +103,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     private final ArrayList<SharedPreferences.OnSharedPreferenceChangeListener> listeners = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    // Original FastKV fields
+    // 原始 FastKV 字段
     private FileChannel aChannel;
     private FileChannel bChannel;
     private MappedByteBuffer aBuffer;
@@ -113,15 +111,15 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
     private int removeStart;
 
-    // The default writing mode is non-blocking (write partial data with mmap).
-    // If mmap API throw IOException, degrade to blocking mode (write all data to disk with blocking I/O).
-    // User could assign to using blocking mode by FastKV.Builder
+    // 默认写入模式是非阻塞的（通过 mmap 写入部分数据）。
+    // 如果 mmap API 抛出 IOException，则降级为阻塞模式（使用阻塞 I/O 将所有数据写入磁盘）。
+    // 用户可以通过 FastKV.Builder 指定使用阻塞模式
     static final int NON_BLOCKING = 0;
     static final int ASYNC_BLOCKING = 1;
     static final int SYNC_BLOCKING = 2;
     private int writingMode;
 
-    // Only take effect when mode is not NON_BLOCKING
+    // 仅在模式不是 NON_BLOCKING 时生效
     boolean autoCommit = true;
 
     FastKV(final String path,
@@ -153,7 +151,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             FastKVConfig.getExecutor().execute(this::loadData);
             while (!startLoading) {
                 try {
-                    // wait util loadData() get the object lock
+                    // 等待直到 loadData() 获得对象锁
                     data.wait();
                 } catch (InterruptedException ignore) {
                 }
@@ -162,7 +160,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private synchronized void loadData() {
-        // Once obtained the object lock, notify the waiter to continue the constructor
+        // 一旦获得对象锁，通知等待者继续构造函数
         synchronized (data) {
             startLoading = true;
             data.notify();
@@ -187,7 +185,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
-    // Utility methods from AbsFastKV
     private int packSize(int size) {
         return cipher == null ? size : size | CIPHER_MASK;
     }
@@ -215,15 +212,15 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * Rewrite data, from non-encrypt to encrypted.
+     * 重写数据：从未加密到加密。
      */
     private void rewrite() {
         FastEncoder[] encoders = new FastEncoder[encoderMap.size()];
         encoders = encoderMap.values().toArray(encoders);
         String tempName = "temp_" + name;
 
-        // Here we use FastKV with blocking mode and close 'autoCommit',
-        // to make data only keep on memory.
+        // 这里我们使用阻塞模式的 FastKV 并关闭 'autoCommit'，
+        // 使数据只保留在内存中。
         FastKV tempKV = new FastKV(path, tempName, encoders, cipher, SYNC_BLOCKING);
         tempKV.autoCommit = false;
 
@@ -279,13 +276,13 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             }
         }
 
-        // 'loadData()' of FastKV is a method execute in async thread, and it's a synchronized method.
-        //  To ensure tempKV loading finish,
-        //  calling another synchronized method to block current process (if loading not finish).
+        // FastKV 的 'loadData()' 是在异步线程中执行的同步方法。
+        // 为了确保 tempKV 加载完成，
+        // 调用另一个同步方法来阻塞当前进程（如果加载未完成）。
         //noinspection ResultOfMethodCallIgnored
         tempKV.contains("");
 
-        // Copy memory data
+        // 复制内存数据
         fastBuffer = tempKV.fastBuffer;
         checksum = tempKV.checksum;
         dataEnd = tempKV.dataEnd;
@@ -295,7 +292,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
         copyToMainFile(tempKV);
 
-        // Move external files
+        // 移动外部文件
         File tempDir = new File(path, tempName);
         String currentDir = path + name;
         Utils.moveDirFiles(tempDir, currentDir);
@@ -458,8 +455,8 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
                     deleteCFiles();
                 }
             } else {
-                // Handle the case:
-                // User opening with non-blocking mode at first, and change to blocking mode in later.
+                // 处理以下情况：
+                // 用户首先以非阻塞模式打开，然后在后续更改为阻塞模式。
                 if (writingMode != NON_BLOCKING) {
                     File aFile = new File(path, name + A_SUFFIX);
                     File bFile = new File(path, name + B_SUFFIX);
@@ -587,11 +584,11 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * Batch put objects.
-     * Only support type in [boolean, int, long, float, double, String, byte[], Set of String] and object with encoder.
+     * 批量放置对象。
+     * 仅支持 [boolean, int, long, float, double, String, byte[], Set of String] 类型和带编码器的对象。
      *
-     * @param values   map of key to value
-     * @param encoders map of value Class to Encoder
+     * @param values   键值映射
+     * @param encoders 值类型到编码器的映射
      */
     public synchronized void putAll(Map<String, Object> values, Map<Class, FastEncoder> encoders) {
         if (closed) return;
@@ -653,9 +650,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * Forces any changes to be written to the storage device containing the mapped file.
-     * No need to call this unless what's had written is very import.
-     * The system crash or power off before data syncing to disk might make recently update lost.
+     * 强制将任何更改写入包含映射文件的存储设备。
+     * 除非写入的内容非常重要，否则无需调用此方法。
+     * 在数据同步到磁盘之前系统崩溃或断电可能导致最近的更新丢失。
      */
     public synchronized void force() {
         if (closed) return;
@@ -666,10 +663,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * When you open file with mode of SYNC_BLOCKING or ASYNC_BLOCKING,
-     * It will auto commit after every putting or removing, by default.
-     * If you need to batch update several key-values, you could call this method at first,
-     * and call {@link #commit()} after updating, that method will recover {@link #autoCommit} to 'true' again.
+     * 当您使用 SYNC_BLOCKING 或 ASYNC_BLOCKING 模式打开文件时，
+     * 默认情况下会在每次放置或移除后自动提交。
+     * 如果您需要批量更新多个键值，可以先调用此方法，
+     * 然后在更新后调用 {@link #commit()}，该方法将再次将 {@link #autoCommit} 恢复为 'true'。
      */
     public synchronized void disableAutoCommit() {
         this.autoCommit = false;
@@ -784,18 +781,18 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         checksum ^= fastBuffer.getChecksum(updateStart, updateSize);
         int packedSize = packSize(dataEnd - DATA_START);
         if (writingMode == NON_BLOCKING) {
-            // When size of changed data is more than 8 bytes,
-            // checksum might fail to check the integrity in small probability.
-            // So we make the dataLen to be negative,
-            // if crash happen when writing data to mmap memory,
-            // we can know that the writing had not accomplished.
+        // 当更改数据的大小超过 8 字节时，
+        // 校验和可能在小概率下无法检查完整性。
+        // 所以我们将 dataLen 设置为负数，
+        // 如果在向 mmap 内存写入数据时发生崩溃，
+        // 我们可以知道写入没有完成。
             aBuffer.putInt(0, -1);
             syncToABBuffer(aBuffer);
             aBuffer.putInt(0, packedSize);
 
-            // bBuffer doesn't need to mark dataLen's part before writing bytes,
-            // cause aBuffer has already written completely.
-            // We just need to have one file to be integrated at least at any time.
+            // bBuffer 不需要在写入字节之前标记 dataLen 部分，
+            // 因为 aBuffer 已经完全写入了。
+            // 我们只需要在任何时候至少有一个文件是完整的。
             bBuffer.putInt(0, packedSize);
             syncToABBuffer(bBuffer);
         } else {
@@ -956,7 +953,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void truncate(int expectedEnd) {
-        // reserve at least one page space
+        // 至少保留一页空间
         int newCapacity = getNewCapacity(PAGE_SIZE, expectedEnd + PAGE_SIZE);
         if (newCapacity >= fastBuffer.hb.length) {
             return;
@@ -1172,7 +1169,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * Merge invalids to speed up compacting bytes.
+     * 合并无效段以加速GC。
      */
     static void mergeInvalids(ArrayList<Segment> invalids) {
         Collections.sort(invalids);
@@ -1210,7 +1207,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         if (!fullChecksum) {
             checksum ^= fastBuffer.getChecksum(gcStart, gcSize);
         }
-        // compact and record shift
+        // 压缩并记录偏移
         int n = invalids.size();
         final int remain = dataEnd - invalids.get(n - 1).end;
         int shiftCount = (remain > 0) ? n : n - 1;
@@ -1348,7 +1345,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         return (checkSum << shift) | (checkSum >>> (64 - shift));
     }
 
-    // SharedPreferences interface methods
+    // SharedPreferences 接口方法
     public synchronized boolean contains(String key) {
         return data.containsKey(key);
     }
@@ -1621,7 +1618,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         listeners.remove(listener);
     }
 
-    // Put methods
+    // Put 方法
     public synchronized Editor putBoolean(String key, boolean value) {
         if (closed) return this;
         checkKey(key);
@@ -1809,11 +1806,11 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * @param key     The name of the data to modify
-     * @param value   The new value
-     * @param encoder The encoder to encode value to byte[], encoder must register in  Builder.encoder(),
-     *                for decoding byte[] to object in next loading.
-     * @param <T>     Type of value
+     * @param key     要修改的数据名称
+     * @param value   新值
+     * @param encoder 将值编码为 byte[] 的编码器，编码器必须在 Builder.encoder() 中注册，
+     *                用于在下次加载时将 byte[] 解码为对象。
+     * @param <T>     值的类型
      */
     public synchronized <T> void putObject(String key, T value, FastEncoder<T> encoder) {
         if (closed) return;
@@ -1851,7 +1848,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
         ObjectContainer c = (ObjectContainer) container;
 
-        // assemble object bytes
+        // 组装对象字节
         int tagSize = FastBuffer.getStringSize(tag);
         FastBuffer buffer = new FastBuffer(1 + tagSize + objBytes.length);
         buffer.put((byte) tagSize);
@@ -1875,7 +1872,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         return this;
     }
 
-    // Helper methods for put operations
+    // Put 操作的辅助方法
     private void preparePutBytes() {
         ensureSize(updateSize);
         updateStart = dataEnd;
@@ -1977,8 +1974,8 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * Return offset when saving success;
-     * Return 0 when saving failed.
+     * 保存成功时返回偏移量；
+     * 保存失败时返回 0。
      */
     private int saveArray(String key, byte[] value, byte type) {
         return wrapArray(key, value, type);
@@ -2005,9 +2002,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * Close the kv instance. <br>
-     * If the kv closed, it will not accept any updates.<br>
-     * If the kv is cached, don't forget to remove it from cache once you call this method.
+     * 关闭 kv 实例。<br>
+     * 如果 kv 已关闭，它将不接受任何更新。<br>
+     * 如果 kv 被缓存，调用此方法后不要忘记将其从缓存中移除。
      */
     public synchronized void close() {
         if (closed) return;
@@ -2058,10 +2055,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
 
         /**
-         * Set obj Encoders
+         * 设置对象编码器
          *
-         * @param encoders The encoder array to decode the bytes to obj.
-         * @return the builder
+         * @param encoders 用于将字节解码为对象的编码器数组。
+         * @return 构建器
          */
         public Builder encoder(FastEncoder[] encoders) {
             this.encoders = encoders;
@@ -2069,7 +2066,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
 
         /**
-         * Set encryption cipher.
+         * 设置加密密码器。
          */
         public Builder cipher(FastCipher cipher) {
             this.cipher = cipher;
@@ -2077,18 +2074,18 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
 
         /**
-         * Assigned writing mode to SYNC_BLOCKING.
+         * 将写入模式设置为 SYNC_BLOCKING。
          * <p>
-         * In non-blocking mode (write data with mmap),
-         * it might lost update if the system crash or power off before flush data to disk.
-         * You could use {@link #force()} to avoid losing update, or use SYNC_BLOCKING mode.
+         * 在非阻塞模式下（使用 mmap 写入数据），
+         * 如果系统在将数据刷新到磁盘之前崩溃或断电，可能会丢失更新。
+         * 您可以使用 {@link #force()} 避免丢失更新，或使用 SYNC_BLOCKING 模式。
          * <p>
-         * In blocking mode, every update will write all data to the file, which is expensive cost.
+         * 在阻塞模式下，每次更新都会将所有数据写入文件，这是昂贵的成本。
          * <p>
-         * So it's recommended to use blocking mode only if the data is every important.
+         * 因此建议仅在数据非常重要时才使用阻塞模式。
          * <p>
          *
-         * @return the builder
+         * @return 构建器
          */
         public Builder blocking() {
             writingMode = SYNC_BLOCKING;
@@ -2096,9 +2093,9 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
 
         /**
-         * Similar to {@link #blocking()}, but put writing task to async thread.
+         * 类似于 {@link #blocking()}，但将写入任务放到异步线程。
          *
-         * @return the builder
+         * @return 构建器
          */
         public Builder asyncBlocking() {
             writingMode = ASYNC_BLOCKING;
@@ -2122,15 +2119,15 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * Adapt old SharePreferences,
-     * return a new SharedPreferences with storage strategy of FastKV.
+     * 适配旧的 SharePreferences，
+     * 返回一个使用 FastKV 存储策略的新 SharedPreferences。
      * <p>
-     * Node: The old SharePreferences must implement getAll() method,
-     * otherwise can not import old data to new files.
+     * 注意：旧的 SharePreferences 必须实现 getAll() 方法，
+     * 否则无法将旧数据导入新文件。
      *
-     * @param context       The context
-     * @param name          The name of SharePreferences
-     * @return The Wrapper of FastKV, which implement SharePreferences.
+     * @param context       上下文
+     * @param name          SharePreferences 的名称
+     * @return FastKV 的包装器，实现了 SharePreferences。
      */
     public static SharedPreferences adapt(Context context, String name) {
         String path = context.getFilesDir().getAbsolutePath() + "/fastkv";
