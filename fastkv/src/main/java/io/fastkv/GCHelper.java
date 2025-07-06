@@ -101,7 +101,8 @@ class GCHelper {
     
     /**
      * 执行垃圾回收 
-     * 
+     * 核心流程：合并无效段 -> 数据压缩 -> 偏移量更新 -> 校验和重算 -> 文件同步
+     *
      * @param kv FastKV实例
      * @param allocate 需要分配的空间大小
      */
@@ -160,6 +161,7 @@ class GCHelper {
 
     /**
      * 更新容器偏移量
+     * 使用二分查找确定每个容器的偏移量调整幅度
      */
     private static void updateOffset(FastKV kv, int gcStart, int[] srcArray, int[] shiftArray) {
         Collection<BaseContainer> values = kv.data.values();
@@ -177,16 +179,18 @@ class GCHelper {
 
     /**
      * 更新缓冲区
+     * 同步数据到A/B文件，根据需要截断缓冲区
      */
     private static void updateBuffer(FastKV kv, int gcStart, int allocate, int gcUpdateSize) {
         int newDataSize = kv.dataEnd - FastKV.DATA_START;
-        int packedSize = BufferHelper.packSize(newDataSize, kv.cipher != null);
+        int packedSize = FileHelper.packSize(newDataSize, kv.cipher != null);
         if (kv.writingMode == FastKV.NON_BLOCKING) {
             kv.aBuffer.putInt(0, -1);
             kv.aBuffer.putLong(4, kv.checksum);
             kv.aBuffer.position(gcStart);
             kv.aBuffer.put(kv.fastBuffer.hb, gcStart, gcUpdateSize);
             kv.aBuffer.putInt(0, packedSize);
+
             kv.bBuffer.putInt(0, packedSize);
             kv.bBuffer.putLong(4, kv.checksum);
             kv.bBuffer.position(gcStart);
@@ -204,6 +208,7 @@ class GCHelper {
 
     /**
      * 截断缓冲区
+     * 在GC后如果空闲空间过大则收缩缓冲区以节省内存
      */
     private static void truncate(FastKV kv, int expectedEnd) {
         // 至少保留一页空间
@@ -230,6 +235,7 @@ class GCHelper {
 
     /**
      * 确保缓冲区大小
+     * 空间不足时优先尝试GC，仍不足则扩容
      *
      * @param kv FastKV实例
      * @param allocate 需要分配的空间大小
@@ -250,7 +256,7 @@ class GCHelper {
                     MappedByteBuffer newBBuffer = FileHelper.remapBuffer(kv.bChannel, newCapacity);
                     if (newABuffer == null || newBBuffer == null) {
                         LoggerHelper.error(kv, new Exception(FileHelper.MAP_FAILED));
-                        int packedSize = BufferHelper.packSize(kv.dataEnd - FastKV.DATA_START, kv.cipher != null);
+                        int packedSize = FileHelper.packSize(kv.dataEnd - FastKV.DATA_START, kv.cipher != null);
                         kv.fastBuffer.putInt(0, packedSize);
                         kv.fastBuffer.putLong(4, kv.checksum);
                         FileHelper.toBlockingMode(kv);
@@ -265,6 +271,7 @@ class GCHelper {
 
     /**
      * 检查是否需要垃圾回收
+     * 基于双重阈值策略判断是否触发GC
      *
      * @param kv FastKV实例
      */

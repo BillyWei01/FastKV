@@ -5,7 +5,7 @@ import java.util.concurrent.*;
 import io.fastkv.interfaces.FastLogger;
 
 public final class FastKVConfig {
-    static FastLogger sLogger = new DefaultLogger();
+    static FastLogger sLogger = null;
     static volatile Executor sExecutor;
 
     private FastKVConfig() {

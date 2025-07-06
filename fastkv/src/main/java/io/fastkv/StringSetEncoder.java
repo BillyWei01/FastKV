@@ -7,6 +7,10 @@ import java.util.Set;
 
 import io.fastkv.interfaces.FastEncoder;
 
+/**
+ * 字符串集合编码器。
+ * 为了兼容 SharedPreferences 的 StringSet读写接口, 内置此编码器。
+ */
 class StringSetEncoder implements FastEncoder<Set<String>> {
     static final StringSetEncoder INSTANCE = new StringSetEncoder();
 

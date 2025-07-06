@@ -27,7 +27,7 @@ import io.fastkv.Container.*;
 /**
  * FastKV - 高性能键值存储库
  * 
- * <h2>架构组成（静态结构）</h2>
+ * <h2>架构组成</h2>
  * FastKV采用模块化设计，主要由以下组件构成：
  * <ul>
  * <li><b>FastKV核心类</b>：主要负责API接口、数据管理和业务逻辑协调</li>
@@ -46,7 +46,7 @@ import io.fastkv.Container.*;
  * <li><b>.tmp文件</b>：临时文件，用于原子性写入操作</li>
  * </ul>
  * 
- * <h2>运作模式（动态行为）</h2>
+ * <h2>运作模式</h2>
  * 
  * <h3>三种写入模式</h3>
  * <ul>
@@ -92,7 +92,6 @@ import io.fastkv.Container.*;
  * <ul>
  * <li>一旦创建后不要更改文件名</li>
  * <li>一旦创建后不要更改加密器（但从无加密状态应用加密器是可以的）</li>
- * <li>不要为同一个key更改值类型</li>
  * <li>当前版本已移除大值外部文件的写入功能，但保留读取逻辑以确保向前兼容</li>
  * </ul>
  */
@@ -104,31 +103,49 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     static final int[] TYPE_SIZE = {0, 1, 4, 4, 8, 8};
     static final int DATA_START = 12;
 
+    // 存储设备的页大小，通常为 4KB，但是最新的 Android 设备可能为 16KB。
     static final int PAGE_SIZE = Utils.getPageSize();
 
+    // 数据文件的路径和名称
     final String path;
     final String name;
+
+    // 编码器映射，包含所有支持的编码器
     final Map<String, FastEncoder> encoderMap;
+
+    // 加密器，如果为 null 则表示不加密
     final FastCipher cipher;
 
+    // 数据结束的位置
     int dataEnd;
+
+    // 数据校验和
     long checksum;
+
+    // 数据存储容器
     final HashMap<String, BaseContainer> data = new HashMap<>();
+
+    // 标记数据是否正在加载
     volatile boolean startLoading = false;
 
+    // 用于存储数据的缓冲区
     FastBuffer fastBuffer;
     int updateStart;
     int updateSize;
 
+    // 用于记录外部文件的名称（兼容旧版本FastKV）
     final List<String> deletedFiles = new ArrayList<>();
 
     // 如果之前没有加密，而这次打开需要加密，则需要重写数据。
     boolean needRewrite = false;
 
+    // 标记是否已经关闭
     boolean closed = false;
 
+    // 用于执行apply()方法的执行器
     private final Executor applyExecutor = new LimitExecutor();
 
+    // 用于记录无效数据段的起始位置和长度
     int invalidBytes;
     final ArrayList<Segment> invalids = new ArrayList<>();
 
@@ -141,7 +158,8 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     MappedByteBuffer aBuffer;
     MappedByteBuffer bBuffer;
 
-    int removeStart;
+    // 用于记录删除操作的起始位置
+    private int removeStart;
 
     // 默认写入模式是非阻塞的（通过 mmap 写入部分数据）。
     // 如果 mmap API 抛出 IOException，则降级为阻塞模式（使用阻塞 I/O 将所有数据写入磁盘）。
@@ -151,9 +169,8 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     static final int SYNC_BLOCKING = 2;
     int writingMode;
 
-    // 仅在模式不是 NON_BLOCKING 时生效
-    boolean autoCommit = true;
-
+    // 自动提交标记，仅在模式不是 NON_BLOCKING 时生效
+    private boolean autoCommit = true;
 
     FastKV(final String path,
            final String name,
@@ -182,7 +199,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
         synchronized (data) {
             FastKVConfig.getExecutor().execute(this::loadData);
-            while (!startLoading) {
+            if (!startLoading) {
                 try {
                     // 等待直到 loadData() 获得对象锁
                     data.wait();
@@ -192,6 +209,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
+    /**
+     * 数据加载流程
+     * 异步加载数据并通知构造函数继续
+     */
     private synchronized void loadData() {
         // 一旦获得对象锁，通知等待者继续构造函数
         synchronized (data) {
@@ -201,6 +222,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
 
         long start = System.nanoTime();
 
+        // 为了兼容先前用阻塞模式保存数据，然后此次用非阻塞模式打开的情况，先尝试加载 C 文件。
         if (!FileHelper.loadFromCFile(this) && writingMode == NON_BLOCKING) {
             FileHelper.loadFromABFile(this);
         }
@@ -215,12 +237,17 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             LoggerHelper.info(this, "rewrite data");
         }
 
-        long t = (System.nanoTime() - start) / 1000000;
-        LoggerHelper.info(this, "loading finish, data len:" + dataEnd + ", get keys:" + data.size() + ", use time:" + t + " ms");
+        if (FastKVConfig.sLogger != null) {
+            long t = (System.nanoTime() - start) / 1000000;
+            LoggerHelper.info(this, "loading finish"
+                    + ", data len:" + dataEnd
+                    + ", get keys:" + data.size()
+                    + ", use time:" + t + " ms");
+        }
     }
 
     private int packSize(int size) {
-        return BufferHelper.packSize(size, cipher != null);
+        return FileHelper.packSize(size, cipher != null);
     }
 
     // SharedPreferences 接口方法
@@ -859,6 +886,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
 
+    /**
+     * 准备数据写入
+     * 确保缓冲区空间并设置写入位置
+     */
     private void preparePutBytes() {
         GCHelper.ensureSize(this, updateSize);
         updateStart = dataEnd;
@@ -911,6 +942,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
+    /**
+     * 添加或更新可变长度数据
+     * 处理新增和更新两种情况
+     */
     private void addOrUpdate(String key, Object value, byte[] bytes, VarContainer c, byte type) {
         if (c == null) {
             addObject(key, value, bytes, type);
@@ -924,6 +959,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
+    /**
+     * 添加新的对象数据
+     * 创建新的容器并写入数据
+     */
     private void addObject(String key, Object value, byte[] bytes, byte type) {
         int offset = wrapArray(key, bytes, type);
         if (offset > 0) {
@@ -941,6 +980,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
+    /**
+     * 更新已存在的对象数据
+     * 处理容器重用和垃圾回收
+     */
     private void updateObject(String key, Object value, byte[] bytes, VarContainer c) {
         int offset = wrapArray(key, bytes, c.getType());
         if (offset > 0) {
@@ -960,8 +1003,8 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     /**
-     * 保存成功时返回偏移量；
-     * 保存失败时返回 0 (仅加密失败时会返回0）
+     * 包装可变长度数据
+     * 根据数据大小选择合适的编码格式
      */
     private int wrapArray(String key, byte[] value, byte type) {
         // 根据数据大小选择合适的类型和长度编码方式
@@ -1015,6 +1058,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
     }
 
+    /**
+     * 更新数据变更
+     * 计算校验和并同步到文件
+     */
     private void updateChange() {
         checksum ^= fastBuffer.getChecksum(updateStart, updateSize);
         int packedSize = packSize(dataEnd - DATA_START);
@@ -1039,6 +1086,10 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         updateSize = 0;
     }
 
+    /**
+     * 同步数据到A/B缓冲区
+     * 更新校验和和数据内容
+     */
     private void syncToABBuffer(MappedByteBuffer buffer) {
         buffer.putLong(4, checksum);
         if (removeStart != 0) {
@@ -1051,7 +1102,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void updateBoolean(byte value, int offset) {
-        checksum ^= BufferHelper.shiftCheckSum(1L, offset);
+        checksum ^= FileHelper.shiftCheckSum(1L, offset);
         if (writingMode == NON_BLOCKING) {
             aBuffer.putLong(4, checksum);
             aBuffer.put(offset, value);
@@ -1064,7 +1115,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void updateInt32(int value, long sum, int offset) {
-        checksum ^= BufferHelper.shiftCheckSum(sum, offset);
+        checksum ^= FileHelper.shiftCheckSum(sum, offset);
         if (writingMode == NON_BLOCKING) {
             aBuffer.putLong(4, checksum);
             aBuffer.putInt(offset, value);
@@ -1077,7 +1128,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
     }
 
     private void updateInt64(long value, long sum, int offset) {
-        checksum ^= BufferHelper.shiftCheckSum(sum, offset);
+        checksum ^= FileHelper.shiftCheckSum(sum, offset);
         if (writingMode == NON_BLOCKING) {
             aBuffer.putLong(4, checksum);
             aBuffer.putLong(offset, value);
@@ -1102,6 +1153,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
             aBuffer.position(offset);
             aBuffer.put(bytes);
             aBuffer.putInt(0, packSize(dataEnd - DATA_START));
+
             bBuffer.putLong(4, checksum);
             bBuffer.position(offset);
             bBuffer.put(bytes);
@@ -1235,7 +1287,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
      * 注意：旧的 SharePreferences 必须实现 getAll() 方法，
      * 否则无法将旧数据导入新文件。
      *
-     * @param context       上下文
+     * @param context       Context
      * @param name          SharePreferences 的名称
      * @return FastKV 的包装器，实现了 SharePreferences。
      */

@@ -19,20 +19,26 @@ import io.fastkv.interfaces.FastEncoder;
  * 文件I/O辅助类，使用扩展方法模式处理FastKV的文件操作。
  */
 class FileHelper {
-    static final String BOTH_FILES_ERROR = "both files error";
     private static final String OPEN_FILE_FAILED = "open file failed";
+    static final String BOTH_FILES_ERROR = "both files error";
     static final String MAP_FAILED = "map failed";
 
+    // 文件后缀名定义
     static final String A_SUFFIX = ".kva";
     static final String B_SUFFIX = ".kvb";
     static final String C_SUFFIX = ".kvc";
     static final String TEMP_SUFFIX = ".tmp";
 
-    private static final int DATA_SIZE_LIMIT = 1 << 28; // 256M
+    // 数据大小限制，256M
+    private static final int DATA_SIZE_LIMIT = 1 << 28;
+
+    // 加密标记掩码
+    private static final int CIPHER_MASK = 1 << 30;
 
     /**
-     * 加载A/B文件
-     * 
+     * 从A/B文件加载数据
+     * 核心流程：创建文件通道 -> 建立内存映射 -> 数据校验 -> 解析数据
+     *
      * @param kv FastKV实例
      */
     @SuppressWarnings("resource")
@@ -69,7 +75,7 @@ class FileHelper {
             if (aFileLen == 0 && bFileLen == 0) {
                 kv.dataEnd = FastKV.DATA_START;
             } else {
-                processExistingFiles(kv, aFileLen, bFileLen);
+                processFiles(kv, aFileLen, bFileLen);
             }
         } catch (Exception e) {
             LoggerHelper.error(kv, e);
@@ -79,17 +85,18 @@ class FileHelper {
     }
     
     /**
-     * 处理已存在的A/B文件数据
+     * 处理A/B文件数据
+     * 优先处理A文件，失败时尝试B文件恢复。
      */
-    private static void processExistingFiles(FastKV kv, long aFileLen, long bFileLen) {
+    private static void processFiles(FastKV kv, long aFileLen, long bFileLen) {
         int aSize = kv.aBuffer.getInt();
-        int aDataSize = BufferHelper.unpackSize(aSize);
-        boolean aHadEncrypted = BufferHelper.isCipher(aSize);
+        int aDataSize = unpackSize(aSize);
+        boolean aHadEncrypted = isCipher(aSize);
         long aCheckSum = kv.aBuffer.getLong();
 
         int bSize = kv.bBuffer.getInt();
-        int bDataSize = BufferHelper.unpackSize(bSize);
-        boolean bHadEncrypted = BufferHelper.isCipher(bSize);
+        int bDataSize = unpackSize(bSize);
+        boolean bHadEncrypted = isCipher(bSize);
         long bCheckSum = kv.bBuffer.getLong();
 
         boolean isAValid = false;
@@ -103,11 +110,13 @@ class FileHelper {
             }
         }
         if (isAValid) {
+            // 若A文件有效且B文件无效，则用A文件数据覆盖B文件
             if (aFileLen != bFileLen || !isABFileEqual(kv)) {
                 LoggerHelper.warning(kv, new Exception("B file error"));
                 copyBuffer(kv, kv.aBuffer, kv.bBuffer, kv.dataEnd);
             }
         } else {
+            // 若A文件无效，则尝试处理B文件
             processFileB(kv, bFileLen, bDataSize, bCheckSum, bHadEncrypted);
         }
     }
@@ -127,6 +136,7 @@ class FileHelper {
             kv.bBuffer.rewind();
             kv.bBuffer.get(kv.fastBuffer.hb, 0, kv.dataEnd);
             if (bCheckSum == kv.fastBuffer.getChecksum(FastKV.DATA_START, bDataSize) && DataParser.parseData(kv, bHadEncrypted)) {
+                // B文件数据有效，打印日志并复制到A文件
                 LoggerHelper.warning(kv, new Exception("A file error"));
                 copyBuffer(kv, kv.bBuffer, kv.aBuffer, kv.dataEnd);
                 kv.checksum = bCheckSum;
@@ -134,6 +144,7 @@ class FileHelper {
             }
         }
         if (!isBValid) {
+            // 若A/B文件都无效，记录错误并清理数据
             LoggerHelper.error(kv, BOTH_FILES_ERROR);
             clearData(kv);
         }
@@ -141,7 +152,8 @@ class FileHelper {
 
     /**
      * 写入数据到A/B文件
-     * 
+     * 创建新的内存映射文件并写入数据
+     *
      * @param kv FastKV实例
      * @param buffer 数据缓冲区
      * @return 是否成功
@@ -183,7 +195,8 @@ class FileHelper {
     }
     
     /**
-     * 检查A/B文件是否相等
+     * 检查A/B文件数据一致性
+     * 逐字节比较两个文件的内容
      */
     static boolean isABFileEqual(FastKV kv) {
         FastBuffer tempBuffer = new FastBuffer(kv.dataEnd);
@@ -200,8 +213,8 @@ class FileHelper {
     }
 
     /**
-     * 复制缓冲区数据
-     * 
+     * 复制 Buffer 数据
+     *
      * @param kv FastKV实例
      * @param src 源缓冲区
      * @param dest 目标缓冲区
@@ -231,7 +244,8 @@ class FileHelper {
     }
 
     /**
-     * 重新映射缓冲区到新的容量
+     * 重新映射缓冲区到新容量
+     * @return 成功时返回新的MappedByteBuffer, 失败时返回null
      */
     static MappedByteBuffer remapBuffer(FileChannel channel, int newCapacity) {
         try {
@@ -245,7 +259,8 @@ class FileHelper {
     
     /**
      * 写入数据到C文件
-     * 
+     * 使用临时文件确保原子性写入
+     *
      * @param kv FastKV实例
      * @return 是否成功
      */
@@ -286,9 +301,7 @@ class FileHelper {
     }
 
     /**
-     * 关闭文件
-     * 
-     * @param kv FastKV实例
+     * 关闭 FastKV 实例
      */
     static void close(FastKV kv) {
         if (kv.closed) return;
@@ -319,7 +332,7 @@ class FileHelper {
         if (channel != null) {
             try {
                 channel.force(true);
-            } catch (IOException e) {
+            } catch (IOException ignore) {
                 // 忽略异常
             }
         }
@@ -394,6 +407,7 @@ class FileHelper {
 
     /**
      * 使用阻塞I/O加载文件
+     * 直接文件读取，不使用内存映射
      */
     static boolean loadWithBlockingIO(FastKV kv, File srcFile) throws IOException {
         long fileLen = srcFile.length();
@@ -415,8 +429,8 @@ class FileHelper {
         if (size < 0) {
             return false;
         }
-        int dataSize = BufferHelper.unpackSize(size);
-        boolean hadEncrypted = BufferHelper.isCipher(size);
+        int dataSize = unpackSize(size);
+        boolean hadEncrypted = isCipher(size);
         long sum = buffer.getLong();
         kv.dataEnd = FastKV.DATA_START + dataSize;
         if (dataSize >= 0 && (dataSize <= fileSize - FastKV.DATA_START)
@@ -429,8 +443,9 @@ class FileHelper {
     }
 
     /**
-     * 从C文件加载数据（尝试）
-     * 
+     * 从C文件加载数据
+     * 优先级：C文件 > 临时文件 > A/B文件
+     *
      * @param kv FastKV实例
      * @return 是否成功写入到AB文件
      */
@@ -479,7 +494,8 @@ class FileHelper {
 
     /**
      * 重写数据：从未加密到加密
-     * 
+     * 创建临时FastKV实例进行数据迁移
+     *
      * @param kv FastKV实例
      */
     static void rewrite(FastKV kv) {
@@ -491,7 +507,7 @@ class FileHelper {
         // 这里我们使用阻塞模式的 FastKV 并关闭 'autoCommit'，
         // 使数据只保留在内存中。
         FastKV tempKV = new FastKV(kv.path, tempName, encoders, kv.cipher, FastKV.SYNC_BLOCKING);
-        tempKV.autoCommit = false;
+        tempKV.disableAutoCommit();
 
         List<String> oldExternalFiles = new ArrayList<>();
         for (Map.Entry<String, BaseContainer> entry : kv.data.entrySet()) {
@@ -575,7 +591,8 @@ class FileHelper {
 
     /**
      * 复制数据到主文件
-     * 
+     * 根据写入模式选择A/B文件或C文件
+     *
      * @param kv FastKV实例
      * @param tempKV 临时FastKV实例
      */
@@ -616,7 +633,7 @@ class FileHelper {
 
     /**
      * 从外部文件读取字符串
-     * 
+     *
      * @param kv FastKV实例
      * @param c 字符串容器
      * @param fastCipher 加密器
@@ -639,7 +656,7 @@ class FileHelper {
 
     /**
      * 从外部文件读取字节数组
-     * 
+     *
      * @param kv FastKV实例
      * @param c 数组容器
      * @param fastCipher 加密器
@@ -661,7 +678,7 @@ class FileHelper {
 
     /**
      * 从外部文件读取对象
-     * 
+     *
      * @param kv FastKV实例
      * @param c 对象容器
      * @param fastCipher 加密器
@@ -735,7 +752,7 @@ class FileHelper {
             }
             buffer = newBuffer;
         }
-        buffer.putInt(0, BufferHelper.packSize(0, kv.cipher != null));
+        buffer.putInt(0, packSize(0, kv.cipher != null));
         buffer.putLong(4, 0L);
     }
 
@@ -762,6 +779,51 @@ class FileHelper {
         } else {
             kv.fastBuffer.putLong(4, 0L);
         }
-        kv.fastBuffer.putInt(0, BufferHelper.packSize(0, kv.cipher != null));
+        kv.fastBuffer.putInt(0, packSize(0, kv.cipher != null));
+    }
+
+    /**
+     * 计算校验和的位移
+     *
+     * @param checkSum 原始校验和
+     * @param offset 偏移量
+     * @return 位移后的校验和
+     */
+    static long shiftCheckSum(long checkSum, int offset) {
+        int shift = (offset & 7) << 3;
+        return (checkSum << shift) | (checkSum >>> (64 - shift));
+    }
+
+    /**
+     * 设置大小中的加密标记
+     * 将size的第31位（对应1 << 30）设置为1表示需要加密
+     *
+     * @param size      原始大小值
+     * @param hasCipher 是否需要加密
+     * @return 带加密标记的大小值
+     */
+    static int packSize(int size, boolean hasCipher) {
+        return hasCipher ? size | CIPHER_MASK : size;
+    }
+
+    /**
+     * 清除大小中的加密标记
+     * 将size的第31位（对应1 << 30）清零，还原原始大小
+     *
+     * @param size 带加密标记的大小值
+     * @return 清除标记后的原始大小
+     */
+    static int unpackSize(int size) {
+        return size & (~CIPHER_MASK);
+    }
+
+    /**
+     * 检查是否加密
+     *
+     * @param size 打包的大小
+     * @return 是否加密
+     */
+    static boolean isCipher(int size) {
+        return (size & CIPHER_MASK) != 0;
     }
 }

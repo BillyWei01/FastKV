@@ -8,7 +8,6 @@ import io.fastkv.interfaces.FastEncoder;
  * 数据解析器，使用扩展方法模式处理FastKV的数据解析。
  */
 class DataParser {
-    
     private static final String PARSE_DATA_FAILED = "parse dara failed";
     private static final String MISS_CIPHER = "miss cipher";
     

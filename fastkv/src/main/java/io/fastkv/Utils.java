@@ -13,7 +13,6 @@ class Utils {
     static final int NAME_SIZE = 32;
     private static final int DEFAULT_PAGE_SIZE = 16 * 1024;
 
-
     @SuppressWarnings({"rawtypes", "unchecked", "ConstantConditions"})
     @SuppressLint("DiscouragedPrivateApi")
     static int getPageSize() {
