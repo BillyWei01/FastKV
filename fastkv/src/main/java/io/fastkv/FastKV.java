@@ -34,7 +34,6 @@ import io.fastkv.Container.*;
  * <li><b>FileHelper</b>：文件I/O操作模块，处理A/B/C文件的读写、重写、备份恢复等</li>
  * <li><b>DataParser</b>：数据解析模块，负责二进制数据的编码解码和容器创建</li>
  * <li><b>GCHelper</b>：垃圾回收模块，处理内存整理、缓冲区扩容和无效数据清理</li>
- * <li><b>BufferHelper</b>：缓冲区工具模块，提供数据打包、校验和计算等底层操作</li>
  * <li><b>LoggerHelper</b>：日志管理模块，统一处理各模块的日志输出</li>
  * <li><b>Container系列</b>：数据容器，包装不同类型的值并记录元数据</li>
  * </ul>
@@ -885,7 +884,6 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         return this;
     }
 
-
     /**
      * 准备数据写入
      * 确保缓冲区空间并设置写入位置
@@ -1220,7 +1218,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
          * 设置对象编码器
          *
          * @param encoders 用于将字节解码为对象的编码器数组。
-         * @return 构建器
+         * @return Builder对象
          */
         public Builder encoder(FastEncoder[] encoders) {
             this.encoders = encoders;
@@ -1228,7 +1226,7 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
 
         /**
-         * 设置加密密码器。
+         * 设置加密实现。
          */
         public Builder cipher(FastCipher cipher) {
             this.cipher = cipher;
@@ -1236,16 +1234,12 @@ public final class FastKV implements SharedPreferences, SharedPreferences.Editor
         }
 
         /**
-         * 将写入模式设置为 SYNC_BLOCKING。
-         * <p>
-         * 在非阻塞模式下（使用 mmap 写入数据），
-         * 如果系统在将数据刷新到磁盘之前崩溃或断电，可能会丢失更新。
-         * 可使用 {@link #force()} 避免丢失更新，或使用 SYNC_BLOCKING 模式。
-         * <p>
-         * 在阻塞模式下，每次更新都会将所有数据写入文件，这是昂贵的成本。
-         * <p>
-         * 因此建议仅在数据非常重要时才使用阻塞模式。
-         * <p>
+         * 将写入模式设置为 SYNC_BLOCKING。<p>
+         * 在 NON_BLOCKING 模式下（默认模式，使用 mmap 写入数据），
+         * 如果系统在将数据刷新到磁盘之前崩溃或断电，可能会丢失更新（仅丢失更新，不会丢失整个文件）。
+         * 如果需要取保数据写盘后，可使用 {@link #force()} 避免丢失更新，或使用 SYNC_BLOCKING 模式。<p>
+         * 在 SYNC_BLOCKING 模式下，每次更新都会将所有数据写入文件，相比而言会稍微耗时一些。
+         * 因此，建议在数据非常重要时才使用阻塞模式。
          *
          * @return 构建器
          */

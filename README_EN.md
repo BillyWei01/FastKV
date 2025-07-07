@@ -58,7 +58,7 @@ FastKV is an efficient and reliable key-value storage library written in Java, o
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.6.0'
+    implementation 'io.github.billywei01:fastkv:3.0.1'
 }
 ```
 
@@ -282,19 +282,6 @@ println("User: ${settings.userName}, Age: ${settings.userAge}")
 ## 4. Architecture Design
 
 FastKV adopts a modular design. For detailed architecture documentation, please refer to [ARCHITECTURE.md](ARCHITECTURE.md).
-
-### Core Modules
-- **FastKV**: Core API and business logic
-- **FileHelper**: File I/O and backup management
-- **DataParser**: Data parsing and serialization
-- **GCHelper**: Garbage collection and memory management
-- **BufferHelper**: Buffer operations and checksum calculation
-
-### Key Features
-- **Dual File Backup**: A/B files ensure data safety
-- **Garbage Collection**: Automatic cleanup of invalid data
-- **Multiple Writing Modes**: Adapt to different performance requirements
-- **Pluggable Encryption**: Support for custom encryption algorithms
 
 ## 5. Related Links
 

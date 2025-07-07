@@ -59,7 +59,7 @@ FastKV是用Java编写的高效可靠的key-value存储库，专为Android平台
 
 ```gradle
 dependencies {
-    implementation 'io.github.billywei01:fastkv:2.6.0'
+    implementation 'io.github.billywei01:fastkv:3.0.1'
 }
 ```
 
@@ -281,18 +281,6 @@ println("用户: ${settings.userName}, 年龄: ${settings.userAge}")
 
 FastKV采用模块化设计，详细的架构说明请参考[ARCHITECTURE.md](ARCHITECTURE.md)。
 
-### 核心模块
-- **FastKV**：核心API和业务逻辑
-- **FileHelper**：文件I/O和备份管理
-- **DataParser**：数据解析和序列化
-- **GCHelper**：垃圾回收和内存管理
-- **BufferHelper**：缓冲区操作和校验和计算
-
-### 关键特性
-- **双文件备份**：A/B文件确保数据安全
-- **智能垃圾回收**：自动清理无效数据
-- **多种写入模式**：适应不同性能需求
-- **可插拔加密**：支持自定义加密算法
 
 ## 5. 相关链接
 

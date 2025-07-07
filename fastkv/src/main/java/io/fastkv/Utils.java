@@ -5,7 +5,6 @@ import android.annotation.SuppressLint;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.fastkv.interfaces.FastLogger;
 
@@ -13,6 +12,9 @@ class Utils {
     static final int NAME_SIZE = 32;
     private static final int DEFAULT_PAGE_SIZE = 16 * 1024;
 
+    /**
+     * 获取当前系统的内存页大小
+     */
     @SuppressWarnings({"rawtypes", "unchecked", "ConstantConditions"})
     @SuppressLint("DiscouragedPrivateApi")
     static int getPageSize() {
@@ -64,34 +66,23 @@ class Utils {
         }
     }
 
-    static void saveBytes(File dstFile, byte[] bytes, AtomicBoolean canceled) {
-        File tmpFile = null;
+    static void saveBytes(File dstFile, byte[] bytes) {
         try {
             int len = bytes.length;
-            tmpFile = new File(dstFile.getParent(), dstFile.getName() + ".tmp");
+            File tmpFile = new File(dstFile.getParent(), dstFile.getName() + ".tmp");
             if (!makeFileIfNotExist(tmpFile)) {
                 logError(new Exception("create file failed"));
                 return;
             }
-            if (canceled != null && canceled.get()) {
-                return;
-            }
+
             try (RandomAccessFile accessFile = new RandomAccessFile(tmpFile, "rw")) {
                 accessFile.setLength(len);
                 accessFile.write(bytes, 0, len);
-                if (canceled != null && canceled.get()) {
-                    return;
-                }
                 accessFile.getFD().sync();
             }
             renameFile(tmpFile, dstFile);
         } catch (Exception e) {
             logError(new Exception("save bytes failed", e));
-        } finally {
-            if (canceled != null && canceled.get()) {
-                deleteFile(tmpFile);
-                deleteFile(dstFile);
-            }
         }
     }
 
@@ -153,7 +144,7 @@ class Utils {
             return;
         }
         if (!srcFile.renameTo(dstFile)) {
-            saveBytes(dstFile, getBytes(srcFile), null);
+            saveBytes(dstFile, getBytes(srcFile));
             deleteFile(srcFile);
         }
     }
