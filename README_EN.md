@@ -62,6 +62,17 @@ dependencies {
 }
 ```
 
+Note:
+In versions 2.x, FastKV supports multi-process storage; however, starting from version 3.x, multi-process support has been dropped.
+If multi-process storage is required, please use [MPFastKV](https://github.com/BillyWei01/FastKV/tree/mpfastkv).
+
+Import:
+```gradle
+dependencies {
+    implementation 'io.github.billywei01:fastkv:2.6.0'
+}
+```
+
 ### 2.2 Initialization
 ```kotlin
 // Optional: Set global configuration
@@ -219,28 +230,17 @@ kv.registerOnSharedPreferenceChangeListener(new SharedPreferences.OnSharedPrefer
 
 ### 2.10 Kotlin Delegate Properties
 
-```kotlin
-// Use delegate properties to simplify access
-class UserSettings(private val kv: FastKV) {
-    var userName: String by kv.string("user_name", "")
-    var userAge: Int by kv.int("user_age", 0)
-    var isVip: Boolean by kv.boolean("is_vip", false)
-}
-
-// Usage example
-val settings = UserSettings(kv)
-settings.userName = "John"
-settings.userAge = 25
-println("User: ${settings.userName}, Age: ${settings.userAge}")
-```
+Kotlin is fully compatible with Java, so you can use FastKV or SharedPreferences APIs directly in Kotlin.
+Additionally, Kotlin provides delegate properties as syntactic sugar to enhance key-value API usage.
+Refer to: [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt)
+For more details, see: [A Practical KV Storage Wrapper Solution](https://juejin.cn/post/7323449163420303370).
 
 ### 2.11 Important Notes
 
 1. **Path and Name Consistency**: Don't change path and name between versions, or different files will be opened
 2. **Cipher Consistency**: If using Cipher, don't change it, or data cannot be parsed (migrating from no encryption to encryption is supported)
 3. **Type Consistency**: Value types for the same key should remain consistent
-4. **Lifecycle Management**: Call close() method to release resources when no longer needed
-5. **Exception Handling**: Properly handle potential exceptions in critical paths
+
 
 ## 3. Performance Benchmark
 
@@ -281,16 +281,13 @@ println("User: ${settings.userName}, Age: ${settings.userAge}")
 
 ## 4. Architecture Design
 
-FastKV adopts a modular design. For detailed architecture documentation, please refer to [ARCHITECTURE.md](ARCHITECTURE.md).
+If you're interested in the implementation of FastKV, you can refer to [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 5. Related Links
 
 - **Technical Blog**: https://juejin.cn/post/7018522454171582500
 - **Pure Java Version**: https://github.com/BillyWei01/FastKV-Java
 - **Serialization Framework**: https://github.com/BillyWei01/Packable
-- **Sample Code**: [FastKV Demo](app/src/main/java/io/fastkv/fastkvdemo/)
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.
-
-

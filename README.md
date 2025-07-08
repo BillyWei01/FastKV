@@ -63,6 +63,16 @@ dependencies {
 }
 ```
 
+备注：
+在2.x版本，FastKV支持多进程存储，但3.x版本开始不再支持多进程。
+如需多进程存储，请使用[MPFastKV](https://github.com/BillyWei01/FastKV/tree/mpfastkv）
+导入：
+```gradle
+dependencies {
+    implementation 'io.github.billywei01:fastkv:2.6.0'
+}
+```
+
 ### 2.2 初始化
 ```kotlin
 // 可选：设置全局配置
@@ -97,7 +107,7 @@ kv.putString("user_name", "张三")
   .putFloat("user_score", 89.5f);
 ```
 
-### 2.4 高级配置
+### 2.4 可选配置
 
 ```java
 FastKV kv = new FastKV.Builder(context, "secure_data")
@@ -220,20 +230,10 @@ kv.registerOnSharedPreferenceChangeListener(new SharedPreferences.OnSharedPrefer
 
 ### 2.10 Kotlin委托属性
 
-```kotlin
-// 使用委托属性简化访问
-class UserSettings(private val kv: FastKV) {
-    var userName: String by kv.string("user_name", "")
-    var userAge: Int by kv.int("user_age", 0)
-    var isVip: Boolean by kv.boolean("is_vip", false)
-}
-
-// 使用示例
-val settings = UserSettings(kv)
-settings.userName = "张三"
-settings.userAge = 25
-println("用户: ${settings.userName}, 年龄: ${settings.userAge}")
-```
+Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。
+此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。
+可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt)
+具体细节可参考: [一种好用的KV存储封装方案](https://juejin.cn/post/7323449163420303370)
 
 ### 2.11 注意事项
 
@@ -279,15 +279,13 @@ println("用户: ${settings.userName}, 年龄: ${settings.userAge}")
 
 ## 4. 架构设计
 
-FastKV采用模块化设计，详细的架构说明请参考[ARCHITECTURE.md](ARCHITECTURE.md)。
-
+如果对 FastKV 的实现原理感兴趣，可参考[ARCHITECTURE.md](ARCHITECTURE.md)。
 
 ## 5. 相关链接
 
 - **技术博客**：https://juejin.cn/post/7018522454171582500
 - **纯Java版本**：https://github.com/BillyWei01/FastKV-Java
 - **序列化框架**：https://github.com/BillyWei01/Packable
-- **示例代码**：[FastKV Demo](app/src/main/java/io/fastkv/fastkvdemo/)
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations.
