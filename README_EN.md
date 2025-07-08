@@ -66,13 +66,6 @@ Note: <br>
 In versions 2.x, FastKV supports multi-process storage; however, starting from version 3.x, multi-process support has been dropped. <br>
 If multi-process storage is required, please use [MPFastKV](https://github.com/BillyWei01/FastKV/tree/mpfastkv). <br>
 
-Import:
-```gradle
-dependencies {
-    implementation 'io.github.billywei01:fastkv:2.6.0'
-}
-```
-
 ### 2.2 Initialization
 ```kotlin
 // Optional: Set global configuration

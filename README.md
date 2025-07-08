@@ -67,13 +67,6 @@ dependencies {
 在2.x版本，FastKV支持多进程存储，但3.x版本开始不再支持多进程。<br>
 如需多进程存储，请使用[MPFastKV](https://github.com/BillyWei01/FastKV/tree/mpfastkv) <br>
 
-导入：
-```gradle
-dependencies {
-    implementation 'io.github.billywei01:fastkv:2.6.0'
-}
-```
-
 ### 2.2 初始化
 ```kotlin
 // 可选：设置全局配置
