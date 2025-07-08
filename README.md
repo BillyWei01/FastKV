@@ -63,9 +63,10 @@ dependencies {
 }
 ```
 
-备注：
-在2.x版本，FastKV支持多进程存储，但3.x版本开始不再支持多进程。
-如需多进程存储，请使用[MPFastKV](https://github.com/BillyWei01/FastKV/tree/mpfastkv）
+备注：<br>
+在2.x版本，FastKV支持多进程存储，但3.x版本开始不再支持多进程。<br>
+如需多进程存储，请使用[MPFastKV](https://github.com/BillyWei01/FastKV/tree/mpfastkv) <br>
+
 导入：
 ```gradle
 dependencies {
@@ -230,9 +231,9 @@ kv.registerOnSharedPreferenceChangeListener(new SharedPreferences.OnSharedPrefer
 
 ### 2.10 Kotlin委托属性
 
-Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。
-此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。
-可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt)
+Kotlin是兼容Java的，所以Kotlin下也可以直接用FastKV或者SharedPreferences的API。<br>
+此外，Kotlin还提供了“委托属性”这一语法糖，可以用于改进key-value API访问。<br>
+可参考：[KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt) <br>
 具体细节可参考: [一种好用的KV存储封装方案](https://juejin.cn/post/7323449163420303370)
 
 ### 2.11 注意事项

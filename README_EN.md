@@ -62,9 +62,9 @@ dependencies {
 }
 ```
 
-Note:
-In versions 2.x, FastKV supports multi-process storage; however, starting from version 3.x, multi-process support has been dropped.
-If multi-process storage is required, please use [MPFastKV](https://github.com/BillyWei01/FastKV/tree/mpfastkv).
+Note: <br>
+In versions 2.x, FastKV supports multi-process storage; however, starting from version 3.x, multi-process support has been dropped. <br>
+If multi-process storage is required, please use [MPFastKV](https://github.com/BillyWei01/FastKV/tree/mpfastkv). <br>
 
 Import:
 ```gradle
@@ -230,9 +230,9 @@ kv.registerOnSharedPreferenceChangeListener(new SharedPreferences.OnSharedPrefer
 
 ### 2.10 Kotlin Delegate Properties
 
-Kotlin is fully compatible with Java, so you can use FastKV or SharedPreferences APIs directly in Kotlin.
-Additionally, Kotlin provides delegate properties as syntactic sugar to enhance key-value API usage.
-Refer to: [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt)
+Kotlin is fully compatible with Java, so you can use FastKV or SharedPreferences APIs directly in Kotlin. <br>
+Additionally, Kotlin provides delegate properties as syntactic sugar to enhance key-value API usage. <br>
+Refer to: [KVData](https://github.com/BillyWei01/FastKV/blob/main/app/src/main/java/io/fastkv/fastkvdemo/fastkv/kvdelegate/KVData.kt) <br>
 For more details, see: [A Practical KV Storage Wrapper Solution](https://juejin.cn/post/7323449163420303370).
 
 ### 2.11 Important Notes
