@@ -243,7 +243,7 @@ object Benchmark {
             .append(" SQLite:").append(time[i++] / MILLION).append(" ms, ")
             .append(" Sp-apply:").append(time[i++] / MILLION).append(" ms, ")
         if (!is16KPageSize) {
-            builder.append(" MMKV:").append(time[5] / MILLION).append(" ms, ")
+            builder.append(" MMKV:").append(time[i++] / MILLION).append(" ms, ")
         }
         builder.append(" FastKV:").append(time[i] / MILLION).append(" ms")
         return builder.toString()
